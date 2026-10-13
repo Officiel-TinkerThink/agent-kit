@@ -1,4 +1,4 @@
-"""Every hook and skill must start PowerShell through run-ps.sh (works on Windows and Ubuntu). Run: python test_launcher.py"""
+"""Every hook and skill must start through the OS-neutral run.sh (PowerShell on Windows, POSIX sh on Linux; no extension in any command). Run: python test_launcher.py"""
 import json
 import os
 import pathlib
@@ -22,42 +22,48 @@ def check(name, ok, extra=''):
 def main():
     check('sh is available to run the launcher', SH, 'no sh on PATH')
     for p in PLUGINS:
-        launcher = p / 'scripts' / 'run-ps.sh'
-        check(f'{p.name}: run-ps.sh exists', launcher.is_file())
+        launcher = p / 'scripts' / 'run.sh'
+        check(f'{p.name}: run.sh exists', launcher.is_file())
         if launcher.is_file():
             raw = launcher.read_bytes()
-            check(f'{p.name}: run-ps.sh uses LF line endings', b'\r' not in raw)
+            check(f'{p.name}: run.sh uses LF line endings', b'\r' not in raw)
         hooks = p / 'hooks' / 'hooks.json'
         if not hooks.is_file():
             continue
         data = json.loads(hooks.read_text(encoding='utf-8'))
         cmds = [h['command'] for evt in data['hooks'].values() for grp in evt for h in grp['hooks']]
-        check(f'{p.name}: hooks go through run-ps.sh', cmds and all('scripts/run-ps.sh' in c and 'powershell.exe' not in c for c in cmds), str(cmds))
-        # every script a hook names must exist next to the launcher
+        check(f'{p.name}: hooks go through run.sh', cmds and all('scripts/run.sh' in c and 'powershell.exe' not in c for c in cmds), str(cmds))
+        # every script a hook names (no extension) must exist as a PowerShell and as a shell version, and lib.sh must be identical everywhere
         for c in cmds:
-            m = re.findall(r'scripts/([A-Za-z0-9_.-]+\.ps1)', c)
-            check(f'{p.name}: hook script exists {m}', m and (p / 'scripts' / m[-1]).is_file(), c)
+            m = re.findall(r'scripts/([A-Za-z0-9_-]+)(?:\\"|"|$)', c.replace('\\"', '"'))
+            name = m[-1] if m else ''
+            check(f'{p.name}: hook script {name} has .ps1 and .sh', name and name != 'run' and (p / 'scripts' / (name + '.ps1')).is_file() and (p / 'scripts' / (name + '.sh')).is_file(), c)
+            check(f'{p.name}: hook command for {name} has no shell-language extension', '.ps1' not in c and '.sh"' not in c.replace('run.sh', ''), c)
     for skill in sorted((ROOT / 'plugins').glob('*/skills/*/SKILL.md')):
         t = skill.read_text(encoding='utf-8')
-        check(f'{skill.parent.name}: skill commands go through run-ps.sh', 'powershell.exe' not in t and 'scripts/run-ps.sh' in t)
+        check(f'{skill.parent.name}: skill commands go through run.sh', 'powershell' not in t.lower() and '.ps1' not in t and 'scripts/run.sh' in t)
+
+    libs = {p.name: (p / 'scripts' / 'lib.sh').read_bytes() for p in PLUGINS if (p / 'scripts' / 'lib.sh').is_file()}
+    check('lib.sh is identical in all four plugins', len(libs) == len(PLUGINS) and len(set(libs.values())) == 1, str(sorted(libs)))
+    check('lib.sh uses LF line endings', all(b'\r' not in v for v in libs.values()))
 
     if not SH:
         return
     guards = ROOT / 'plugins' / 'haiku-delegation' / 'scripts'
     # the launcher runs a script, passes stdin and arguments through, and returns its exit code
     with tempfile.TemporaryDirectory() as td:
-        ps1 = pathlib.Path(td) / 'echo.ps1'
-        ps1.write_text('param([string]$A)\n$in = [Console]::In.ReadToEnd()\nWrite-Output ("A=" + $A + " IN=" + $in.Trim())\nexit 7\n', encoding='utf-8')
-        p = subprocess.run([SH, str(guards / 'run-ps.sh'), str(ps1), '-A', 'hello'], input='piped', capture_output=True, text=True, timeout=120)
+        ps_src = 'param([string]$A)\n$in = [Console]::In.ReadToEnd()\nWrite-Output ("A=" + $A + " IN=" + $in.Trim())\nexit 7\n'
+        sh_src = 'while [ $# -gt 0 ]; do case "$1" in -A) a="$2"; shift 2;; *) shift;; esac; done\nin=$(cat)\nprintf "A=%s IN=%s\\n" "$a" "$in"\nexit 7\n'
+        (pathlib.Path(td) / 'echo.ps1').write_text(ps_src, encoding='utf-8')
+        (pathlib.Path(td) / 'echo.sh').write_text(sh_src, encoding='utf-8', newline='\n')
+        ps1 = pathlib.Path(td) / 'echo'
+        p = subprocess.run([SH, str(guards / 'run.sh'), str(ps1), '-A', 'hello'], input='piped', capture_output=True, text=True, timeout=120)
         check('launcher passes args and stdin through', 'A=hello IN=piped' in p.stdout, p.stdout + p.stderr)
         check('launcher returns the script exit code', p.returncode == 7, str(p.returncode))
-        # no PowerShell on PATH: clear message, exit 2 (blocks a guard rather than silently skipping it)
-        empty = pathlib.Path(td) / 'empty'
-        empty.mkdir()
-        p = subprocess.run([SH, str(guards / 'run-ps.sh'), str(ps1)], capture_output=True, text=True, timeout=60, env=dict(os.environ, PATH=str(empty)))
-        check('missing PowerShell: exit 2', p.returncode == 2, str(p.returncode))
-        check('missing PowerShell: says how to install pwsh', 'PowerShell 7' in p.stderr and 'pwsh' in p.stderr, p.stderr)
-        p = subprocess.run([SH, str(guards / 'run-ps.sh')], capture_output=True, text=True, timeout=60)
+        # a script with no shell version: clear message, exit 2 (a guard that cannot run blocks instead of being skipped)
+        p = subprocess.run([SH, str(guards / 'run.sh'), str(pathlib.Path(td) / 'nothere')], capture_output=True, text=True, timeout=60)
+        check('missing script version: exit 2', p.returncode == 2, str(p.returncode))
+        p = subprocess.run([SH, str(guards / 'run.sh')], capture_output=True, text=True, timeout=60)
         check('no script argument: exit 2', p.returncode == 2, str(p.returncode))
     print(f'\n{sum(results)}/{len(results)} passed')
     sys.exit(0 if all(results) else 1)

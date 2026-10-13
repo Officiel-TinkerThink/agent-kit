@@ -1,0 +1,13 @@
+#!/bin/sh
+# TEST-ONLY shim, installed as 'pwsh' in the Linux test image so the existing tests (which call
+# `<powershell> -NoProfile [-ExecutionPolicy X] -File x.ps1 args`) exercise the native sh scripts:
+# it maps `-File x.ps1 args` to `sh x.sh args`. There is no PowerShell in the image.
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -NoProfile) shift ;;
+    -ExecutionPolicy) shift 2 ;;
+    -File) f="$2"; shift 2; break ;;
+    *) break ;;
+  esac
+done
+exec sh "${f%.ps1}.sh" "$@"

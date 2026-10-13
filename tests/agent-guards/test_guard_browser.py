@@ -152,9 +152,13 @@ def main():
     cached.mkdir(parents=True)
     copy = cached / HOOK.name
     copy.write_bytes(HOOK.read_bytes())
+    for sib in (HOOK.with_suffix('.sh'), HOOK.parent / 'lib.sh'):   # the shell version (Linux) and its helper travel with the script
+        if sib.exists():
+            (cached / sib.name).write_bytes(sib.read_bytes())
     home = tempfile.mkdtemp(prefix='home-')
     env2 = {k: v for k, v in os.environ.items() if k not in ('AGENT_KIT_DATA', 'CLAUDE_CONFIG_DIR')}
     env2['USERPROFILE'] = home
+    env2['HOME'] = home
     subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(copy)], input=op_click, capture_output=True, text=True, env=env2)
     report('KIT_DATA derived from plugin cache path (no env)', (cfg / 'agent-kit' / 'audit' / 'browser-actions.jsonl').exists())
     report('KIT_DATA derivation did not touch USERPROFILE\\.claude', not pathlib.Path(home, '.claude').exists())

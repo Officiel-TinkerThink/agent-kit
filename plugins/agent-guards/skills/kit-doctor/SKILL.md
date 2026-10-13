@@ -1,11 +1,11 @@
 ---
 description: Check that the agent-kit data folder, policy files, hooks and installed versions are healthy; use when a hook or subagent misbehaves, after an update, or when audit or usage records seem missing.
 argument-hint: ""
-allowed-tools: Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh ${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor.ps1)
+allowed-tools: Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh ${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor)
 ---
 
 Run:
-`sh ${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh ${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor.ps1`
+`sh ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh ${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor`
 
 It is read-only apart from a probe file per folder that it removes again. Report the result as a short table: each `[FAIL]` and `[WARN]` with what it means and the one action that fixes it; summarise the `[OK]` lines in one sentence.
 

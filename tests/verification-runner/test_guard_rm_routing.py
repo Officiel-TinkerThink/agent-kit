@@ -145,7 +145,8 @@ try:
 except Exception as e:
     j = hs = ui = new = None
 check("rewrite: valid hook JSON with allow + updatedInput", hs is not None and hs["permissionDecision"] == "allow" and hs["hookEventName"] == "PreToolUse", out[:200])
-check("rewrite: command runs safe-rm.ps1 with -Recurse", new and new.startswith("powershell.exe -NoProfile -ExecutionPolicy Bypass -File " if WIN else "pwsh -NoProfile -File ") and "safe-rm.ps1" in new and " -Recurse " in new, new)
+EXE = "safe-rm.ps1" if WIN else "safe-rm.sh"   # the machine decides: PowerShell on Windows, POSIX sh on Linux (no PowerShell there)
+check("rewrite: command runs " + EXE + " with -Recurse", new and new.startswith("powershell.exe -NoProfile -ExecutionPolicy Bypass -File " if WIN else 'sh "') and (WIN or "powershell" not in new.lower() and "pwsh" not in new.lower()) and EXE in new and " -Recurse " in new, new)
 check("rewrite: agent and session recorded", new and "-Agent verification-runner" in new and '-Session "11111111-2222-3333-4444-555555555555"' in new, new)
 check("rewrite: paths canonical, /-separated and quoted", new and f'"{PRJ}/zz-proj/build/nonexistent-dir"' in new and f'"{PRJ}/zz-proj/a/n1"' in new, new)
 check("rewrite: other tool_input fields preserved", ui and ui.get("description") == "cleanup" and ui.get("timeout") == 5000, str(ui))
@@ -168,7 +169,7 @@ try:
     ):
         code, out, err = run(cmd)
         new = json.loads(out)["hookSpecificOutput"]["updatedInput"]["command"]
-        dry = new.replace('safe-rm.ps1"', 'safe-rm.ps1" -DryRun', 1)
+        dry = new.replace(EXE + '"', EXE + '" -DryRun', 1)
         r = subprocess.run(dry, shell=True, capture_output=True, text=True)
         check(f"e2e dry run: {label}", r.returncode == 0 and expect_in in r.stdout, f"rc={r.returncode} out={r.stdout[:150]!r} err={r.stderr[:150]!r}")
     check("e2e dry run changed nothing", (probe / "x.txt").exists() and (probe / "d" / "y.tmp").exists())
@@ -184,7 +185,10 @@ for label, agent in (("main thread", None), ("other agent", "repo-scout")):
 import os, shutil, tempfile
 tmp = pathlib.Path(tempfile.mkdtemp())
 try:
-    shutil.copy(HOOK, tmp / HOOK.name)          # a copy WITHOUT safe-rm-lib.ps1 / policy next to it -> internal error in the rm branch
+    shutil.copy(HOOK, tmp / HOOK.name)          # a copy WITHOUT safe-rm-lib / policy next to it -> internal error in the rm branch
+    for sib in (HOOK.with_suffix('.sh'), HOOK.parent / 'lib.sh'):   # Linux runs the .sh version, which needs its helper
+        if sib.exists():
+            shutil.copy(sib, tmp / sib.name)
     p = subprocess.run([PWSH, *PSARGS, "-File", str(tmp / HOOK.name)],
                        input=json.dumps({"tool_name": "Bash", "agent_type": AGENT, "tool_input": {"command": f"rm {PRJ}/zz-proj/a/b"}}), capture_output=True, text=True)
     check("runner: internal error fails CLOSED", p.returncode == 2 and "fails closed" in p.stderr, f"{p.returncode} {p.stderr[:160]}")

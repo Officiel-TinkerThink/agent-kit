@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context\"",
             "timeout": 60
           }
         ],

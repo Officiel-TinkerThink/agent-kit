@@ -1,6 +1,6 @@
 # agent-kit
 
-Claude Code plugins for cost-aware, auditable use of subagents in GxP-regulated engineering teams. Windows (PowerShell 5.1) and Ubuntu Linux (PowerShell 7) + Python 3.10+ (see "Platform").
+Claude Code plugins for cost-aware, auditable use of subagents in GxP-regulated engineering teams. Windows (PowerShell 5.1) and Ubuntu Linux (POSIX sh; nothing to install) (see "Platform").
 
 | Plugin | What it gives you | Standalone? |
 |---|---|---|
@@ -12,20 +12,13 @@ Claude Code plugins for cost-aware, auditable use of subagents in GxP-regulated 
 ## Installation
 
 ### Before you start
-- **Claude Code** (a recent version; `claude --version`) and PowerShell, because the hooks are PowerShell scripts: **Windows PowerShell 5.1** on Windows (already installed), or **PowerShell 7 (`pwsh`)** on Ubuntu/Linux/macOS (see below).
+- **Claude Code** (a recent version; `claude --version`). Nothing else is needed to run the plugins: on **Windows** the hooks are PowerShell 5.1 scripts (already installed), on **Ubuntu/Linux/macOS** they are POSIX `sh` scripts that use only `sh`, `awk`, `sed`, `grep` and coreutils. No PowerShell and no Python is installed or used on Linux.
 - **Python 3.10+** only if you want to run the tests, the operator CLIs of `agent-eval`, or the browser benchmark.
 - **Claude in Chrome** (the Chrome extension, connected to Claude Code) only if you want the two browser agents.
 - **Hooks run code on your machine.** Read `plugins/*/scripts` and `plugins/*/hooks/hooks.json` before installing, install from a repository you trust, and pin a released version. Treat an installed version as a controlled software release in your QMS.
 
-### Ubuntu / Linux: install PowerShell 7 first
-```
-sudo apt-get update && sudo apt-get install -y wget ca-certificates
-wget -q https://packages.microsoft.com/config/ubuntu/$(. /etc/os-release && echo $VERSION_ID)/packages-microsoft-prod.deb
-sudo dpkg -i packages-microsoft-prod.deb && rm packages-microsoft-prod.deb
-sudo apt-get update && sudo apt-get install -y powershell
-pwsh --version
-```
-`pwsh` must be on the `PATH` of the shell Claude Code starts. Every hook and skill is started through `scripts/run-ps.sh`, which uses `powershell.exe` when it exists (Windows) and `pwsh` otherwise; if neither is found the hook exits with code 2 and a message saying so (a guard that cannot run blocks instead of silently doing nothing). Tested on Ubuntu 24.04.
+### Linux needs nothing extra
+Every hook and skill is started through `scripts/run.sh`, which looks at the machine: with `powershell.exe` on the `PATH` (Windows) it runs `<script>.ps1`, otherwise it runs `<script>.sh` in POSIX `sh` (Ubuntu's `dash`, busybox, bash). No command shown to you or to an agent names a shell language. If a script has no version for the machine, the hook exits with code 2 and says so (a guard that cannot run blocks instead of silently doing nothing). Tested on Ubuntu 24.04 (`dash`, `mawk`) in a container that has no PowerShell and no Python.
 
 ### Install (from inside Claude Code)
 ```
@@ -113,18 +106,18 @@ The judge (a stronger model through `claude -p`, about $0.10 per case) and your 
 - Guards refuse paths containing `~` (8.3 short names); keep the data folder on a normal long path.
 
 ## Platform
-- **Windows:** Windows PowerShell 5.1. **Ubuntu 24.04:** PowerShell 7. The same scripts run on both; paths are handled per platform (on Linux: absolute `/` paths, case-sensitive, no drive letters; `safe-rm` zones in `safe-rm-policy.json` must be `/` paths on Linux, entries written as `D:/...` are ignored there). macOS should behave like Linux but is not tested.
-- The agents, policies and Python CLIs are platform-independent.
-- Hooks start through `sh scripts/run-ps.sh`; on Windows this needs Git Bash, which Claude Code on Windows already requires.
+- **Windows:** PowerShell 5.1 scripts (`*.ps1`). **Ubuntu/Linux:** POSIX `sh` scripts (`*.sh`, same behaviour, same flags, same data files) chosen automatically by `scripts/run.sh`. Paths are handled per platform (on Linux: absolute `/` paths, case-sensitive, no drive letters; `safe-rm` zones in `safe-rm-policy.json` must be `/` paths on Linux, entries written as `D:/...` are ignored there). macOS should behave like Linux but is not tested.
+- The agents and policies are platform-independent. The optional Python tools (`agent_eval.py`, usage reports, the benchmark) need Python 3 on any platform; the hooks do not.
+- Hooks start through `sh scripts/run.sh`; on Windows this needs Git Bash, which Claude Code on Windows already requires. Linux needs only the `sh`, `awk`, `sed`, `grep` and coreutils that ship with Ubuntu.
 - Project-specific commands in `verification-runner` use the platform's own layout (for example `.venv/Scripts/python.exe` on Windows, `.venv/bin/python` on Linux).
 
 ## About the secret-looking strings in tests
 The files under `tests/` contain deliberately fake credentials (AWS-, GitHub-, Slack- and Sonar-shaped tokens, a PEM header, test passwords) used to prove that redaction works. They are fixtures, not secrets; if your organisation runs a secret scanner on shared repositories, mark `tests/` as test fixtures there. Shipped code under `plugins/` contains none.
 
 ## Tests
-`python tests/run_all.py` runs 14 suites (about 670 checks: agent frontmatter, the SUBAGENTS.md roster, browser guard, other guards, secret leak, kit tools, launcher and hook smoke tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
+`python tests/run_all.py` runs 16 suites (about 820 checks: agent frontmatter, the SUBAGENTS.md roster, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
 
-**On Ubuntu in Docker** (from a Linux shell or WSL with Docker; nothing is installed on the host and the container is removed afterwards): `sh tests/linux/run-in-docker.sh`. It builds `tests/linux/Dockerfile` (Ubuntu 24.04 + PowerShell 7 + Python), mounts the repository read-only, copies it inside the container and runs the same suites. Remove the image with `docker rmi agent-kit-ubuntu-test`.
+**On Ubuntu in Docker** (from a Linux shell or WSL with Docker; nothing is installed on the host and the container is removed afterwards): `sh tests/linux/run-in-docker.sh`. It builds `tests/linux/Dockerfile` (Ubuntu 24.04 + Python for the test runner only; no PowerShell: a test shim maps the PowerShell entry points to the `.sh` scripts), mounts the repository read-only, copies it inside the container and runs the same suites. Remove the image with `docker rmi agent-kit-ubuntu-test`.
 
 ## License
 MIT, see `LICENSE`. This is software that runs hooks on your machine and is provided without warranty. If you use it in a regulated (GxP) setting, validating it for your intended use is your responsibility; the READMEs describe what each plugin does and does not guarantee.

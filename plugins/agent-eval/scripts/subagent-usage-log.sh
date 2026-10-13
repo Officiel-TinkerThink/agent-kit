@@ -5,6 +5,11 @@
 # never a matched secret value. Fails open: any error exits 0 and never blocks the agent.
 # Usage: subagent-usage-log.sh [-SelfTestInput <file>]    (stdin: the SubagentStop hook JSON)
 # Needs sh, awk (POSIX/mawk), grep, sed, tr, wc, sha256sum, mkdir, mktemp. No PowerShell, no Python.
+# Bytes, not characters, whatever the user's locale: the awk programs spell UTF-8 by hand (checks.awk matches byte
+# ranges such as [\200-\277]). gawk rejects those in a UTF-8 locale ("Invalid collation character"), the checks stage
+# exited 1 and no run record was ever written on Ubuntu (en_US.UTF-8, C.UTF-8). mawk always reads bytes; C makes gawk do too.
+LC_ALL=C
+export LC_ALL
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$KIT_SCRIPT_DIR/lib.sh"
 
@@ -561,8 +566,8 @@ fi
 SRC=/dev/null
 if [ -n "$TP" ] && [ -f "$TP" ]; then SRC="$TP"; fi
 OUTF="$WORK/output.txt"
-if ! OUTF="$OUTF" awk -f "$WORK/usage_full.awk" "$SRC" > "$WORK/stats" 2>/dev/null; then
-  hook_error "$SCRIPT_NAME" "run record not written: transcript could not be read"
+if ! OUTF="$OUTF" awk -f "$WORK/usage_full.awk" "$SRC" > "$WORK/stats" 2> "$WORK/usage.err"; then
+  hook_error "$SCRIPT_NAME" "run record not written: transcript could not be read ($(head -c 200 "$WORK/usage.err" | tr '\n' ' '))"
   exit 0
 fi
 
@@ -588,8 +593,9 @@ done < "$WORK/stats"
 # --- stage C: Get-Flags checks on the hand-back text ----------------------------------------------------------
 [ -f "$OUTF" ] || : > "$OUTF"
 ATYPE="$(printf '%s' "$AGENT_TYPE" | sed 's/^.*://')"
-if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2>/dev/null; then
-  hook_error "$SCRIPT_NAME" "run record not written: output checks failed"
+if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
+  # The awk error says why (it used to go to /dev/null, which hid a whole class of failures).
+  hook_error "$SCRIPT_NAME" "run record not written: output checks failed ($(head -c 200 "$WORK/checks.err" | tr '\n' ' '))"
   exit 0
 fi
 

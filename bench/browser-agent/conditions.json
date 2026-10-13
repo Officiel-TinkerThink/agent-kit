@@ -1,0 +1,118 @@
+{
+  "explorer-haiku-low-v1": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v1.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "explorer-haiku-medium-v1": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v1.md",
+    "model": "haiku",
+    "effort": "medium"
+  },
+  "explorer-haiku-high-v1": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v1.md",
+    "model": "haiku",
+    "effort": "high"
+  },
+  "operator-haiku-low-v1": {
+    "role": "operator",
+    "prompt": "prompts/operator_v1.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "operator-haiku-medium-v1": {
+    "role": "operator",
+    "prompt": "prompts/operator_v1.md",
+    "model": "haiku",
+    "effort": "medium"
+  },
+  "operator-haiku-high-v1": {
+    "role": "operator",
+    "prompt": "prompts/operator_v1.md",
+    "model": "haiku",
+    "effort": "high"
+  },
+  "explorer-haiku-low-v2": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v2.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "explorer-haiku-medium-v2": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v2.md",
+    "model": "haiku",
+    "effort": "medium"
+  },
+  "explorer-haiku-low-v3": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v3.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "operator-haiku-low-v2-guard": {
+    "role": "operator",
+    "prompt": "prompts/operator_v2.md",
+    "model": "haiku",
+    "effort": "low",
+    "guard": true
+  },
+  "operator-haiku-medium-v2-guard": {
+    "role": "operator",
+    "prompt": "prompts/operator_v2.md",
+    "model": "haiku",
+    "effort": "medium",
+    "guard": true
+  },
+  "explorer-haiku-low-v4": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v4.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "operator-haiku-low-v3-guard": {
+    "role": "operator",
+    "prompt": "prompts/operator_v3.md",
+    "model": "haiku",
+    "effort": "low",
+    "guard": true
+  },
+  "explorer-sonnet-low-v3": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v3.md",
+    "model": "sonnet",
+    "effort": "low",
+    "run_cap": 0.25
+  },
+  "operator-sonnet-low-v3-guard": {
+    "role": "operator",
+    "prompt": "prompts/operator_v3.md",
+    "model": "sonnet",
+    "effort": "low",
+    "guard": true,
+    "run_cap": 0.25
+  },
+  "explorer-haiku-low-v5": {
+    "role": "explorer",
+    "prompt": "prompts/explorer_v5.md",
+    "model": "haiku",
+    "effort": "low"
+  },
+  "operator-haiku-low-v4-guard": {
+    "role": "operator",
+    "prompt": "prompts/operator_v4.md",
+    "model": "haiku",
+    "effort": "low",
+    "guard": true
+  },
+  "opv3-on-explorer-tasks": {
+    "role": "operator",
+    "prompt": "prompts/operator_v3.md",
+    "model": "haiku",
+    "effort": "low",
+    "guard": true
+  }
+}

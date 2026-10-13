@@ -1,0 +1,7 @@
+# verification-runner
+
+A Haiku agent that runs ONE test, lint, type-check or build command per call (pytest, ruff, mypy, npm test/lint/typecheck/build, vitest, jest, tsc --noEmit, go test, dotnet test, or a project script you name), sends all output to a new log in `<data>/verification-logs/` and reports only the verdict, first failures and log path.
+
+**Which commands may run is decided by Claude Code's own permissions** (your allow, ask and deny rules, the permission mode and the prompts); the kit keeps no command list of its own. If a command is refused or needs permission, the runner stops and reports the exact command, and the main agent asks you; approve the prompt or add a rule to your Claude Code settings. A subagent's permission prompts appear in your session; in an unattended `claude -p` run anything that would prompt is denied. The guard hook only adds what permission rules cannot express: `rm` is rewritten to the safe-rm quarantine (and a delete hidden inside another command is refused), and a redirect into `<data>/verification-logs/` must create a new file (no overwrite, no append, no `..`). It fails closed for the runner on an internal error.
+
+`rm` (only on request) is rewritten by the hook into a MOVE to `<data>/quarantine/` with a manifest and an audit line (SHA-256) written first; zones come from `safe-rm-policy.json` (default: single files in the logs folder). Restore with `scripts/safe-rm-restore.ps1`. Runs the project's own code: trusted repositories only.

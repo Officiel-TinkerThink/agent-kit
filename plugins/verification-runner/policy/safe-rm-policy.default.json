@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "note": "Default policy for safe-rm. rm never deletes: it MOVES items into quarantineRoot with a manifest (restore with safe-rm-restore.ps1). Copy this file to <kit data>/safe-rm-policy.json and add allowedRoots (your project folders) to let the verification-runner delete there. ${DATA} is the kit data folder.",
+  "quarantineRoot": "${DATA}/quarantine",
+  "auditFile": "${DATA}/verification-logs/_deletions.jsonl",
+  "allowedRoots": [
+    {
+      "path": "${DATA}/verification-logs",
+      "minDepth": 1,
+      "allowGlob": false,
+      "maxItems": 1
+    }
+  ],
+  "protectedComponents": [
+    ".git",
+    ".claude",
+    ".claude-me",
+    ".ssh",
+    ".gnupg",
+    ".venv",
+    "venv",
+    "quarantine",
+    "agent-kit"
+  ],
+  "protectedNames": [
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "*.pfx",
+    "id_rsa*",
+    "_deletions.jsonl",
+    "*.sqlite",
+    "*.sqlite3",
+    "*.db"
+  ],
+  "caps": {
+    "maxFiles": 5000,
+    "maxBytes": 209715200,
+    "maxGlobMatches": 100,
+    "maxTokens": 20
+  }
+}

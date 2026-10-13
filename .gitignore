@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.jsonl
+.pytest_cache/
+# local benchmark output and generated files: run logs hold local paths, results are summarised in the READMEs
+bench/browser-agent/results/
+bench/browser-agent/agents/
+bench/browser-agent/cases/
+*.log
+*.bak
+*.tmp

@@ -1,0 +1,3 @@
+# Subagent evaluation (agent-eval plugin)
+
+Recording failures (evaluation): when a delegated agent's result turns out wrong, partial, non-compliant with its own rules, or missing in-scope items (found by your spot-check, a failed citation check, or the user), fix the task first, then call the `annotator` subagent ONCE per failed run with: the run's agent id (from the Agent result; if you do not have it, `last:<agent_type>`), what was wrong, what you expected, and how you found out. It checks your claim against the recorded run and writes the annotation; it never redoes the task. Do not annotate style preferences or runs you did not check, and never put secret values in the details. A claim it cannot confirm is recorded as `disputed`, so state only what you verified.

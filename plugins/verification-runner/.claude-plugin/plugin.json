@@ -1,0 +1,15 @@
+{
+  "name": "verification-runner",
+  "version": "0.1.10",
+  "description": "A Haiku subagent that runs tests, linters, type checks and builds, writes full output to a log and reports only the verdict; deletes are routed through safe-rm (quarantine, audit, restore). Runs project code: trusted repos only.",
+  "author": {
+    "name": "Unidentified"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "tests",
+    "verification",
+    "safe-rm",
+    "hooks"
+  ]
+}

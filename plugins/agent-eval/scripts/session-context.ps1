@@ -1,3 +1,3 @@
 # SessionStart hook: stdout is injected into the session context.
-try { Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '..\policy\eval.md') } catch { }
+try { Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot '../policy/eval.md') } catch { }
 exit 0

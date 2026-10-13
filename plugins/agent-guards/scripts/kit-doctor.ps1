@@ -18,7 +18,7 @@ $cands = [ordered]@{}
 if ($env:AGENT_KIT_DATA) { $cands['AGENT_KIT_DATA'] = Norm $env:AGENT_KIT_DATA }
 if ($env:CLAUDE_CONFIG_DIR) { $cands['CLAUDE_CONFIG_DIR'] = Norm (Join-Path $env:CLAUDE_CONFIG_DIR 'agent-kit') }
 if ($cacheCfg) { $cands['plugin cache path'] = Norm (Join-Path $cacheCfg 'agent-kit') }
-$cands['USERPROFILE default'] = Norm (Join-Path $env:USERPROFILE '.claude/agent-kit')
+$cands['USERPROFILE default'] = Norm (Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude/agent-kit')
 $chosen = if ($KitData) { Norm $KitData } else { @($cands.Values)[0] }
 Say 'OK' 'KIT_DATA' "$chosen (first candidate in the hooks' resolution order)"
 $distinct = @($cands.Values | Select-Object -Unique)

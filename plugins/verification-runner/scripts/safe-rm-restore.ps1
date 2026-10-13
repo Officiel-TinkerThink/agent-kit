@@ -37,7 +37,7 @@ foreach ($it in @($m.items)) {
     Move-Item -LiteralPath $it.quarantinePath -Destination $it.path
     $restored += $it.path
 }
-Add-Jsonl $auditFile ([ordered]@{ schema = 'safe-rm/1'; op = 'restore'; id = $Id; ts = (Get-Date).ToUniversalTime().ToString('o'); user = $env:USERNAME; restored = $restored; problems = $problems })
+Add-Jsonl $auditFile ([ordered]@{ schema = 'safe-rm/1'; op = 'restore'; id = $Id; ts = (Get-Date).ToUniversalTime().ToString('o'); user = $(if ($env:USERNAME) { $env:USERNAME } else { $env:USER }); restored = $restored; problems = $problems })
 foreach ($r in $restored) { Write-Output "RESTORED $r" }
 foreach ($p in $problems) { [Console]::Error.WriteLine("PROBLEM: $p") }
 if ($problems.Count -gt 0) { exit 3 }

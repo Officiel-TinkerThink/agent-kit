@@ -13,7 +13,7 @@ param(
 $ErrorActionPreference = 'Stop'
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Get-Sha([string]$Path) { if (Test-Path -LiteralPath $Path) { return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLower() } return $null }
@@ -26,7 +26,7 @@ function Write-Json([string]$Path, $Obj) {
 function Add-Change([string]$File, $Before, $After, $Entry) {
     $dir = (Get-KitData) + '/audit'
     [void](New-Item -ItemType Directory -Force -Path $dir)
-    $rec = [ordered]@{ ts = (Get-Date).ToUniversalTime().ToString('o'); actor = $env:USERNAME; action = $Action; file = $File
+    $rec = [ordered]@{ ts = (Get-Date).ToUniversalTime().ToString('o'); actor = $(if ($env:USERNAME) { $env:USERNAME } else { $env:USER }); action = $Action; file = $File
                        before_sha256 = $Before; after_sha256 = $After; entry = $Entry; reason = $Reason; approved = 'user confirmed in chat' }
     Add-Content -LiteralPath ($dir + '/policy-changes.jsonl') -Value ($rec | ConvertTo-Json -Compress -Depth 6) -Encoding UTF8 -ErrorAction Stop
 }

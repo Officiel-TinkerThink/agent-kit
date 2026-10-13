@@ -263,8 +263,9 @@ def run_one(name, cond, task_id, rep, port=PORT):
     env = None
     if cond.get("guard"):   # run with the real guard-browser.ps1 hook active, audit data in results/kitdata
         guard = str((HERE.parents[1] / "plugins" / "agent-guards" / "scripts" / "guard-browser.ps1")).replace("\\", "/")
+        launcher = str((HERE.parents[1] / "plugins" / "agent-guards" / "scripts" / "run-ps.sh")).replace("\\", "/")
         hook = {"hooks": {"PreToolUse": [{"matcher": "mcp__claude-in-chrome__.*", "hooks": [{"type": "command", "timeout": 10,
-                "command": f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{guard}"'}]}]}}
+                "command": f'sh "{launcher}" "{guard}"'}]}]}}
         cmd += ["--settings", json.dumps(hook)]
         import os
         env = dict(os.environ, AGENT_KIT_DATA=str(HERE / "results" / "kitdata"))

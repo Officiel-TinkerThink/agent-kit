@@ -46,9 +46,13 @@ try {
     # --- hash everything first (files <= caps, so this is bounded) ---
     $manifestItems = New-Object System.Collections.ArrayList
     foreach ($i in $res.Items) {
-        $drive = $i.Full.Substring(0, 1).ToUpper()
-        $relNoDrive = $i.Full.Substring(3)
-        $dest = Join-Path $qdir (Join-Path ('data\' + $drive) $relNoDrive)
+        if ($script:IsWin) {
+            $drive = $i.Full.Substring(0, 1).ToUpper()
+            $relNoDrive = $i.Full.Substring(3)
+            $dest = Join-Path $qdir (Join-Path ('data\' + $drive) $relNoDrive)
+        } else {
+            $dest = Join-Path $qdir ('data' + $i.Full)   # data/<absolute path>, mirrors the original location
+        }
         if ($i.IsDir) {
             $lines = New-Object System.Collections.ArrayList
             foreach ($f in (Get-ChildItem -LiteralPath $i.Full -Recurse -Force -File)) {
@@ -66,11 +70,11 @@ try {
 
     # --- record BEFORE moving; if the record cannot be written nothing is moved ---
     $ts = (Get-Date).ToUniversalTime().ToString('o')
-    $manifest = [ordered]@{ schema = 'safe-rm/1'; id = $id; ts = $ts; user = $env:USERNAME; agent = $Agent; session = $Session; recurse = $Recurse.IsPresent; status = 'pending'; items = @($manifestItems) }
+    $manifest = [ordered]@{ schema = 'safe-rm/1'; id = $id; ts = $ts; user = $(if ($env:USERNAME) { $env:USERNAME } else { $env:USER }); agent = $Agent; session = $Session; recurse = $Recurse.IsPresent; status = 'pending'; items = @($manifestItems) }
     try {
         [void](New-Item -ItemType Directory -Force -Path $qdir)
         Write-Utf8NoBom (Join-Path $qdir 'manifest.json') ($manifest | ConvertTo-Json -Depth 8)
-        Add-Jsonl $auditFile ([ordered]@{ schema = 'safe-rm/1'; op = 'delete'; phase = 'planned'; id = $id; ts = $ts; user = $env:USERNAME; agent = $Agent; session = $Session; items = @($manifestItems | ForEach-Object { [ordered]@{ path = $_.path; kind = $_.kind; files = $_.files; bytes = $_.bytes; sha256 = $_.sha256 } }) })
+        Add-Jsonl $auditFile ([ordered]@{ schema = 'safe-rm/1'; op = 'delete'; phase = 'planned'; id = $id; ts = $ts; user = $(if ($env:USERNAME) { $env:USERNAME } else { $env:USER }); agent = $Agent; session = $Session; items = @($manifestItems | ForEach-Object { [ordered]@{ path = $_.path; kind = $_.kind; files = $_.files; bytes = $_.bytes; sha256 = $_.sha256 } }) })
     } catch {
         [Console]::Error.WriteLine("REFUSED: could not write the audit record or manifest, so nothing was moved. ($($_.Exception.Message))")
         exit 2

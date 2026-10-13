@@ -1,11 +1,15 @@
 """Sandbox tests for safe-rm.ps1 / safe-rm-lib.ps1 / safe-rm-restore.ps1. Real files, real junctions, a throwaway policy.
 Run: python test_safe_rm.py   (creates and removes a folder under %LOCALAPPDATA%\\Temp; never touches your real policy, quarantine or audit file)."""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json, os, pathlib, random, shutil, subprocess, sys
 
 HOOKS = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'verification-runner' / 'scripts'
 RM = HOOKS / "safe-rm.ps1"
 RESTORE = HOOKS / "safe-rm-restore.ps1"
-LONG_TEMP = pathlib.Path(os.path.expanduser("~")) / "AppData" / "Local" / "Temp"   # long (non-8.3) path on purpose
+IS_WIN = _sys.platform == 'win32'
+import tempfile
+LONG_TEMP = (pathlib.Path(os.path.expanduser("~")) / "AppData" / "Local" / "Temp") if IS_WIN else pathlib.Path(tempfile.gettempdir())   # Windows: long (non-8.3) path on purpose
 SB = LONG_TEMP / f"srm-test-{random.randrange(10**8):08d}"
 results = []
 
@@ -35,7 +39,7 @@ def make_policy(name="policy.json", **caps_over):
 
 
 def ps(script, *args):
-    r = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), *map(str, args)], capture_output=True, text=True)
+    r = subprocess.run([PWSH, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), *map(str, args)], capture_output=True, text=True)
     return r.returncode, r.stdout, r.stderr
 
 
@@ -106,9 +110,10 @@ try:
     check("dry run: nothing moved", r[0] == 0 and f.exists() and "WOULD QUARANTINE" in r[1])
 
     f = write(P / "app" / "gb.txt")
-    gb = "/" + posix(f)[0].lower() + posix(f)[2:]
-    r = rm(gb)
-    check("git-bash style /c/... path accepted", r[0] == 0 and not f.exists(), f"{r}")
+    if IS_WIN:
+        gb = "/" + posix(f)[0].lower() + posix(f)[2:]
+        r = rm(gb)
+        check("git-bash style /c/... path accepted", r[0] == 0 and not f.exists(), f"{r}")
 
     # ---- zone rules ----
     f = write(SB / "other" / "o.txt")
@@ -149,10 +154,15 @@ try:
     base = write(P / "app" / "h" / "f.txt")
     refused("relative path", rm("app/h/f.txt"), [base])
     refused("UNC path", rm("//server/share/x.txt"), [base])
-    refused("alternate data stream", rm(posix(base) + ":stream"), [base])
-    refused("trailing dot component", rm(posix(base) + "."), [base])
-    refused("8.3 short name", rm(posix(P).replace("proj", "PROJ~1") + "/app/h/f.txt"), [base])
-    refused("reserved device name", rm(posix(P / "app" / "h" / "NUL")), [base])
+    if IS_WIN:
+        refused("alternate data stream", rm(posix(base) + ":stream"), [base])
+        refused("trailing dot component", rm(posix(base) + "."), [base])
+        refused("8.3 short name", rm(posix(P).replace("proj", "PROJ~1") + "/app/h/f.txt"), [base])
+        refused("reserved device name", rm(posix(P / "app" / "h" / "NUL")), [base])
+    else:
+        refused("backslash in path", rm(posix(P / "app" / "h") + "\\f.txt"), [base])
+        refused("filesystem root", rm("/"), [str(base)])
+        refused("system path outside zones", rm("/etc/passwd"), [base])
     refused("dollar sign", rm(posix(P / "app" / "h" / "$HOME")), [base])
     refused("wildcard in a middle segment", rm(posix(P / "app" / "*" / "f.txt")), [base])
     refused("one bad item refuses the whole command", rm(base, SB / "other" / "o.txt"), [base, SB / "other" / "o.txt"])
@@ -160,15 +170,18 @@ try:
     # ---- junctions / links ----
     tgt = write(SB / "other" / "inside" / "t.txt")
     lk = P / "app" / "link"
-    subprocess.run(["cmd", "/c", "mklink", "/J", str(lk), str(SB / "other" / "inside")], capture_output=True)
+    def mklink(link, target):
+        if IS_WIN: subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True)
+        else: os.symlink(str(target), str(link))
+    mklink(lk, SB / "other" / "inside")
     if lk.exists():
         refused("junction itself", rm(lk), [tgt])
         refused("junction as directory with -r", rm(lk, recurse=True), [tgt])
         refused("path below a junction", rm(posix(lk) + "/t.txt"), [tgt])
-        holder = P / "app" / "holder"; write(holder / "a.txt"); subprocess.run(["cmd", "/c", "mklink", "/J", str(holder / "jl"), str(SB / "other" / "inside")], capture_output=True)
+        holder = P / "app" / "holder"; write(holder / "a.txt"); mklink(holder / "jl", SB / "other" / "inside")
         refused("tree containing a junction", rm(holder, recurse=True), [tgt, holder / "a.txt"])
     else:
-        check("junction tests (skipped: mklink unavailable)", True)
+        check("junction tests (skipped: link creation unavailable)", True)
 
     # ---- caps ----
     big = P / "app" / "big"

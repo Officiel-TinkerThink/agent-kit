@@ -5,7 +5,7 @@
 $isAnnotator = $false
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Test-AgentIs([string]$Type, [string[]]$Names) {
@@ -28,7 +28,7 @@ try {
             [Console]::Error.WriteLine("BLOCKED: the annotator may only write NEW .json files directly inside $base (letters, digits, _ . - in the name).")
             exit 2
         }
-        if (Test-Path -LiteralPath ($p -replace '/', '\')) {
+        if (Test-Path -LiteralPath ($p -replace '/', ([string][System.IO.Path]::DirectorySeparatorChar))) {
             [Console]::Error.WriteLine('BLOCKED: that file already exists; annotation files are never overwritten. Use a new unique file name.')
             exit 2
         }
@@ -42,12 +42,12 @@ try {
             exit 2
         }
         # the script path must be THIS plugin's annotate.py (compared by content, so 8.3 or case differences in the path do not matter)
-        $given = $m.Groups[1].Value -replace '/', '\'
+        $given = $m.Groups[1].Value -replace '/', ([string][System.IO.Path]::DirectorySeparatorChar)
         if (-not (Test-Path -LiteralPath $given -PathType Leaf) -or ((Get-FileHash -LiteralPath $given -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $selfScript -Algorithm SHA256).Hash)) {
             [Console]::Error.WriteLine('BLOCKED: that is not the annotate.py shipped with this plugin.')
             exit 2
         }
-        if (-not (Test-Path -LiteralPath ($m.Groups[2].Value -replace '/', '\'))) {
+        if (-not (Test-Path -LiteralPath ($m.Groups[2].Value -replace '/', ([string][System.IO.Path]::DirectorySeparatorChar)))) {
             [Console]::Error.WriteLine('BLOCKED: write the annotation file first; it does not exist yet.')
             exit 2
         }

@@ -8,7 +8,7 @@ if ($env:BULK_READ_MIN_LINES -match '^\d+$') { $MinLines = [int]$env:BULK_READ_M
 $SkipExt = '.png','.jpg','.jpeg','.gif','.webp','.pdf','.ipynb','.svg'
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Test-AgentIs([string]$Type, [string[]]$Names) {
@@ -20,7 +20,7 @@ function Test-AgentIs([string]$Type, [string[]]$Names) {
 function Write-Audit([string]$Tool, [string]$Path, [int]$Lines, [string]$Decision, [string]$Session) {
     try {
         $rec = [ordered]@{
-            ts = (Get-Date).ToUniversalTime().ToString('o'); user = $env:USERNAME; session = $Session
+            ts = (Get-Date).ToUniversalTime().ToString('o'); user = $(if ($env:USERNAME) { $env:USERNAME } else { $env:USER }); session = $Session
             tool = $Tool; path = $Path; lines = $Lines; threshold = $MinLines; decision = $Decision
         }
         $f = Join-Path (Get-KitData) 'audit/bulk-read-audit.jsonl'
@@ -38,7 +38,7 @@ function Get-LineCount([string]$Path) {
 
 function Resolve-Target([string]$Raw, [string]$Cwd) {
     $p = $Raw.Trim('"', "'")
-    if ($p -match '^/([a-zA-Z])/(.*)$') { $p = "$($Matches[1]):\$($Matches[2])" }   # Git Bash style /d/core/...
+    if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92 -and $p -match '^/([a-zA-Z])/(.*)$') { $p = "$($Matches[1]):\$($Matches[2])" }   # Git Bash style /d/core/...
     if (-not [System.IO.Path]::IsPathRooted($p)) { $p = Join-Path $Cwd $p }
     return $p
 }

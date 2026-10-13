@@ -1,15 +1,18 @@
 # safe-rm-lib.ps1 - shared parsing + validation for safe-rm (dot-sourced by guard-verification-runner.ps1 and safe-rm.ps1).
-# Windows PowerShell 5.1 compatible. Nothing here changes the filesystem.
+# Windows PowerShell 5.1 and PowerShell 7 (Linux/macOS) compatible. Nothing here changes the filesystem.
+# Canonical paths use the native separator; on Linux/macOS paths are case-sensitive, have no drive letters and no 8.3 / device-name rules.
+$script:IsWin = ([System.IO.Path]::DirectorySeparatorChar -eq [char]92)
+$script:Sep = [string][System.IO.Path]::DirectorySeparatorChar
 
 function Get-SafeRmPolicy {
     param([string]$PolicyFile)
     # policy: -PolicyFile (tests) > <kit data>/safe-rm-policy.json (yours) > the shipped default (only the verification-logs folder is deletable)
     $data = $env:AGENT_KIT_DATA
-    if (-not $data) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $data = Join-Path $c 'agent-kit' }
+    if (-not $data) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $data = Join-Path $c 'agent-kit' }
     $data = ($data -replace '\\', '/').TrimEnd('/')
     if (-not $PolicyFile) {
         $PolicyFile = Join-Path $data 'safe-rm-policy.json'
-        if (-not (Test-Path -LiteralPath $PolicyFile)) { $PolicyFile = Join-Path $PSScriptRoot '..\policy\safe-rm-policy.default.json' }
+        if (-not (Test-Path -LiteralPath $PolicyFile)) { $PolicyFile = Join-Path $PSScriptRoot '../policy/safe-rm-policy.default.json' }
     }
     $raw = (Get-Content -LiteralPath $PolicyFile -Raw -Encoding UTF8).Replace('${DATA}', $data)
     return ($raw | ConvertFrom-Json)
@@ -68,18 +71,24 @@ function ConvertTo-SafeRmFullPath {
     if ($s -eq '') { return @{ Ok = $false; Reason = 'empty path' } }
     if ($s -match '[\$`%;&|<>''"\x00-\x1f]') { return @{ Ok = $false; Reason = "forbidden character in path '$Raw'" } }
     if ($s -match '^(\\\\|//)') { return @{ Ok = $false; Reason = "network/UNC and device paths are not allowed ('$Raw')" } }
-    if ($s -match '^/([A-Za-z])(/.*)?$') {
-        $tail = $Matches[2]; if (-not $tail) { $tail = '/' }
-        $s = $Matches[1].ToUpper() + ':' + $tail
-    }
-    if ($s -notmatch '^[A-Za-z]:[\\/]') { return @{ Ok = $false; Reason = "path must be absolute (drive letter or /c/...): '$Raw'" } }
-    if ($s.Substring(2) -match ':') { return @{ Ok = $false; Reason = "alternate data streams / extra colons are not allowed ('$Raw')" } }
-    $devices = @('CON','PRN','AUX','NUL','CLOCK$') + (1..9 | ForEach-Object { "COM$_"; "LPT$_" })
-    foreach ($comp in ($s.Substring(3) -split '[\\/]')) {
-        if ($comp -eq '' -or $comp -eq '.' -or $comp -eq '..') { continue }
-        if ($comp -match '~\d') { return @{ Ok = $false; Reason = "8.3 short names are not allowed ('$comp')" } }
-        if ($comp -match '[. ]$') { return @{ Ok = $false; Reason = "components ending in a dot or space are not allowed ('$comp')" } }
-        if ($devices -contains (($comp -split '\.')[0].ToUpper())) { return @{ Ok = $false; Reason = "reserved device name ('$comp')" } }
+    if ($script:IsWin) {
+        if ($s -match '^/([A-Za-z])(/.*)?$') {
+            $tail = $Matches[2]; if (-not $tail) { $tail = '/' }
+            $s = $Matches[1].ToUpper() + ':' + $tail
+        }
+        if ($s -notmatch '^[A-Za-z]:[\\/]') { return @{ Ok = $false; Reason = "path must be absolute (drive letter or /c/...): '$Raw'" } }
+        if ($s.Substring(2) -match ':') { return @{ Ok = $false; Reason = "alternate data streams / extra colons are not allowed ('$Raw')" } }
+        $devices = @('CON','PRN','AUX','NUL','CLOCK$') + (1..9 | ForEach-Object { "COM$_"; "LPT$_" })
+        foreach ($comp in ($s.Substring(3) -split '[\\/]')) {
+            if ($comp -eq '' -or $comp -eq '.' -or $comp -eq '..') { continue }
+            if ($comp -match '~\d') { return @{ Ok = $false; Reason = "8.3 short names are not allowed ('$comp')" } }
+            if ($comp -match '[. ]$') { return @{ Ok = $false; Reason = "components ending in a dot or space are not allowed ('$comp')" } }
+            if ($devices -contains (($comp -split '\.')[0].ToUpper())) { return @{ Ok = $false; Reason = "reserved device name ('$comp')" } }
+        }
+    } else {
+        # POSIX: absolute /-separated paths only; a backslash is an ordinary filename character, so refuse it as ambiguous.
+        if ($s.Contains('\')) { return @{ Ok = $false; Reason = "backslashes are not allowed in paths on this platform ('$Raw')" } }
+        if ($s -notmatch '^/') { return @{ Ok = $false; Reason = "path must be absolute (start with /): '$Raw'" } }
     }
     # A wildcard is only legal in the last segment; canonicalize the folder part and re-attach the pattern (GetFullPath rejects * and ?).
     $leafGlob = $null
@@ -91,8 +100,9 @@ function ConvertTo-SafeRmFullPath {
     }
     if ($s -match '[*?]') { return @{ Ok = $false; Reason = "wildcards are only allowed in the last path segment ('$Raw')" } }
     try { $full = [System.IO.Path]::GetFullPath($s) } catch { return @{ Ok = $false; Reason = "invalid path '$Raw'" } }
-    $full = $full.TrimEnd('\')
-    if ($leafGlob) { $full = $full + '\' + $leafGlob }
+    $full = $full.TrimEnd([char[]]@([char]92, [char]47))
+    if ($full -eq '') { $full = $script:Sep }
+    if ($leafGlob) { $full = $full.TrimEnd([char[]]@([char]92, [char]47)) + $script:Sep + $leafGlob }
     return @{ Ok = $true; Path = $full }
 }
 
@@ -108,8 +118,11 @@ function Test-SafeRmProtected {
 function Find-SafeRmRoot {
     param([string]$Full, $Policy)
     foreach ($r in @($Policy.allowedRoots)) {
-        $root = [System.IO.Path]::GetFullPath($r.path).TrimEnd('\')
-        if ($Full.Length -gt $root.Length -and $Full.StartsWith($root + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        # a zone written as a Windows drive path (D:/...) cannot match anything on POSIX
+        if (-not $script:IsWin -and ([string]$r.path) -notmatch '^/') { continue }
+        $root = [System.IO.Path]::GetFullPath($r.path).TrimEnd([char[]]@([char]92, [char]47))
+        $cmp = if ($script:IsWin) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+        if ($Full.Length -gt $root.Length -and $Full.StartsWith($root + $script:Sep, $cmp)) {
             return @{ Rule = $r; Root = $root }
         }
     }
@@ -151,17 +164,18 @@ function Resolve-SafeRmPaths {
         $conv = ConvertTo-SafeRmFullPath -Raw $tok
         if (-not $conv.Ok) { return @{ Ok = $false; Reason = $conv.Reason } }
         $full = $conv.Path
+        if ($full -eq $script:Sep -or $full -match '^[A-Za-z]:[\\/]?$') { return @{ Ok = $false; Reason = "a filesystem root cannot be deleted ('$tok')" } }
         $leaf = Split-Path -Leaf $full
         $isGlob = $leaf -match '[*?]'
         $parent = Split-Path -Parent $full
         if ($parent -match '[*?]') { return @{ Ok = $false; Reason = "wildcards are only allowed in the last path segment ('$tok')" } }
         $candidates = @()
         if ($isGlob) {
-            $probe = Find-SafeRmRoot -Full ($parent + '\' + 'x') -Policy $Policy
+            $probe = Find-SafeRmRoot -Full ($parent.TrimEnd([char[]]@([char]92, [char]47)) + $script:Sep + 'x') -Policy $Policy
             if (-not $probe) { return @{ Ok = $false; Reason = "'$tok' is outside the allowed zones" } }
             if (-not $probe.Rule.allowGlob) { return @{ Ok = $false; Reason = "wildcards are not allowed in this zone; name each item ('$tok')" } }
             if (Test-Path -LiteralPath $parent -PathType Container) {
-                $matches = @([System.IO.Directory]::GetFileSystemEntries($parent) | Where-Object { (Split-Path -Leaf $_) -ilike $leaf })
+                $matches = @([System.IO.Directory]::GetFileSystemEntries($parent) | Where-Object { if ($script:IsWin) { (Split-Path -Leaf $_) -ilike $leaf } else { (Split-Path -Leaf $_) -clike $leaf } })
                 if ($matches.Count -gt [int]$Policy.caps.maxGlobMatches) { return @{ Ok = $false; Reason = "'$tok' matches too many items ($($matches.Count) > $($Policy.caps.maxGlobMatches))" } }
                 $candidates = $matches
             }
@@ -173,7 +187,7 @@ function Resolve-SafeRmPaths {
             $rootInfo = Find-SafeRmRoot -Full $cand -Policy $Policy
             if (-not $rootInfo) { return @{ Ok = $false; Reason = "'$cand' is outside the allowed zones (or is a zone root itself)" } }
             $rel = $cand.Substring($rootInfo.Root.Length + 1)
-            $comps = @($rel -split '\\')
+            $comps = @($rel -split [regex]::Escape($script:Sep))
             if ($comps.Count -lt [int]$rootInfo.Rule.minDepth) { return @{ Ok = $false; Reason = "'$cand' is too close to the zone root (minimum depth $($rootInfo.Rule.minDepth))" } }
             $prot = Test-SafeRmProtected -RelComponents $comps -Policy $Policy
             if ($prot) { return @{ Ok = $false; Reason = "'$cand' is blocked: $prot" } }

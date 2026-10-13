@@ -1,4 +1,6 @@
 """Regression tests for guard-verification-runner.ps1. Run: python test_guard_verification_runner.py"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json, pathlib, subprocess, sys
 
 HOOK = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'verification-runner' / 'scripts' / "guard-verification-runner.ps1"
@@ -74,7 +76,7 @@ CASES = [
 
 def run(payload: str) -> int:
     return subprocess.run(
-        ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(HOOK)],
+        [PWSH, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(HOOK)],
         input=payload, capture_output=True, text=True,
     ).returncode
 

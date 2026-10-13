@@ -1,5 +1,7 @@
 """Tests for Layers 2-4: annotate.py validation, guard-annotator.ps1, and agent_eval.py (queue, judge with a stub, review, export, report).
 Uses a throwaway base directory (AGENT_EVAL_BASE) so the real logs are never touched. Run: python test_eval_pipeline.py"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import hashlib
 import io
 import json
@@ -116,7 +118,7 @@ PY = (str(SCRIPTS).replace('\\', '/')) + '/annotate.py'
 
 def guard(agent, tool, **ti):
     inp = json.dumps({'agent_type': agent, 'tool_name': tool, 'tool_input': ti})
-    r = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(GUARD)], input=inp, capture_output=True, text=True, timeout=60)
+    r = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(GUARD)], input=inp, capture_output=True, text=True, timeout=60)
     return r.returncode, r.stderr
 
 

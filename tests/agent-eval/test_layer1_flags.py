@@ -1,5 +1,7 @@
 """Layer 1 tests: run subagent-usage-log.ps1 on synthetic transcripts with planted failures and check the recorded flags.
 Run: python test_layer1_flags.py   (uses a temp log via AGENT_USAGE_LOG; never touches the real log)"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json
 import os
 import pathlib
@@ -40,7 +42,7 @@ def run(agent, output, **kw):
     if log.exists():
         log.unlink()
     env = dict(os.environ, AGENT_USAGE_LOG=str(log), AGENT_KIT_DATA=str(TMP / 'kit'))   # never write hook errors or audit into the real data folder
-    subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(inp)], env=env, check=True, capture_output=True, timeout=60)
+    subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(inp)], env=env, check=True, capture_output=True, timeout=60)
     return json.loads(log.read_text(encoding='utf-8').splitlines()[-1]), log.read_text(encoding='utf-8')
 
 
@@ -138,7 +140,7 @@ del os.environ['SECRET_GUARD_AUDIT']
 for bad in ['', 'not json', '{"agent_id": "z", "agent_transcript_path": "C:/nope.jsonl", "agent_type": "x"}']:
     inp = TMP / 'bad.json'
     inp.write_text(bad, encoding='utf-8')
-    p = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(inp)],
+    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(inp)],
                        env=dict(os.environ, AGENT_USAGE_LOG=str(TMP / 'bad.log'), AGENT_KIT_DATA=str(TMP / 'kit')), capture_output=True, timeout=60)
     check('fail-open on bad input %r' % bad[:20], p.returncode == 0)
 last = (TMP / 'bad.log').read_text(encoding='utf-8').splitlines()[-1] if (TMP / 'bad.log').exists() else ''

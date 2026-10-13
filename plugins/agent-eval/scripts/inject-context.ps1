@@ -1,7 +1,7 @@
 # SubagentStart hook: tells selected subagents where this kit keeps its data (their prompts refer to KIT_DATA).
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Test-AgentIs([string]$Type, [string[]]$Names) {
@@ -23,7 +23,7 @@ try {
     if (-not $reader.Wait(10000)) { Write-HookError 'inject-context' 'stdin not closed within 10 s; no context injected'; exit 0 }
     $in = $reader.Result | ConvertFrom-Json
     if (-not (Test-AgentIs ([string]$in.agent_type) @('annotator'))) { exit 0 }
-    $cfg = $env:CLAUDE_CONFIG_DIR; if (-not $cfg -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $cfg = $Matches[1] }; if (-not $cfg) { $cfg = Join-Path $env:USERPROFILE '.claude' }
+    $cfg = $env:CLAUDE_CONFIG_DIR; if (-not $cfg -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $cfg = $Matches[1] }; if (-not $cfg) { $cfg = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }
     $ctx = "KIT_DATA=$(Get-KitData)`nCONFIG_DIR=$(($cfg -replace '\\', '/').TrimEnd('/'))"
     [Console]::Out.WriteLine((@{ hookSpecificOutput = @{ hookEventName = 'SubagentStart'; additionalContext = $ctx } } | ConvertTo-Json -Depth 5 -Compress))
 } catch { Write-HookError 'inject-context' $_.Exception.Message }

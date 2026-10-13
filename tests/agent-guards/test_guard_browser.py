@@ -1,4 +1,6 @@
 """Regression tests for guard-browser.ps1. Run: python test_guard_browser.py"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json
 import os
 import pathlib
@@ -86,7 +88,7 @@ CASES += [
 
 
 def run(env, payload):
-    p = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK)],
+    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK)],
                        input=payload, capture_output=True, text=True, env=env)
     return p.returncode
 
@@ -153,7 +155,7 @@ def main():
     home = tempfile.mkdtemp(prefix='home-')
     env2 = {k: v for k, v in os.environ.items() if k not in ('AGENT_KIT_DATA', 'CLAUDE_CONFIG_DIR')}
     env2['USERPROFILE'] = home
-    subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(copy)], input=op_click, capture_output=True, text=True, env=env2)
+    subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(copy)], input=op_click, capture_output=True, text=True, env=env2)
     report('KIT_DATA derived from plugin cache path (no env)', (cfg / 'agent-kit' / 'audit' / 'browser-actions.jsonl').exists())
     report('KIT_DATA derivation did not touch USERPROFILE\\.claude', not pathlib.Path(home, '.claude').exists())
 

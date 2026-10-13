@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.ps1\"",
             "timeout": 60
           }
         ],
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/check-bulk-read.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/check-bulk-read.ps1\"",
             "timeout": 10
           }
         ],
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-git-readonly.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-git-readonly.ps1\"",
             "timeout": 10,
             "onFailure": "block"
           }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-env-files.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-env-files.ps1\"",
             "timeout": 10
           }
         ],
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-monitor-patterns.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-monitor-patterns.ps1\"",
             "timeout": 10
           }
         ],
@@ -59,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-secret-leak.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-secret-leak.ps1\"",
             "timeout": 15
           }
         ],
@@ -69,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-browser.ps1\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run-ps.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-browser.ps1\"",
             "timeout": 10,
             "onFailure": "block"
           }

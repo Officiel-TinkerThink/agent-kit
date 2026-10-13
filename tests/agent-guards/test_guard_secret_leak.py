@@ -1,6 +1,8 @@
 """Tests for guard-secret-leak.ps1: redaction at SubagentHandback (format-based AND taint from what the agent read), exfiltration block on
 WebFetch/WebSearch, references/credential-names/hashes left alone, audit without values, and behaviour on odd input.
 Run: python test_guard_secret_leak.py"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json
 import os
 import pathlib
@@ -46,7 +48,7 @@ def run(tool, tool_input, read_texts=None, agent_id='ag1', agent_type='bulk-read
         inp.update(agent_id=agent_id, agent_type=agent_type)
     f = TMP / ('in%d.json' % n)
     f.write_text(json.dumps(inp), encoding='utf-8')
-    p = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(f)], capture_output=True, text=True,
+    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(f)], capture_output=True, text=True,
                        env=dict(os.environ, SECRET_GUARD_AUDIT=str(AUDIT)), timeout=90)
     out = None
     if p.stdout.strip():
@@ -142,7 +144,7 @@ check('audit kinds recorded', any('aws_access_key' in r['kinds'] for r in recs) 
 for bad in ['', 'not json', '{}']:
     f = TMP / 'bad.json'
     f.write_text(bad, encoding='utf-8')
-    p = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(f)], capture_output=True, text=True, env=dict(os.environ, SECRET_GUARD_AUDIT=str(AUDIT)), timeout=60)
+    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(HOOK), '-SelfTestInput', str(f)], capture_output=True, text=True, env=dict(os.environ, SECRET_GUARD_AUDIT=str(AUDIT)), timeout=60)
     check('unparseable/empty input exits 0 %r' % bad, p.returncode == 0)
 rc, new, _ = handback('', None)
 check('empty message passes', rc == 0 and new is None)

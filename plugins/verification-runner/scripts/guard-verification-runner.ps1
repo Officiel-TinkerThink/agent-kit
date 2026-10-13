@@ -8,7 +8,7 @@
 $isRunner = $false
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Test-AgentIs([string]$Type, [string[]]$Names) {
@@ -24,8 +24,9 @@ try {
     $cmd = ([string]$in.tool_input.command).Trim()
 
     $logRoot = (Get-KitData) + '/verification-logs'
-    $drive = $logRoot.Substring(0, 1)
-    $gitBash = '/' + $drive.ToLower() + $logRoot.Substring(2)       # /c/Users/... form
+    if ($logRoot -match '^[A-Za-z]:') { $gitBash = '/' + $logRoot.Substring(0, 1).ToLower() + $logRoot.Substring(2) }   # /c/Users/... form
+    else { $gitBash = $logRoot }                                      # POSIX: already /-rooted
+    $logDirNative = $logRoot.Replace('/', [string][System.IO.Path]::DirectorySeparatorChar)
     $logAlt = '(?:' + ([regex]::Escape($logRoot) -replace '/', '[/\\]') + '|' + ([regex]::Escape($gitBash) -replace '/', '[/\\]') + ')'
 
     # --- rm: routed through safe-rm (policy zones, protected names, quarantine instead of deletion, audit first). See safe-rm-policy.json.
@@ -40,7 +41,8 @@ try {
         $wrapper = (Join-Path $PSScriptRoot 'safe-rm.ps1') -replace '\\', '/'
         $sess = ([string]$in.session_id) -replace '[^A-Za-z0-9-]', ''
         $parts = New-Object System.Collections.ArrayList
-        [void]$parts.Add('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $wrapper + '"')
+        if ($script:IsWin) { [void]$parts.Add('powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $wrapper + '"') }
+        else { [void]$parts.Add('pwsh -NoProfile -File "' + $wrapper + '"') }
         if ($parsed.Recurse) { [void]$parts.Add('-Recurse') }
         [void]$parts.Add('-Agent verification-runner -Session "' + $sess + '"')
         foreach ($tok in $parsed.Tokens) { $conv = ConvertTo-SafeRmFullPath -Raw $tok; [void]$parts.Add('"' + ($conv.Path -replace '\\', '/') + '"') }
@@ -63,15 +65,15 @@ try {
         $op = $m.Groups[1].Value; $target = $m.Groups[3].Value
         if ($op -eq '>>') { [Console]::Error.WriteLine("BLOCKED: appending (>>) to a verification log would alter earlier evidence. Redirect to a NEW file with >."); exit 2 }
         if ($target -match '(^|[/\\])\.\.([/\\]|$)') { [Console]::Error.WriteLine("BLOCKED: a log path must stay inside $logRoot (no '..')."); exit 2 }
-        [void](New-Item -ItemType Directory -Force -Path ($logRoot -replace '/', '\'))   # the redirect target folder must exist
+        [void](New-Item -ItemType Directory -Force -Path $logDirNative)   # the redirect target folder must exist
         $name = [regex]::Match($target, '[^/\\]+$').Value
-        $path = Join-Path ($logRoot -replace '/', '\') $name
+        $path = Join-Path $logDirNative $name
         if (Test-Path -LiteralPath $path) {
             [Console]::Error.WriteLine("BLOCKED: log file '$name' already exists; logs are never overwritten. Use a new unique name (for example add a run number).")
             exit 2
         }
     }
-    [void](New-Item -ItemType Directory -Force -Path ($logRoot -replace '/', '\'))
+    [void](New-Item -ItemType Directory -Force -Path $logDirNative)
     exit 0   # silent: Claude Code's permission rules decide whether this command runs
 } catch {
     if ($isRunner) { [Console]::Error.WriteLine("BLOCKED: the verification-runner guard hit an internal error and fails closed for this agent. ($($_.Exception.Message))"); exit 2 }

@@ -6,7 +6,7 @@
 param([string]$SelfTestInput = '')
 function Get-KitData {
     $d = $env:AGENT_KIT_DATA
-    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $env:USERPROFILE '.claude' }; $d = Join-Path $c 'agent-kit' }
+    if (-not $d) { $c = $env:CLAUDE_CONFIG_DIR; if (-not $c -and $PSScriptRoot -match '^(.*?)[\\/]plugins[\\/]cache[\\/]') { $c = $Matches[1] }; if (-not $c) { $c = Join-Path $(if ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }) '.claude' }; $d = Join-Path $c 'agent-kit' }
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 function Test-AgentIs([string]$Type, [string[]]$Names) {
@@ -62,10 +62,10 @@ function Get-Flags {
 
     # --- citations: absolute paths only; the file must exist and the line must be inside it
     $seen = @{}; $n = 0
-    foreach ($m in [regex]::Matches($Output, '(?<![A-Za-z0-9])([A-Za-z]:[/\\][^\s`''"|<>*?():]+?\.[A-Za-z0-9]{1,8}):(\d+)(?:[-,](\d+))?')) {
+    foreach ($m in [regex]::Matches($Output, '((?:(?<![A-Za-z0-9])[A-Za-z]:[/\\]|(?<![A-Za-z0-9._~/\\-])/)[^\s`''"|<>*?():]+?\.[A-Za-z0-9]{1,8}):(\d+)(?:[-,](\d+))?')) {
         $path = $m.Groups[1].Value; $line = [int]$m.Groups[2].Value; $key = "$path`:$line"
         if ($seen.ContainsKey($key)) { continue }; $seen[$key] = 1; $n++; if ($n -gt 80) { break }
-        $win = $path -replace '/', '\'
+        $win = if ([System.IO.Path]::DirectorySeparatorChar -eq [char]92) { $path -replace '/', '\' } else { $path }
         if (-not (Test-Path -LiteralPath $win -PathType Leaf)) { Add-Flag 'citation_file_missing' 'fail' ("file not found: $path"); continue }
         $len = (Get-Item -LiteralPath $win).Length
         if ($len -gt 5MB) { continue }

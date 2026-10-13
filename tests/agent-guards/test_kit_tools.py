@@ -1,4 +1,6 @@
 """Tests for kit-policy.ps1 (/kit-allow: browser hosts) and kit-doctor.ps1 (/kit-doctor). Run: python test_kit_tools.py"""
+import sys as _sys
+PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import hashlib
 import json
 import os
@@ -21,7 +23,7 @@ def kit():
 
 def ps(script, k, *args, stdin=None):
     env = dict(os.environ, AGENT_KIT_DATA=str(k).replace('\\', '/'))
-    p = subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script), *args],
+    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script), *args],
                        input=stdin, capture_output=True, text=True, env=env)
     return p.returncode, p.stdout, p.stderr
 

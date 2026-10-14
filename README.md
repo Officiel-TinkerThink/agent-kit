@@ -4,7 +4,7 @@ Claude Code plugins for cost-aware, auditable use of subagents in GxP-regulated 
 
 | Plugin | What it gives you | Standalone? |
 |---|---|---|
-| `haiku-delegation` | 24 read-only Haiku 5.5 subagents (reading, inventories, schema / API-contract / pipeline description, research, advisory collection) with per-agent effort tiers, two browser agents for Claude in Chrome (`browser-explorer` read-only, `browser-operator` for named steps), and a session policy telling the main model when to delegate | yes |
+| `haiku-delegation` | 17 read-only Haiku 5.5 subagents (reading, inventories, schema / API-contract / pipeline description, research, advisory collection) with per-agent effort tiers, two browser agents for Claude in Chrome (`browser-explorer` read-only, `browser-operator` for named steps), and a session policy telling the main model when to delegate | yes |
 | `agent-guards` | Deterministic hooks: secret redaction at hand-back and web-exfiltration block, `.env` protection, bulk-read redirect, monitor/poll blocking, read-only git for `changelog-summarizer` | yes (best with `haiku-delegation`) |
 | `agent-eval` | Per-run usage log with deterministic contract checks, an `annotator` agent for warm failure annotations, operator CLIs for judging and human review | yes (best with the others) |
 | `verification-runner` | A Haiku agent that runs tests / linters / builds (Claude Code's permissions decide which commands) and reports only the verdict; deletes go through safe-rm (quarantine, audit, restore) | yes |
@@ -40,9 +40,9 @@ You do not need all four. `haiku-delegation` is the core; `agent-guards` is stro
 
 ### Check that it works
 1. **Restart Claude Code.** New agents and hooks are loaded at session start.
-2. Run `/agents`: you should see the `haiku-delegation` agents (for example `bulk-reader`, `repo-scout`, `browser-explorer`) with their descriptions.
+2. Run `/agents`: you should see the `haiku-delegation` agents (for example `code-explorer`, `contracts-reader`, `browser-explorer`) with their descriptions.
 3. Run `/agent-guards:kit-doctor`. Expect `0 FAIL`. A `WARN` on the first run is normal when no policy files exist yet; it tells you what each line means.
-4. Ask for something a subagent should do, for example "find where `main` is defined in this repo", and watch the main agent delegate to `repo-scout`. The session policy that tells the main model when to delegate is injected automatically at session start by the plugin; you do not need to edit `CLAUDE.md` for that (for the per-project roster see the next section).
+4. Ask for something a subagent should do, for example "find where `main` is defined in this repo", and watch the main agent delegate to `code-explorer`. The session policy that tells the main model when to delegate is injected automatically at session start by the plugin; you do not need to edit `CLAUDE.md` for that (for the per-project roster see the next section).
 
 ### Set up each project (once per project)
 Installing the plugins is per machine; the project roster is per project. In every project where you want the main agent to delegate consistently, open Claude Code in that project and run:
@@ -69,7 +69,7 @@ claude plugin update haiku-delegation@agent-kit      # repeat for each plugin yo
 ```
 Restart Claude Code afterwards, then run `/agent-guards:kit-doctor` (it checks that the running version is the installed one). Claude Code updates a plugin only when its `version` changes, so a release is what delivers new agents, hooks and skills; see [`CHANGELOG.md`](CHANGELOG.md) for what each version contains. Projects that use the roster run `/haiku-delegation:subagents-init update` once after an update to refresh `SUBAGENTS.md` (your "Project facts" are kept and a backup is written). To remove a plugin: `claude plugin uninstall <plugin>@agent-kit`. The data folder is left in place so your audit records are kept; delete it yourself if you do not need them.
 
-Plugin agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:bulk-reader`); the plain name also works.
+Plugin agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); the plain name also works.
 
 ## Where data lives
 All state is in one folder (KIT_DATA), resolved in this order by every hook and CLI: `$AGENT_KIT_DATA`; `<CLAUDE_CONFIG_DIR>/agent-kit`; the config folder the plugin is installed under (derived from the script's own `.../plugins/cache/...` path, so it still works when `CLAUDE_CONFIG_DIR` is not passed to the hook, e.g. `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`); `~/.claude/agent-kit`. The plugins' own `${CLAUDE_PLUGIN_DATA}` is not used: it is per plugin and deleted on uninstall, while the audit and usage data is shared by four plugins and must outlive any one of them.
@@ -92,7 +92,7 @@ hook-errors.log                  why a hook or audit write failed
 Logs hold no prompts, answers or file content. Back this folder up if you need the records to endure.
 
 ## Configuration
-- `BULK_READ_MIN_LINES` (environment variable, default 200): whole-file reads above this are redirected to `bulk-reader`.
+- `BULK_READ_MIN_LINES` (environment variable, default 200): whole-file reads above this are redirected to `code-explorer`.
 - **safe-rm zones:** by default the verification-runner can delete only one file at a time inside its own `verification-logs` folder. To let it clean build artefacts in your projects, copy `plugins/verification-runner/policy/safe-rm-policy.default.json` to `<data>/safe-rm-policy.json` and add entries to `allowedRoots` (`path`, `minDepth` below the root, `allowGlob`, `maxItems`). `${DATA}` expands to the data folder. Protected names (`.git`, `.env*`, keys, databases, ...) are always refused. Restore with `powershell -File <plugin>/scripts/safe-rm-restore.ps1 -List` / `-Id <id>`; purge by deleting folders under `quarantine/` yourself.
 - **Effort tiers** (frontmatter `effort:` per agent): low = mechanical extraction; medium = multi-source reconciliation, classification, drafting; high = a silent miss or leak is costly; max = `advisory-collector`, `annotator`. These are judgement-based starting points, not benchmark-proven (accuracy did not differ between low and max on 8 tasks, n = 2 each; max cost 4-15x more). Tune them from the usage log.
 
@@ -131,7 +131,7 @@ The files under `tests/` contain deliberately fake credentials (AWS-, GitHub-, S
 [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release and what is waiting under `[Unreleased]`. Each pull request adds its line there and does not bump a version; releases are cut in a separate step. Rules, release steps and the PR template: [`CONTRIBUTING.md`](CONTRIBUTING.md). A test keeps the changelog in step with the version numbers.
 
 ## Tests
-`python tests/run_all.py` runs 19 suites (about 870 checks: agent frontmatter, the SUBAGENTS.md roster, the `subagents-init` project setup tool, the changelog, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
+`python tests/run_all.py` runs 22 suites (about 930 checks: agent frontmatter, the SUBAGENTS.md roster, the `subagents-init` project setup tool, the changelog, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
 
 **On Ubuntu in Docker** (from a Linux shell or WSL with Docker; nothing is installed on the host and the container is removed afterwards): `sh tests/linux/run-in-docker.sh`. It builds `tests/linux/Dockerfile` (Ubuntu 24.04 + Python for the test runner only; no PowerShell: a test shim maps the PowerShell entry points to the `.sh` scripts), mounts the repository read-only, copies it inside the container and runs the same suites. Remove the image with `docker rmi agent-kit-ubuntu-test`.
 

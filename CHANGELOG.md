@@ -6,6 +6,15 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** nine agents are merged into two. `repo-scout`, `bulk-reader`, `module-mapper`, `inventory-extractor` and `test-case-lister` became `code-explorer` (kinds `locate`, `read`, `map`, `inventory`, `tests`); `schema-reader`, `contract-reader`, `migration-checker` and `api-contract-checker` became `contracts-reader` (kinds `schema`, `api-spec`, `migrations`, `api-match`). The agent count drops from 29 to 22. Start the brief with `Task kind: <kind>` (several kinds when a task mixes them); the agent applies that section's rules first. Callers that name an old agent (your own `CLAUDE.md`, prompts, settings deny rules, scripts) must switch to the new names; projects run `/haiku-delegation:subagents-init update` to refresh `SUBAGENTS.md`. Each section keeps the old agent's rules word for word; the shared operating rules are written once. `contracts-reader` runs at effort medium and `code-explorer` at low; the main agent can pass a different `effort` per call.
+- The bulk-read redirect (`agent-guards`) now tells the main agent to call `code-explorer` with `Task kind: read`, and the session policy and `SUBAGENTS.md` list the new names.
+- The usage log (`agent-eval`) reads the brief's `Task kind:` line to choose the footer checks of the merged agents (for example `contracts-reader` with `schema` or `api-spec` must print Coverage and Reconciliation, with `migrations` or `api-match` it need not). Records written by older versions that carry the old agent types are still checked as before.
+
+### Added
+- `tests/haiku-delegation/test_agent_references.py`: fails when a hook, script, policy or doc names an agent that does not exist or a merged one that was removed; `tests/agent-eval/test_usage_log_task_kind.py` tests the kind-aware footer checks on both the PowerShell and the shell hook.
+- `bench/merge-readers`: headless experiment comparing the five reader agents with one merged agent (with sections in the prompt, with sections as on-demand skills, and with a hook-written `Task kind:` marker). Results and limits are in its README. No shipped agent changed.
+
 ## [0.1.14] - 2026-10-14
 
 ### Added

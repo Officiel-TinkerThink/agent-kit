@@ -9,3 +9,5 @@ bench/browser-agent/cases/
 *.log
 *.bak
 *.tmp
+bench/merge-readers/fixture/
+bench/merge-readers/results/

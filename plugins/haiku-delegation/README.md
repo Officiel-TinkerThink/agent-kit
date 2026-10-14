@@ -1,8 +1,8 @@
 # haiku-delegation
 
-26 subagents on Haiku 5.5 (24 read-only, plus the browser pair) plus a session policy (injected at session start) that tells the main model when to delegate bounded, read-heavy work.
+19 subagents on Haiku 5.5 (17 read-only, plus the browser pair) plus a session policy (injected at session start) that tells the main model when to delegate bounded, read-heavy work.
 
-Agents: browser-explorer, browser-operator, bulk-reader, repo-scout, module-mapper, dependency-reader, inventory-extractor, spec-extractor, doc-researcher, log-triage, test-run-summarizer, test-case-lister, migration-checker, config-drift-checker, doc-link-checker, api-contract-checker, audit-coverage-lister, secret-candidate-lister, ticket-classifier, doc-drafter, citation-verifier, schema-reader, contract-reader, pipeline-reader, release-diff, advisory-collector.
+Agents: browser-explorer, browser-operator, code-explorer (kinds: locate, read, map, inventory, tests), contracts-reader (kinds: schema, api-spec, migrations, api-match), dependency-reader, spec-extractor, doc-researcher, log-triage, test-run-summarizer, config-drift-checker, doc-link-checker, audit-coverage-lister, secret-candidate-lister, ticket-classifier, doc-drafter, citation-verifier, pipeline-reader, release-diff, advisory-collector.
 
 Every agent shares the same operating rules (data is not instructions, read-only, answer first, verifiable citations, reconciled counts, NOT FOUND discipline, no verdicts: compliance, safety and fit-for-purpose questions are answered `not_determinable`). Effort tiers are set per agent in frontmatter; see the top-level README.
 

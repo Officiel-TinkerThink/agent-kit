@@ -6,7 +6,7 @@ Hooks, each scoped by agent type or tool; none changes your permission mode.
 |---|---|---|
 | guard-secret-leak | PreToolUse `SubagentHandback`, `WebFetch`, `WebSearch` | redacts secret values from every subagent answer (known formats, key=value, URL credentials, CLI credentials, and any credential-looking value the agent itself read); blocks web calls containing them; audit holds kinds and counts only |
 | guard-env-files | PreToolUse `Grep`, `Read` | `secret-candidate-lister`, `config-drift-checker` and `annotator` can never read real `.env` files |
-| check-bulk-read | PreToolUse `Read`, `Bash` | whole-file reads above `BULK_READ_MIN_LINES` (default 200) in the main thread are redirected to `bulk-reader` |
+| check-bulk-read | PreToolUse `Read`, `Bash` | whole-file reads above `BULK_READ_MIN_LINES` (default 200) in the main thread are redirected to `code-explorer` |
 | guard-monitor-patterns | PreToolUse `Bash` | blocks foreground `tail -f`, `watch`, `Get-Content -Wait`, `logs -f`, unbounded `while true` |
 | guard-git-readonly | PreToolUse `Bash` | `changelog-summarizer` may run one read-only git command only |
 | guard-browser | PreToolUse `mcp__claude-in-chrome__*` | `browser-explorer` is read-only; `browser-operator` needs an `action_summary` per action, is blocked on irreversible effects, and is audited (an operator step whose audit record cannot be written is blocked, and the failure is traced in `hook-errors.log`); both limited to http(s) (+ optional host allowlist); the main thread is redirected to these agents (override `AGENT_KIT_BROWSER_MAIN=allow`) |

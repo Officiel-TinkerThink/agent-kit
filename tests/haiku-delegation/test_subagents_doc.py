@@ -15,7 +15,7 @@ def check(name, ok, extra=''):
 
 def main():
     agents = {f.stem: f.parent.parent.name for f in sorted((ROOT / 'plugins').glob('*/agents/*.md'))}
-    check('agents found', len(agents) >= 29, str(len(agents)))
+    check('agents found', len(agents) >= 22, str(len(agents)))
     # an agent counts as listed when it appears as `name` inside a table row of the doc
     rows = [line for line in DOC.splitlines() if line.startswith('|')]
     for name in agents:

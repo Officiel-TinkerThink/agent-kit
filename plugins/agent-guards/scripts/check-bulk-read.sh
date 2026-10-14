@@ -1,6 +1,6 @@
 #!/bin/sh
 # PreToolUse hook (matcher: Read|Bash). Blocks whole-file reads of large text files in the MAIN
-# conversation and redirects Claude to the Haiku-backed `bulk-reader` subagent.
+# conversation and redirects Claude to the Haiku-backed `code-explorer` subagent.
 # Fails open on any internal error (cost optimisation only - not a compliance control).
 # Threshold: env BULK_READ_MIN_LINES (default 200). Audit trail: <kit data>/audit/bulk-read-audit.jsonl.
 # POSIX sh port of check-bulk-read.ps1. Line counting follows .NET StreamReader.ReadLine (LF, CRLF and CR).
@@ -76,7 +76,7 @@ if ! json_ok "$INPUT"; then
   exit 0
 fi
 
-# Subagents (incl. bulk-reader) may read freely.
+# Subagents (incl. code-explorer) may read freely.
 AGENT_ID=$(json_get "$INPUT" agent_id)
 case "$AGENT_ID" in
   ''|false|0|null) ;;
@@ -152,5 +152,5 @@ fi
 [ "$LINES" -le "$MIN" ] && exit 0
 
 write_audit "$TOOL" "$FULL" "$LINES" blocked "$(session_token "$INPUT")"
-printf "BLOCKED: '%s' has %s lines (limit %s). Do not read it whole in the main context. Delegate with the Agent tool: subagent_type='bulk-reader', prompt = the exact question + absolute file path(s). For edits or exact line numbers, re-issue Read with offset/limit on the relevant section instead.\n" "$FULL" "$LINES" "$MIN" >&2
+printf "BLOCKED: '%s' has %s lines (limit %s). Do not read it whole in the main context. Delegate with the Agent tool: subagent_type='code-explorer', prompt = a first line 'Task kind: read', then the exact question + absolute file path(s). For edits or exact line numbers, re-issue Read with offset/limit on the relevant section instead.\n" "$FULL" "$LINES" "$MIN" >&2
 exit 2

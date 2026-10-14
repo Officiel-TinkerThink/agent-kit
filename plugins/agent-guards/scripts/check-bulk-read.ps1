@@ -1,5 +1,5 @@
 # PreToolUse hook (matcher: Read|Bash). Blocks whole-file reads of large text files in the MAIN
-# conversation and redirects Claude to the Haiku-backed `bulk-reader` subagent.
+# conversation and redirects Claude to the Haiku-backed `code-explorer` subagent.
 # Fails open on any internal error (cost optimisation only - not a compliance control).
 # Threshold: env BULK_READ_MIN_LINES (default 200). Audit trail: <kit data>/audit/bulk-read-audit.jsonl.
 $ErrorActionPreference = 'Stop'
@@ -45,7 +45,7 @@ function Resolve-Target([string]$Raw, [string]$Cwd) {
 
 try {
     $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    if ($in.agent_id) { exit 0 }                       # subagents (incl. bulk-reader) may read freely
+    if ($in.agent_id) { exit 0 }                       # subagents (incl. code-explorer) may read freely
 
     $target = $null
     if ($in.tool_name -eq 'Read') {
@@ -71,7 +71,7 @@ try {
     Write-Audit $in.tool_name $full $lines 'blocked' $in.session_id
     [Console]::Error.WriteLine(
         "BLOCKED: '$full' has $lines lines (limit $MinLines). Do not read it whole in the main context. " +
-        "Delegate with the Agent tool: subagent_type='bulk-reader', prompt = the exact question + absolute file path(s). " +
+        "Delegate with the Agent tool: subagent_type='code-explorer', prompt = a first line 'Task kind: read', then the exact question + absolute file path(s). " +
         "For edits or exact line numbers, re-issue Read with offset/limit on the relevant section instead.")
     exit 2
 }

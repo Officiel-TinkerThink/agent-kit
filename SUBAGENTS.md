@@ -2,7 +2,7 @@
 
 Which subagents exist, what each one is for, and when the main agent should hand work to it.
 
-**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root and imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:bulk-reader`); the plain name also works.
+**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root and imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); the plain name also works.
 
 ## Stance
 
@@ -19,11 +19,13 @@ If the action you are about to take matches a row, call the Agent tool instead. 
 
 ### Find and read
 
+`code-explorer` and `contracts-reader` each serve several kinds of task. Put `Task kind: <kind>` on the first line of the brief (the kinds are in the rows below); the agent applies that section's rules first, and the usage log uses the kind to pick the footer checks. A task that mixes kinds names several, for example `Task kind: locate, inventory`.
+
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
-| Read a file over about 80 lines, open a second file in one investigation, or run `cat`/`head`/`ls`/`grep` for facts you only need summarised | `bulk-reader` | The exact question and the files; at most about 10 files per agent (it has a turn cap), split the rest | Speculate on bugs, design or compliance; edit anything |
-| Search for anything beyond one known symbol in one known file | `repo-scout` | The symbol, config key or endpoint, and the directory; say "whole word" if you need it | Map the whole repo; judge quality |
-| List every endpoint, config key, env var, TODO, error message, requirement ID | `inventory-extractor` | The item kind and the glob | Infer items that are not written down (ambiguous ones are `UNCLEAR`) |
+| Read a file over about 80 lines, open a second file in one investigation, or run `cat`/`head`/`ls`/`grep` for facts you only need summarised | `code-explorer` | First line `Task kind: read`, then the exact question and the files; at most about 10 files per agent (it has a turn cap), split the rest | Speculate on bugs, design or compliance; edit anything |
+| Search for anything beyond one known symbol in one known file | `code-explorer` | First line `Task kind: locate`, then the symbol, config key or endpoint, and the directory; say "whole word" if you need it | Map the whole repo; judge quality |
+| List every endpoint, config key, env var, TODO, error message, requirement ID | `code-explorer` | First line `Task kind: inventory`, then the item kind and the glob | Infer items that are not written down (ambiguous ones are `UNCLEAR`) |
 | Open a long log, stack trace or CI output | `log-triage` | The file path | Diagnose root cause or suggest fixes |
 | Open a saved pytest/jest/CI output file | `test-run-summarizer` | The file path. (For a fresh run use `verification-runner`; it already summarises.) | Diagnose; assume a missing count is zero |
 
@@ -31,13 +33,13 @@ If the action you are about to take matches a row, call the Agent tool instead. 
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
-| Map packages, import edges, layering, entry points or a module's public API | `module-mapper` | The target package(s); static versus dynamic imports if it matters | Judge the design |
-| Read database DDL, migrations or ORM models for tables, columns, keys, indexes | `schema-reader` | The files; say whether you want per-statement history or the net schema | Normalise a type, suggest indexes, read seed or data rows |
-| Inspect an Alembic (or similar) migrations directory: heads, branches, gaps, duplicate ids | `migration-checker` | The migrations directory | Judge migration content or say what will fail |
-| Compare frontend calls with backend routes | `api-contract-checker` | Both source roots, the router prefix, and the base URL the frontend uses | Predict runtime behaviour |
-| Read an OpenAPI/Swagger or GraphQL schema | `contract-reader` | The schema file | Review the design or check an implementation |
+| Map packages, import edges, layering, entry points or a module's public API | `code-explorer` | First line `Task kind: map`, then the target package(s); static versus dynamic imports if it matters | Judge the design |
+| Read database DDL, migrations or ORM models for tables, columns, keys, indexes | `contracts-reader` | First line `Task kind: schema`, then the files; say whether you want per-statement history or the net schema | Normalise a type, suggest indexes, read seed or data rows |
+| Inspect an Alembic (or similar) migrations directory: heads, branches, gaps, duplicate ids | `contracts-reader` | First line `Task kind: migrations`, then the migrations directory | Judge migration content or say what will fail |
+| Compare frontend calls with backend routes | `contracts-reader` | First line `Task kind: api-match`, then both source roots, the router prefix, and the base URL the frontend uses | Predict runtime behaviour |
+| Read an OpenAPI/Swagger or GraphQL schema | `contracts-reader` | First line `Task kind: api-spec`, then the schema file | Review the design or check an implementation |
 | Find which use cases reference the audit log | `audit-coverage-lister` | The glob of use-case files; optional search term (default `audit`) | Decide whether a NO is a defect or a YES is sufficient (that is a human GxP call) |
-| Map tests to code, or find untested public symbols | `test-case-lister` | Test directory and source directory | Write tests; it is a name-reference check, not coverage |
+| Map tests to code, or find untested public symbols | `code-explorer` | First line `Task kind: tests`, then the test directory and source directory | Write tests; it is a name-reference check, not coverage |
 
 ### Describe configuration, infrastructure and dependencies
 
@@ -131,7 +133,7 @@ The user should never have to say "annotate that". When you find that a subagent
 
 Every edit, debugging and root cause, architecture and layering, security and authorization changes, GxP and 21 CFR Part 11 conclusions, validation conclusions, and upgrade-safety calls. Agents supply the evidence; you make the call.
 
-Documents your project says to read before a change are decision inputs. Locate the section with `repo-scout`, then read that section yourself with an offset and limit.
+Documents your project says to read before a change are decision inputs. Locate the section with `code-explorer` (`Task kind: locate`), then read that section yourself with an offset and limit.
 
 ## Writing a brief
 

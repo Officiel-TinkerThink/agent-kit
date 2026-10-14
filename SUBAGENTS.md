@@ -2,7 +2,7 @@
 
 Which subagents exist, what each one is for, and when the main agent should hand work to it.
 
-**How to use this file.** Copy it into a project and import it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`. Add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:bulk-reader`); the plain name also works.
+**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root and imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:bulk-reader`); the plain name also works.
 
 ## Stance
 
@@ -104,7 +104,28 @@ Which commands the runner may run is decided by **Claude Code's own permissions*
 - **Before editing from an agent's result:** `citation-verifier` on the claims you will rely on.
 - **Dependency question:** `dependency-reader` first, then `advisory-collector` and `release-diff` in parallel on the versions it returned.
 - **Task touched documents:** `doc-link-checker`. **Task touched audit-relevant code:** `audit-coverage-lister`.
-- **Agent result wrong or partial:** fix the task, then `annotator` once.
+- **Agent result wrong or partial (you verified it):** fix the task, then `annotator` once, without being asked. See "Report agent failures to the annotator" below.
+
+## Report agent failures to the annotator: on your own initiative
+
+The user should never have to say "annotate that". When you find that a subagent's result is off, record it yourself. This is a standing duty, like running `verification-runner` after edits.
+
+**Trigger: you verified it yourself** (a re-read of the cited lines, `citation-verifier`, a recount, a failing check, or the user pointing it out), and the run:
+
+- stated a fact that is false, or a `path:line` that does not hold;
+- gave a wrong count or total, or left out items that were in scope (`partial` or `missed`);
+- broke a rule of its own definition or the format you asked for (a verdict where only evidence was allowed, scope creep, a write or command it should not have made);
+- exposed a secret or personal data (describe by location and kind only, never the value);
+- ended without a usable answer (`BLOCKED`, empty hand-back, a `no_final_answer` flag in the usage log) for a reason that points at the agent's instructions or the kit, not at your brief.
+
+**Do it in this order:**
+
+1. Fix the task first: redo the read, correct the count, or repeat the run with a better brief.
+2. Call `annotator` once per failed run, in the background, and keep working. Give it: the agent id (or `last:<agent_type>`), what was wrong, what you expected, and how you found out.
+3. State only what you verified. A claim it cannot confirm is recorded as `disputed`, which counts against the record.
+4. Mention it in the close-out line (`Annotated: <agent_type> <outcome>`).
+
+**Do not annotate:** style or wording preferences, runs you did not check, a failure caused by a vague or wrong brief of your own (fix the brief), the same run twice, or an agent that correctly reported `NOT FOUND` or `UNCLEAR`. Never put secret values in the details.
 
 ## What stays on the main thread
 
@@ -129,7 +150,7 @@ An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is se
 
 ## Close-out
 
-End every task with one line: `Handoffs: <agent x count>` or `Inline: <reason>`. Reading three or more files inline with no handoff needs a stated reason.
+End every task with one line: `Handoffs: <agent x count>` or `Inline: <reason>`. Reading three or more files inline with no handoff needs a stated reason. If a delegated result failed your check, add `Annotated: <agent_type> <outcome>`, or `Annotate: skipped, <reason>`.
 
 ## Project facts (fill in per project)
 

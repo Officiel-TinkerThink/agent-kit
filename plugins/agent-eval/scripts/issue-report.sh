@@ -43,6 +43,25 @@ plugin_version() {
   printf '%s' "${_v:-unknown}"
 }
 
+# version_of <plugin>  -> the highest installed version of a kit plugin (installed layout .../agent-kit/<plugin>/<version>/, or this repository), else "not installed"
+version_of() {
+  if [ "$1" = agent-eval ]; then plugin_version; return; fi
+  _v=$( { ls "$KIT_SCRIPT_DIR/../../../$1"/*/.claude-plugin/plugin.json "$KIT_SCRIPT_DIR/../../$1/.claude-plugin/plugin.json"; } 2>/dev/null | while IFS= read -r _f; do sed -n 's/^ *"version": *"\([0-9][0-9.]*\)".*/\1/p' "$_f" | head -n 1; done | sort -V | tail -n 1)
+  printf '%s' "${_v:-not installed}"
+}
+
+# claude_version  -> the Claude Code version (digits and dots only), else "unknown"
+claude_version() {
+  _c=$(command -v claude 2>/dev/null) || { printf 'unknown'; return; }
+  _v=$(timeout 10 "$_c" --version 2>/dev/null | head -n 1 | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')
+  printf '%s' "${_v:-unknown}"
+}
+
+versions_line() {
+  printf '**Versions:** agent-kit %s (agent-eval %s, agent-guards %s, haiku-delegation %s, verification-runner %s), claude-code %s, os %s' \
+    "$(plugin_version)" "$(version_of agent-eval)" "$(version_of agent-guards)" "$(version_of haiku-delegation)" "$(version_of verification-runner)" "$(claude_version)" "$(os_name | sanitize)"
+}
+
 os_name() { printf '%s' "$(uname -s 2>/dev/null | tr -c 'A-Za-z0-9._-' ' ' | sed 's/ *$//') $(uname -m 2>/dev/null | tr -c 'A-Za-z0-9._-' ' ' | sed 's/ *$//')"; }
 
 # word <text> <max-length>  -> text when it is a short plain word, otherwise "other"
@@ -93,9 +112,9 @@ do_draft() {
   if [ "$NERR" -gt 0 ]; then
     TOP=$(printf '%s\n' "$ERR" | head -n 1)
     _sc=$(printf '%s' "$TOP" | awk -F "$TAB" '{print $4}'); _m=$(printf '%s' "$TOP" | awk -F "$TAB" '{print substr($5, 1, 60)}')
-    TITLE="Error report: $_sc: $_m"
+    TITLE="[agent-kit $(plugin_version)] Error report: $_sc: $_m"
   else
-    TITLE="Agent failure report: $(printf '%s' "$ANN" | head -n 1 | awk -F "$TAB" '{print $2 " " $4}')"
+    TITLE="[agent-kit $(plugin_version)] Agent failure report: $(printf '%s' "$ANN" | head -n 1 | awk -F "$TAB" '{print $2 " " $4}')"
   fi
   TITLE=$(printf '%s' "$TITLE" | sanitize)
   OUT="$DATA/reports/issue-draft-$(date -u +%Y%m%dT%H%M%SZ).md"
@@ -104,7 +123,7 @@ do_draft() {
     printf '<!-- agent-kit-report fingerprint: %s -->\n<!-- title: %s -->\n' "$FP" "$TITLE"
     printf '## Error report from a plugin user (reviewed by the user before sending)\n\n'
     printf 'Contains only counts, script names, versions and sanitized error messages. No prompts, answers, transcripts or file contents.\n\n'
-    printf '**Versions:** agent-eval %s, os %s\n' "$(plugin_version)" "$(os_name | sanitize)"
+    printf '%s\n' "$(versions_line)"
     printf '**Window:** last %s days\n\n' "$DAYS"
     printf '### Hook errors (%s kinds)\n\n' "$NERR"
     if [ "$NERR" -gt 0 ]; then

@@ -38,6 +38,34 @@ function Get-PluginVersion {
     try { $m = [regex]::Match([System.IO.File]::ReadAllText((Join-Path $PSScriptRoot '../.claude-plugin/plugin.json')), '"version"\s*:\s*"([0-9][0-9.]*)"'); if ($m.Success) { return $m.Groups[1].Value } } catch { }
     return 'unknown'
 }
+# The highest installed version of a kit plugin (installed layout .../agent-kit/<plugin>/<version>/, or this repository), else 'not installed'. Same lookup as version_of in the shell twin.
+function Get-PluginVersionOf([string]$Plugin) {
+    if ($Plugin -eq 'agent-eval') { return (Get-PluginVersion) }
+    $found = @()
+    $cands = @()
+    try { $cands += @(Get-ChildItem -Path (Join-Path $PSScriptRoot "../../../$Plugin/*/.claude-plugin/plugin.json") -ErrorAction SilentlyContinue) } catch { }
+    $repo = Join-Path $PSScriptRoot "../../$Plugin/.claude-plugin/plugin.json"
+    if (Test-Path -LiteralPath $repo) { $cands += Get-Item -LiteralPath $repo }
+    foreach ($f in $cands) {
+        $m = [regex]::Match([System.IO.File]::ReadAllText($f.FullName), '"version"\s*:\s*"([0-9][0-9.]*)"')
+        if ($m.Success) { try { $found += [version]$m.Groups[1].Value } catch { } }
+    }
+    if ($found.Count -eq 0) { return 'not installed' }
+    return (($found | Sort-Object | Select-Object -Last 1).ToString())
+}
+function Get-ClaudeVersion {
+    try {
+        $c = Get-Command claude -ErrorAction SilentlyContinue
+        if (-not $c) { return 'unknown' }
+        $o = (& $c.Source --version 2>$null | Select-Object -First 1)
+        $m = [regex]::Match([string]$o, '^([0-9][0-9.]*)')
+        if ($m.Success) { return $m.Groups[1].Value }
+    } catch { }
+    return 'unknown'
+}
+function Get-VersionsLine {
+    return ("**Versions:** agent-kit $(Get-PluginVersion) (agent-eval $(Get-PluginVersionOf 'agent-eval'), agent-guards $(Get-PluginVersionOf 'agent-guards'), haiku-delegation $(Get-PluginVersionOf 'haiku-delegation'), verification-runner $(Get-PluginVersionOf 'verification-runner')), claude-code $(Get-ClaudeVersion), os $(Sanitize (Get-OsName))")
+}
 function Get-OsName {
     $o = [System.Environment]::OSVersion.Platform.ToString() + ' ' + [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
     return $o
@@ -102,8 +130,8 @@ function Invoke-Draft {
     foreach ($a in $ann) { $sigs += ('A|' + ($a.Key -replace "`t", '|')) }
     $sorted = [string[]]$sigs; [Array]::Sort($sorted, [System.StringComparer]::Ordinal)
     $fp = Get-Fingerprint ($sorted -join "`n")
-    if ($err.Count -gt 0) { $top = $err[0]; $title = "Error report: $($top.Script): $($top.Message.Substring(0, [Math]::Min(60, $top.Message.Length)))" }
-    else { $p = $ann[0].Key -split "`t"; $title = "Agent failure report: $($p[0]) $($p[2])" }
+    if ($err.Count -gt 0) { $top = $err[0]; $title = "[agent-kit $(Get-PluginVersion)] Error report: $($top.Script): $($top.Message.Substring(0, [Math]::Min(60, $top.Message.Length)))" }
+    else { $p = $ann[0].Key -split "`t"; $title = "[agent-kit $(Get-PluginVersion)] Agent failure report: $($p[0]) $($p[2])" }
     $title = Sanitize $title
     $outDir = "$Data/reports"
     [void](New-Item -ItemType Directory -Path $outDir -Force)
@@ -112,7 +140,7 @@ function Invoke-Draft {
     [void]$sb.Append("<!-- agent-kit-report fingerprint: $fp -->`n<!-- title: $title -->`n")
     [void]$sb.Append("## Error report from a plugin user (reviewed by the user before sending)`n`n")
     [void]$sb.Append("Contains only counts, script names, versions and sanitized error messages. No prompts, answers, transcripts or file contents.`n`n")
-    [void]$sb.Append("**Versions:** agent-eval $(Get-PluginVersion), os $(Sanitize (Get-OsName))`n")
+    [void]$sb.Append((Get-VersionsLine) + "`n")
     [void]$sb.Append("**Window:** last $Days days`n`n")
     [void]$sb.Append("### Hook errors ($($err.Count) kinds)`n`n")
     if ($err.Count -gt 0) {

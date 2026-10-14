@@ -11,7 +11,7 @@ Report plugin errors to the maintainers. The issue tracker is public, so nothing
    sh ${CLAUDE_PLUGIN_ROOT}/scripts/run.sh ${CLAUDE_PLUGIN_ROOT}/scripts/issue-report draft [-Days <n>]
 
    If it prints `NO ERRORS`, tell the user there is nothing to report and stop.
-2. Read the `DRAFT <path>` file with the Read tool and show its table to the user in the reply. State plainly what it contains (counts, script names, versions, sanitized messages) and what it never contains (prompts, answers, transcripts, file contents). Point out anything in it that still looks like private data (a project name, a host name) so the user can edit the file before sending.
+2. Read the `DRAFT <path>` file with the Read tool and show its table to the user in the reply. State plainly what it contains (counts, script names, the kit, plugin, Claude Code and OS versions, sanitized messages) and what it never contains (prompts, answers, transcripts, file contents). Point out anything in it that still looks like private data (a project name, a host name) so the user can edit the file before sending.
 3. Ask: "Send this as a GitHub issue to the agent-kit repository?" Do nothing more until the user answers. A "no" ends the skill; the draft stays in the reports folder.
 4. On yes, submit the draft (it is sanitized once more, and an issue with the same fingerprint is looked up first):
 

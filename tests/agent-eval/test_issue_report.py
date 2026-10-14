@@ -135,6 +135,11 @@ def main():
         check(f'[{t}] secrets and addresses are replaced', '<redacted:secret>' in txt and '<email>' in txt, txt)
         check(f'[{t}] annotation rows are counted: code-explorer 2, unverified-no left out, odd agent type becomes "other"', '| 2 | `code-explorer` | wrong | wrong_count | medium |' in txt and '| 1 | `other` | partial | omission | low |' in txt, txt)
         check(f'[{t}] the draft starts with the fingerprint line and a title line', txt.startswith('<!-- agent-kit-report fingerprint: ') and txt.split('\n')[1].startswith('<!-- title: '), txt[:200])
+        vm = re.search(r'^\*\*Versions:\*\* agent-kit (\d+\.\d+\.\d+) \(agent-eval (\d+\.\d+\.\d+), agent-guards (\d+\.\d+\.\d+), haiku-delegation (\d+\.\d+\.\d+), verification-runner (\d+\.\d+\.\d+)\), claude-code (\S+), os (.+)$', txt, re.M)
+        check(f'[{t}] the Versions line names the kit, all four plugins, Claude Code and the OS', vm is not None, txt[:600])
+        plugin_json = json.loads((SCRIPTS.parent / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
+        check(f'[{t}] the kit and plugin versions are the ones in plugin.json', vm is not None and set(vm.groups()[:5]) == {plugin_json['version']}, str(vm.groups() if vm else ''))
+        check(f'[{t}] the title starts with the kit version', r['TITLE'].startswith(f"[agent-kit {plugin_json['version']}] "), r['TITLE'])
         check(f'[{t}] the draft says what it never contains', 'No prompts, answers, transcripts or file contents' in txt)
         # empty data folder
         e = TMP / f'empty-{t}'
@@ -153,6 +158,8 @@ def main():
         a, b = drafts['sh'], drafts['ps1']
         check('sh and ps1 print the same fingerprint', a[1]['FINGERPRINT'] == b[1]['FINGERPRINT'], f"{a[1]['FINGERPRINT']} vs {b[1]['FINGERPRINT']}")
         check('sh and ps1 print the same title', a[1]['TITLE'] == b[1]['TITLE'], f"{a[1]['TITLE']!r} vs {b[1]['TITLE']!r}")
+        va, vb = re.search(r'^\*\*Versions:\*\* (.*?), claude-code', a[0], re.M), re.search(r'^\*\*Versions:\*\* (.*?), claude-code', b[0], re.M)
+        check('sh and ps1 report the same kit and plugin versions', va is not None and vb is not None and va.group(1) == vb.group(1), f"{va and va.group(1)} vs {vb and vb.group(1)}")
         x, y = body_without_environment(a[0]), body_without_environment(b[0])
         check('sh and ps1 write the same draft (apart from the Versions line)', x == y, '\n--- sh\n' + x + '\n--- ps1\n' + y)
 
@@ -192,7 +199,7 @@ def main():
         body = (d / 'reports' / '.submit-body.md').read_text(encoding='utf-8') if (d / 'reports' / '.submit-body.md').exists() else ''
         check(f'[{t}] the submitted body is sanitized again (user-added secret and user name are gone)', 'hunter2' not in body and 'bob' not in body and 'password=<redacted:secret>' in body, body[-300:])
         check(f'[{t}] the submitted body starts with the fingerprint and has no title comment', body.startswith('<!-- agent-kit-report fingerprint: ') and '<!-- title:' not in body, body[:200])
-        check(f'[{t}] the issue title is passed to gh', '--title Error report: ' in calls.replace('"', ''), calls)
+        check(f'[{t}] the issue title is passed to gh', '--title [agent-kit ' in calls.replace('"', '') and '] Error report: ' in calls, calls)
 
         log.unlink(missing_ok=True)
         p = run(cmd, d, 'submit', '-Draft', str(edited), mode='dup', gh=stub, log=log)

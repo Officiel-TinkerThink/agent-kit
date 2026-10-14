@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Added
+- `/agent-eval:report-issue` lets a plugin user report errors to the maintainers as a GitHub issue. It reads `hook-errors.log` and `eval/annotations.jsonl` (last 30 days by default, `-Days N`), groups equal errors, and writes a draft to `reports/issue-draft-<time>.md` with counts, script names, versions and sanitized messages (home folders and paths, tokens, long opaque strings and e-mail addresses replaced; never prompts, answers, transcripts or file contents). Nothing is sent until the user has read the draft and confirms: with `gh` logged in it checks for an existing issue with the same fingerprint and otherwise creates the issue; without `gh` it prints a prefilled browser link. The submit step sanitizes the draft again and accepts only files `issue-draft-*.md` inside `reports/`. PowerShell and shell versions write the same draft (`tests/agent-eval/test_issue_report.py`, 88 checks).
+
 ## [0.2.0] - 2026-10-14
 
 ### Changed

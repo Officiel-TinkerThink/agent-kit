@@ -88,6 +88,7 @@ audit/blocked-requests.jsonl     browser hosts the guard blocked, waiting for th
 audit/policy-changes.jsonl       every approved host change: who, when, why, SHA-256 of the file before and after
 audit/browser-actions.jsonl      every browser-operator decision (typed text never stored)
 hook-errors.log                  why a hook or audit write failed
+reports/                         drafts of /agent-eval:report-issue, kept until you delete them (agent-eval)
 ```
 Logs hold no prompts, answers or file content. Back this folder up if you need the records to endure.
 

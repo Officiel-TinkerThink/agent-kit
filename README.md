@@ -67,7 +67,7 @@ It copies [`SUBAGENTS.md`](SUBAGENTS.md) (which agent for which job, what each b
 claude plugin marketplace update agent-kit
 claude plugin update haiku-delegation@agent-kit      # repeat for each plugin you installed
 ```
-Restart Claude Code afterwards. To remove a plugin: `claude plugin uninstall <plugin>@agent-kit`. The data folder is left in place so your audit records are kept; delete it yourself if you do not need them.
+Restart Claude Code afterwards, then run `/agent-guards:kit-doctor` (it checks that the running version is the installed one). Claude Code updates a plugin only when its `version` changes, so a release is what delivers new agents, hooks and skills; see [`CHANGELOG.md`](CHANGELOG.md) for what each version contains. Projects that use the roster run `/haiku-delegation:subagents-init update` once after an update to refresh `SUBAGENTS.md` (your "Project facts" are kept and a backup is written). To remove a plugin: `claude plugin uninstall <plugin>@agent-kit`. The data folder is left in place so your audit records are kept; delete it yourself if you do not need them.
 
 Plugin agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:bulk-reader`); the plain name also works.
 
@@ -131,7 +131,7 @@ The files under `tests/` contain deliberately fake credentials (AWS-, GitHub-, S
 [`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release and what is waiting under `[Unreleased]`. Each pull request adds its line there and does not bump a version; releases are cut in a separate step. Rules, release steps and the PR template: [`CONTRIBUTING.md`](CONTRIBUTING.md). A test keeps the changelog in step with the version numbers.
 
 ## Tests
-`python tests/run_all.py` runs 18 suites (about 870 checks: agent frontmatter, the SUBAGENTS.md roster, the `subagents-init` project setup tool, the changelog, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
+`python tests/run_all.py` runs 19 suites (about 870 checks: agent frontmatter, the SUBAGENTS.md roster, the `subagents-init` project setup tool, the changelog, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
 
 **On Ubuntu in Docker** (from a Linux shell or WSL with Docker; nothing is installed on the host and the container is removed afterwards): `sh tests/linux/run-in-docker.sh`. It builds `tests/linux/Dockerfile` (Ubuntu 24.04 + Python for the test runner only; no PowerShell: a test shim maps the PowerShell entry points to the `.sh` scripts), mounts the repository read-only, copies it inside the container and runs the same suites. Remove the image with `docker rmi agent-kit-ubuntu-test`.
 

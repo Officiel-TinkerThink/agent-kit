@@ -4,15 +4,15 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 **How to keep it.** Each pull request adds its own line under `## [Unreleased]` and does not change any version; a separate release step renames `[Unreleased]` to the version and date and bumps the versions. The full rules, the release steps and the pull request template are in [`CONTRIBUTING.md`](CONTRIBUTING.md). `tests/haiku-delegation/test_changelog.py` checks that this file and the version numbers agree.
 
-## [Unreleased]` in the same pull request, in one of the groups Added, Changed, Fixed, Security or Removed. Write what a user sees, not how the code works, and name the file or command when that helps. At release, rename `[Unreleased]` to the version and date, bump the version in the four `plugin.json` files and in `.claude-plugin/marketplace.json`, and open a fresh empty `[Unreleased]`. `tests/haiku-delegation/test_changelog.py` checks that this file and the version numbers agree.
-
 ## [Unreleased]
+
+## [0.1.14] - 2026-10-14
 
 ### Added
 - `/haiku-delegation:subagents-init`: copies `SUBAGENTS.md` into the current project root and adds an `@SUBAGENTS.md` import to `CLAUDE.md` (or `AGENTS.md`, or a new `CLAUDE.md`). Safe to repeat: an identical file is `UNCHANGED`, the import is never added twice, and a `SUBAGENTS.md` the project edited is kept. Options: `update` (refresh the shipped part above "Project facts", keep the project's facts, write `SUBAGENTS.md.bak-<timestamp>`; running it twice changes nothing), `dry-run`, `claude` or `agents` to choose the import target, or a folder path. Shell and PowerShell versions behave identically. User-started only.
 - `SUBAGENTS.md`: new section "Report agent failures to the annotator: on your own initiative". The main agent records a verified failure of a subagent (false fact, wrong count, omission, broken rule, exposed secret, no usable answer) without the user having to ask: fix the task first, then call `annotator` once per failed run, and note it in the close-out line. Lists what not to annotate (style preferences, unchecked runs, its own vague briefs, duplicates).
 - `CONTRIBUTING.md` and a pull request template: the changelog line goes in the PR, versions are bumped only in a separate release step (rules, release steps and notes for agents).
-- README: "Set up each project (once per project)" explains how to put the roster into a project; this changelog.
+- README: "Set up each project (once per project)" explains how to put the roster into a project; "Update and uninstall" now says what to do in each project after a kit update; this changelog.
 - Tests: `test_subagents_init.py` (both tools, identical output, idempotence), `test_changelog.py`.
 
 ### Changed

@@ -390,12 +390,19 @@ function recon(   pos, mt, g1, g2, rest) {
     if (g1 != g2) emit("reconciliation_mismatch", "fail", "expected " g1 " / listed " g2)
   }
 }
-function footers(AT, KD,   need_rec, need_cov, nk, KW, kset, ki) {
+function footers(AT, KD,   need_rec, need_cov, nk, KW, kset, ki, nr, ROWS, RF, ri, known) {
   # merged agents: the `Task kind:` line of the brief says which contract applies (KD is that line, lower case, at most 40 characters)
   # whole words only: `roadmap` is not `map`; the text after the kind words (the pattern may run on into the sentence) is ignored by the exact comparison
   nk = split(KD, KW, /[, ]+/); kset = " "; for (ki = 1; ki <= nk; ki++) kset = kset KW[ki] " "
-  if (AT == "contracts-reader") { need_rec = (index(kset, " schema ") > 0 || index(kset, " api-spec ") > 0); need_cov = need_rec }
-  else if (AT == "code-explorer") { need_rec = 0; need_cov = (index(kset, " locate ") > 0 || index(kset, " map ") > 0 || index(kset, " inventory ") > 0) }
+  # topic agents: kinds.txt rows "<agent> <kind> <footers>" (KINDTAB); the footers of every kind named in the brief apply
+  nr = split(KINDTAB, ROWS, "\n"); known = 0; need_rec = 0; need_cov = 0
+  for (ri = 1; ri <= nr; ri++) {
+    split(ROWS[ri], RF, /[ \t]+/)
+    if (RF[1] == "" || substr(RF[1], 1, 1) == "#" || RF[1] != AT) continue
+    known = 1
+    if (index(kset, " " RF[2] " ") > 0) { if (RF[3] ~ /reconciliation/) need_rec = 1; if (RF[3] ~ /coverage/) need_cov = 1 }
+  }
+  if (known) { }
   else {
     need_rec = (AT == "schema-reader" || AT == "contract-reader" || AT == "pipeline-reader")
     need_cov = need_rec || AT == "inventory-extractor" || AT == "module-mapper" || AT == "repo-scout"
@@ -462,7 +469,7 @@ function citations(   pos, a, endp, key, nuniq) {
 BEGIN { RS = "\001" }
 { O = (NR > 1) ? O "\001" $0 : $0 }
 END {
-  HBv = (ENVIRON["HB"] == "1"); BL = ENVIRON["BLOCKED"] + 0; AT = tolower(ENVIRON["ATYPE"]); KD = tolower(ENVIRON["KIND"])
+  HBv = (ENVIRON["HB"] == "1"); BL = ENVIRON["BLOCKED"] + 0; AT = tolower(ENVIRON["ATYPE"]); KD = tolower(ENVIRON["KIND"]); KINDTAB = ENVIRON["KINDTAB"]
   T = trim(O); tl = u16(T); ol = u16(O)
   LO = tolower(O); Ln = length(O)
   if (!HBv) emit("no_final_answer", "fail", "run ended without a SubagentHandback result")
@@ -600,11 +607,12 @@ done < "$WORK/stats"
 # --- stage C: Get-Flags checks on the hand-back text ----------------------------------------------------------
 [ -f "$OUTF" ] || : > "$OUTF"
 ATYPE="$(printf '%s' "$AGENT_TYPE" | sed 's/^.*://')"
-# the first `Task kind: ...` in the transcript is the brief's own line (merged agents: code-explorer, contracts-reader); empty when there is none
+# the first `Task kind: ...` in the transcript is the brief's own line (topic agents: the kinds are in kinds.txt); empty when there is none
 KIND=""
 # only the first lines are read (the brief is the first user message; a transcript can be large), and the file is read from stdin so a path that starts with '-' is never an option
 if [ -n "$TP" ] && [ -f "$TP" ]; then KIND="$(head -n 20 < "$TP" 2>/dev/null | grep -m1 -o 'Task kind: [a-z, -]\{1,40\}' | head -n 1 | sed 's/^Task kind: //')"; fi
-if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" KIND="$KIND" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
+KINDTAB="$(cat "$KIT_SCRIPT_DIR/kinds.txt" 2>/dev/null)"
+if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" KIND="$KIND" KINDTAB="$KINDTAB" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
   # The awk error says why (it used to go to /dev/null, which hid a whole class of failures).
   hook_error "$SCRIPT_NAME" "run record not written: output checks failed ($(head -c 200 "$WORK/checks.err" | tr '\n' ' '))"
   exit 0

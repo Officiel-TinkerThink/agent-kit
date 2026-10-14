@@ -1,0 +1,26 @@
+# One row per kind of task of a topic agent: <agent> <kind> <footers> <effort>
+# footers = the lines the answer must carry for that kind: coverage, reconciliation (comma separated) or - for none.
+# effort  = the effort the old single-purpose agent ran at. The agent's default effort is in its frontmatter; the main agent passes `effort` per call when a kind needs more.
+# Read by guard-task-kind (valid kinds of the agent) and, as a copy in plugins/agent-eval/scripts, by the usage log (footer checks).
+# To add a topic: add its rows here and in agent-eval, and a section per kind in the agent file. A test keeps the copies and the agent files in step.
+code-explorer locate coverage low
+code-explorer read - low
+code-explorer map coverage medium
+code-explorer inventory coverage low
+code-explorer tests - low
+contracts-reader schema coverage,reconciliation medium
+contracts-reader api-spec coverage,reconciliation medium
+contracts-reader migrations - medium
+contracts-reader api-match - medium
+infra-reader pipeline-reader coverage,reconciliation high
+infra-reader dependency-reader - low
+infra-reader config-drift-checker - medium
+docs-reader spec-extractor - medium
+docs-reader doc-link-checker - low
+docs-reader doc-drafter - medium
+triage log-triage - low
+triage test-run-summarizer - low
+triage ticket-classifier - medium
+compliance-lister audit-coverage-lister - medium
+compliance-lister secret-candidate-lister - high
+compliance-lister citation-verifier - high

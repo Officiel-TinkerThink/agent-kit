@@ -1,7 +1,7 @@
-"""The merged agents (code-explorer, contracts-reader) serve several kinds of task. The usage-log hook reads the brief's `Task kind: <kind>` line and applies
-the footer checks (Coverage, Reconciliation) of that kind only. Runs the PowerShell and the POSIX sh hook (whichever exist here) and requires identical flags.
+"""The merged agents (code-explorer, contracts-reader) serve several kinds of task. The usage-log hook reads the brief's `Task kind: <kind>` line and applies\nthe footer checks (Coverage, Reconciliation) of that kind only. Runs the PowerShell and the POSIX sh hook (whichever exist here) and requires identical flags.
 Run: python test_usage_log_task_kind.py   (uses a temp log and data folder)"""
 import json
+from concurrent.futures import ThreadPoolExecutor
 import os
 import pathlib
 import shutil
@@ -45,13 +45,13 @@ def transcript(brief, answer, n):
 
 def flags(cmd, agent, brief, answer, n):
     tp = transcript(brief, answer, n)
-    inp = TMP / 'in.json'
+    inp = TMP / f'in{n}.json'
     inp.write_text(json.dumps({'session_id': 's', 'agent_id': f'agent{n}', 'agent_type': agent, 'effort': {'level': 'low'}, 'cwd': str(TMP), 'agent_transcript_path': str(tp)}), encoding='utf-8')
-    log = TMP / 'log.jsonl'
+    log = TMP / f'log{n}.jsonl'
     if log.exists():
         log.unlink()
     env = dict(os.environ, AGENT_USAGE_LOG=str(log), AGENT_KIT_DATA=str(TMP / 'kit'))
-    subprocess.run(cmd + ['-SelfTestInput', str(inp)], env=env, check=True, capture_output=True, timeout=90)
+    subprocess.run(cmd + ['-SelfTestInput', str(inp)], env=env, check=True, capture_output=True, timeout=600)
     rec = json.loads(log.read_text(encoding='utf-8').splitlines()[-1])
     return sorted(f['detail'] for f in rec['flags'] if f['code'] == 'footer_missing')
 
@@ -75,6 +75,10 @@ CASES = [  # (label, agent, brief, answer, expected footer_missing details)
     ('whole words only: relocate is not locate', 'code-explorer', 'Task kind: relocate\nq', PLAIN, []),
     ('kind text running on into the sentence still finds the kind word', 'code-explorer', 'Task kind: locate and report back\nq', PLAIN, ['no Coverage line']),
     ('capitalised kind is not a kind (case-sensitive, like the guard)', 'code-explorer', 'Task kind: Locate\nq', PLAIN, []),
+    ('infra-reader pipeline-reader: both footers required', 'infra-reader', 'Task kind: pipeline-reader\nRead ci.yml', PLAIN, ['no Coverage line', 'no Reconciliation line']),
+    ('infra-reader dependency-reader: none required', 'infra-reader', 'Task kind: dependency-reader\nRead manifests', PLAIN, []),
+    ('triage log-triage: none required', 'triage', 'Task kind: log-triage\nRead the log', PLAIN, []),
+    ('compliance-lister mixed kinds: none required', 'compliance-lister', 'Task kind: audit-coverage-lister, citation-verifier\nBoth', PLAIN, []),
     ('plugin-prefixed agent type works', 'agent-eval:code-explorer', 'Task kind: inventory\nList env vars', PLAIN, ['no Coverage line']),
     ('legacy schema-reader still requires both', 'schema-reader', 'do the task', PLAIN, ['no Coverage line', 'no Reconciliation line']),
     ('legacy bulk-reader requires none', 'bulk-reader', 'do the task', PLAIN, []),
@@ -87,11 +91,15 @@ def main():
     got = {}
     n = 0
     for tool, cmd in ts.items():
-        got[tool] = []
+        # one run of the hook takes about 20 s on Windows (process start-up): run the cases side by side, each with its own files
+        jobs = []
         for label, agent, brief, answer, want in CASES:
             n += 1
-            have = flags(cmd, agent, brief, answer, n)
-            got[tool].append(have)
+            jobs.append((n, label, agent, brief, answer, want))
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            haves = list(pool.map(lambda j: flags(cmd, j[2], j[3], j[4], j[0]), jobs))
+        got[tool] = haves
+        for (_, label, _, _, _, want), have in zip(jobs, haves):
             check(f'[{tool}] {label}', have == sorted(want), f'{have} != {sorted(want)}')
     if len(ts) == 2:
         check('sh and ps1 record identical footer flags', got['sh'] == got['ps1'], f"{got['sh']} vs {got['ps1']}")

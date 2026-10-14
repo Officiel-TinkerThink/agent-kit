@@ -5,7 +5,7 @@ Hooks, each scoped by agent type or tool; none changes your permission mode.
 | Hook | Event | Effect |
 |---|---|---|
 | guard-secret-leak | PreToolUse `SubagentHandback`, `WebFetch`, `WebSearch` | redacts secret values from every subagent answer (known formats, key=value, URL credentials, CLI credentials, and any credential-looking value the agent itself read); blocks web calls containing them; audit holds kinds and counts only |
-| guard-env-files | PreToolUse `Grep`, `Read` | `secret-candidate-lister`, `config-drift-checker` and `annotator` can never read real `.env` files |
+| guard-env-files | PreToolUse `Grep`, `Read` | `infra-reader`, `compliance-lister` and `annotator` (and the older `secret-candidate-lister`, `config-drift-checker`) can never read real `.env` files |
 | check-bulk-read | PreToolUse `Read`, `Bash` | whole-file reads above `BULK_READ_MIN_LINES` (default 200) in the main thread are redirected to `code-explorer` |
 | guard-monitor-patterns | PreToolUse `Bash` | blocks foreground `tail -f`, `watch`, `Get-Content -Wait`, `logs -f`, unbounded `while true` |
 | guard-git-readonly | PreToolUse `Bash` | `changelog-summarizer` may run one read-only git command only |

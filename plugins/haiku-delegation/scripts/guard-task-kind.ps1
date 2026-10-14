@@ -8,11 +8,13 @@ try {
     $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
     $type = [string]$in.tool_input.subagent_type
     $base = $type -replace '^.*:', ''
-    $valid = switch -CaseSensitive ($base) {
-        'code-explorer'    { @('locate', 'read', 'map', 'inventory', 'tests') }
-        'contracts-reader' { @('schema', 'api-spec', 'migrations', 'api-match') }
-        default            { exit 0 }
+    # the kinds of each topic agent come from kinds.txt (<agent> <kind> <footers>); an agent with no rows, or a missing table, is not guarded
+    $valid = @()
+    foreach ($row in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'kinds.txt') -ErrorAction Stop)) {
+        $f = @($row.Trim() -split '\s+')
+        if ($f.Count -ge 2 -and -not $f[0].StartsWith('#') -and $f[0] -ceq $base) { $valid += $f[1] }
     }
+    if ($valid.Count -eq 0) { exit 0 }
     $prompt = [string]$in.tool_input.prompt
     $first = ($prompt -split "`r?`n" | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1)
     $kinds = @()

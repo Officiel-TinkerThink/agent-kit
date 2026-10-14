@@ -14,11 +14,9 @@ case "$_t" in \{*\}) ;; *) exit 0 ;; esac
 
 TYPE=$(json_get "$INPUT" tool_input.subagent_type) || exit 0
 BASE=$(printf '%s' "$TYPE" | sed 's/^.*://')
-case "$BASE" in
-  code-explorer)    VALID="locate read map inventory tests" ;;
-  contracts-reader) VALID="schema api-spec migrations api-match" ;;
-  *) exit 0 ;;
-esac
+# the kinds of each topic agent come from kinds.txt (<agent> <kind> <footers>); an agent with no rows, or a missing table, is not guarded
+VALID=$(awk -v a="$BASE" '$1 !~ /^#/ && $1 == a { printf "%s ", $2 }' "$KIT_SCRIPT_DIR/kinds.txt" 2>/dev/null | sed 's/ $//')
+[ -n "$VALID" ] || exit 0
 
 PROMPT=$(json_get "$INPUT" tool_input.prompt) || exit 0
 FIRST=$(printf '%s\n' "$PROMPT" | awk 'NF { print; exit }')

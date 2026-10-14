@@ -11,18 +11,24 @@ Your context is the scarce resource. A subagent returns facts with `path:line` i
 - **Handoff is the default; inline needs a reason.** Hand the reading off first, then keep working on the next independent step while the agent runs. Never sit waiting when there is independent work left.
 - **Fan out.** Independent parts (per module, per file group, per question, per verification gate) go to one agent each, launched in a single message.
 - **Agents return evidence, not judgement.** Counts reconciled, quotes verbatim, `NOT FOUND` / `UNCLEAR` marked, and no verdicts on safety, compliance or design. Judgement stays with you.
-- **Treat every result as unverified.** Check totals, and run `citation-verifier` on the `path:line` claims you will edit from.
+- **Treat every result as unverified.** Check totals, and run `compliance-lister` (`Task kind: citation-verifier`) on the `path:line` claims you will edit from.
 
-## Two agents serve several kinds of task: say which kind
+## One agent per topic: say which kind of task
 
-`code-explorer` and `contracts-reader` each replace several narrower agents (22 agents in all). Each kind is one section of the agent with its own rules, output format and "will not" list. **The first line of your brief names the kind** (`Task kind: <kind>`), then the question follows. Name several kinds, separated by commas, when a task mixes them (`Task kind: locate, inventory`).
+A topic agent replaces several narrower agents (14 agents in all). Each kind of task is one section of the agent with its own rules, output format and "will not" list; kinds named after an old agent (`log-triage`, `secret-candidate-lister`, ...) keep that agent's rules word for word. **The first line of your brief names the kind** (`Task kind: <kind>`), then the question follows. Name several kinds, separated by commas, when a task mixes them (`Task kind: locate, inventory`).
 
 | Agent | Kinds | Default effort |
 |---|---|---|
-| `code-explorer` | `locate` (where something is defined or used), `read` (answer from large or many files), `map` (structure, imports, a file's purpose), `inventory` (tables of items), `tests` (which tests exist and what they cover) | low; pass `effort: medium` for `map` (it used to run at medium) |
-| `contracts-reader` | `schema` (tables and columns from DDL, migrations or models), `api-spec` (OpenAPI or GraphQL operations), `migrations` (revision chain: heads, branches, gaps), `api-match` (frontend calls against backend routes) | medium |
+| `code-explorer` | `locate`, `read`, `map`, `inventory`, `tests` | low; `effort: medium` for `map` |
+| `contracts-reader` | `schema`, `api-spec`, `migrations`, `api-match` | medium |
+| `infra-reader` | `pipeline-reader`, `dependency-reader`, `config-drift-checker` | low; `effort: high` for `pipeline-reader`, `medium` for `config-drift-checker` |
+| `docs-reader` | `spec-extractor`, `doc-link-checker`, `doc-drafter` | low; `effort: medium` for `spec-extractor` and `doc-drafter` |
+| `triage` | `log-triage`, `test-run-summarizer`, `ticket-classifier` | low; `effort: medium` for `ticket-classifier` |
+| `compliance-lister` | `audit-coverage-lister`, `secret-candidate-lister`, `citation-verifier` | low; `effort: medium` for `audit-coverage-lister`, `high` for the other two |
 
-A hook (`guard-task-kind`) blocks a brief that has no valid kind line and tells you what to add; re-issue the call with the line and nothing else changes. Without the line the agent would have to guess the section, and the usage log could not pick the right footer checks (Coverage, Reconciliation). The Agent tool's `effort` parameter overrides the default for one call.
+The effort of each kind is the one its old agent ran at, listed in `kinds.txt` (a plugin file). The Agent tool's `effort` parameter sets it for one call.
+
+A hook (`guard-task-kind`) blocks a brief that has no valid kind line and tells you what to add; re-issue the call with the line and nothing else changes. Without the line the agent would have to guess the section, and the usage log could not pick the right footer checks (Coverage, Reconciliation). Adding a topic later means a new row set in `kinds.txt` and a section in the agent, not a new agent.
 
 ## Before every Read, Grep, Glob, Bash or web call, check this table
 
@@ -30,15 +36,15 @@ If the action you are about to take matches a row, call the Agent tool instead. 
 
 ### Find and read
 
-Rows for `code-explorer` and `contracts-reader` give the kind to put on the first line of the brief (see "Two agents serve several kinds of task" above).
+Rows name the agent and the kind to put on the first line of the brief (see "One agent per topic" above).
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
 | Read a file over about 80 lines, open a second file in one investigation, or run `cat`/`head`/`ls`/`grep` for facts you only need summarised | `code-explorer` | First line `Task kind: read`, then the exact question and the files; at most about 10 files per agent (it has a turn cap), split the rest | Speculate on bugs, design or compliance; edit anything |
 | Search for anything beyond one known symbol in one known file | `code-explorer` | First line `Task kind: locate`, then the symbol, config key or endpoint, and the directory; say "whole word" if you need it | Map the whole repo; judge quality |
 | List every endpoint, config key, env var, TODO, error message, requirement ID | `code-explorer` | First line `Task kind: inventory`, then the item kind and the glob | Infer items that are not written down (ambiguous ones are `UNCLEAR`) |
-| Open a long log, stack trace or CI output | `log-triage` | The file path | Diagnose root cause or suggest fixes |
-| Open a saved pytest/jest/CI output file | `test-run-summarizer` | The file path. (For a fresh run use `verification-runner`; it already summarises.) | Diagnose; assume a missing count is zero |
+| Open a long log, stack trace or CI output | `triage` (`Task kind: log-triage`) | The file path | Diagnose root cause or suggest fixes |
+| Open a saved pytest/jest/CI output file | `triage` (`Task kind: test-run-summarizer`) | The file path. (For a fresh run use `verification-runner`; it already summarises.) | Diagnose; assume a missing count is zero |
 
 ### Describe code and structure
 
@@ -49,28 +55,28 @@ Rows for `code-explorer` and `contracts-reader` give the kind to put on the firs
 | Inspect an Alembic (or similar) migrations directory: heads, branches, gaps, duplicate ids | `contracts-reader` | First line `Task kind: migrations`, then the migrations directory | Judge migration content or say what will fail |
 | Compare frontend calls with backend routes | `contracts-reader` | First line `Task kind: api-match`, then both source roots, the router prefix, and the base URL the frontend uses | Predict runtime behaviour |
 | Read an OpenAPI/Swagger or GraphQL schema | `contracts-reader` | First line `Task kind: api-spec`, then the schema file | Review the design or check an implementation |
-| Find which use cases reference the audit log | `audit-coverage-lister` | The glob of use-case files; optional search term (default `audit`) | Decide whether a NO is a defect or a YES is sufficient (that is a human GxP call) |
+| Find which use cases reference the audit log | `compliance-lister` (`Task kind: audit-coverage-lister`) | The glob of use-case files; optional search term (default `audit`) | Decide whether a NO is a defect or a YES is sufficient (that is a human GxP call) |
 | Map tests to code, or find untested public symbols | `code-explorer` | First line `Task kind: tests`, then the test directory and source directory | Write tests; it is a name-reference check, not coverage |
 
 ### Describe configuration, infrastructure and dependencies
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
-| Read `Jenkinsfile`, `Dockerfile`, compose files, GitHub Actions or other CI files | `pipeline-reader` | The file paths | Print secret values (names only); say the pipeline is good or safe |
-| Compare config keys across `.env.example`, compose files and a settings class | `config-drift-checker` | Named files only; list the real `.env*` files and `*.bak` as exclusions | Open real `.env` files; say which source is right |
-| Read dependency manifests (`pyproject.toml`, `package.json`, `pom.xml`, `go.mod`, Dockerfile base images) | `dependency-reader` | The manifest paths; ask for lockfile-resolved versions explicitly, it skips them otherwise | Assess security, licences or upgrade needs |
+| Read `Jenkinsfile`, `Dockerfile`, compose files, GitHub Actions or other CI files | `infra-reader` (`Task kind: pipeline-reader`) | The file paths | Print secret values (names only); say the pipeline is good or safe |
+| Compare config keys across `.env.example`, compose files and a settings class | `infra-reader` (`Task kind: config-drift-checker`) | Named files only; list the real `.env*` files and `*.bak` as exclusions | Open real `.env` files; say which source is right |
+| Read dependency manifests (`pyproject.toml`, `package.json`, `pom.xml`, `go.mod`, Dockerfile base images) | `infra-reader` (`Task kind: dependency-reader`) | The manifest paths; ask for lockfile-resolved versions explicitly, it skips them otherwise | Assess security, licences or upgrade needs |
 | Look up CVEs and advisories for pinned versions | `advisory-collector` | Exact `package@version` pairs | Say a version is "safe" or judge exploitability |
 | Read a changelog between two versions | `release-diff` | The package and versions A and B | Conclude that an upgrade is safe; substitute nearby versions |
-| Scan a directory for hardcoded-credential candidates | `secret-candidate-lister` | One source directory (never the repo root) | Print any part of a value; say a candidate is or is not real |
+| Scan a directory for hardcoded-credential candidates | `compliance-lister` (`Task kind: secret-candidate-lister`) | One source directory (never the repo root) | Print any part of a value; say a candidate is or is not real |
 
 ### Specs, tickets and documents
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
-| Pull requirements, IDs and acceptance criteria out of specs, SOPs, URS/FS, Jira exports or meeting notes | `spec-extractor` | The documents | Merge, reword, renumber or invent IDs (no ID means `(none)`); a human reviews before validation use |
-| Triage a folder of ticket Markdown files | `ticket-classifier` | **The category list** (for example defect / feature / refactor / docs-or-ops / other) | Invent categories (it uses `OTHER` or `UNCLEAR`); it is first-pass triage |
-| Check Markdown for broken relative links | `doc-link-checker` | The document root | Edit files |
-| Draft a docstring, README section, SOP outline or test description | `doc-drafter` | The source files; an example to match the format if you have one | Invent versions, IDs, dates or citations. Output starts `DRAFT - UNREVIEWED` and every `[VERIFY]` is yours to resolve before you write the file |
+| Pull requirements, IDs and acceptance criteria out of specs, SOPs, URS/FS, Jira exports or meeting notes | `docs-reader` (`Task kind: spec-extractor`) | The documents | Merge, reword, renumber or invent IDs (no ID means `(none)`); a human reviews before validation use |
+| Triage a folder of ticket Markdown files | `triage` (`Task kind: ticket-classifier`) | **The category list** (for example defect / feature / refactor / docs-or-ops / other) | Invent categories (it uses `OTHER` or `UNCLEAR`); it is first-pass triage |
+| Check Markdown for broken relative links | `docs-reader` (`Task kind: doc-link-checker`) | The document root | Edit files |
+| Draft a docstring, README section, SOP outline or test description | `docs-reader` (`Task kind: doc-drafter`) | The source files; an example to match the format if you have one | Invent versions, IDs, dates or citations. Output starts `DRAFT - UNREVIEWED` and every `[VERIFY]` is yours to resolve before you write the file |
 
 ### Web research
 
@@ -108,22 +114,22 @@ Which commands the runner may run is decided by **Claude Code's own permissions*
 
 | When | Agent | Brief must carry |
 |---|---|---|
-| Before you edit based on another agent's `path:line` claims | `citation-verifier` | The list of claims, each with file, line and the claimed text. Returns `CONFIRMED`, `WRONG LINE`, `WRONG TEXT` or `FILE MISSING` per claim |
+| Before you edit based on another agent's `path:line` claims | `compliance-lister` (`Task kind: citation-verifier`) | The list of claims, each with file, line and the claimed text. Returns `CONFIRMED`, `WRONG LINE`, `WRONG TEXT` or `FILE MISSING` per claim |
 | An agent's result turned out wrong, partial, non-compliant or missing something, and you verified that yourself | `annotator` | The agent id (or `last:<agent_type>`), what was wrong, what you expected, how you found out. Once per failed run; fix the task first. Never annotate style preferences or runs you did not check |
 
 ## Standing handoffs: no trigger needed from the user
 
 - **After every batch of code edits:** `verification-runner`, once per gate (tests, lint, types, build), in parallel.
-- **Before editing from an agent's result:** `citation-verifier` on the claims you will rely on.
-- **Dependency question:** `dependency-reader` first, then `advisory-collector` and `release-diff` in parallel on the versions it returned.
-- **Task touched documents:** `doc-link-checker`. **Task touched audit-relevant code:** `audit-coverage-lister`.
+- **Before editing from an agent's result:** `compliance-lister` (`Task kind: citation-verifier`) on the claims you will rely on.
+- **Dependency question:** `infra-reader` (`Task kind: dependency-reader`) first, then `advisory-collector` and `release-diff` in parallel on the versions it returned.
+- **Task touched documents:** `docs-reader` (`Task kind: doc-link-checker`). **Task touched audit-relevant code:** `compliance-lister` (`Task kind: audit-coverage-lister`).
 - **Agent result wrong or partial (you verified it):** fix the task, then `annotator` once, without being asked. See "Report agent failures to the annotator" below.
 
 ## Report agent failures to the annotator: on your own initiative
 
 The user should never have to say "annotate that". When you find that a subagent's result is off, record it yourself. This is a standing duty, like running `verification-runner` after edits.
 
-**Trigger: you verified it yourself** (a re-read of the cited lines, `citation-verifier`, a recount, a failing check, or the user pointing it out), and the run:
+**Trigger: you verified it yourself** (a re-read of the cited lines, `compliance-lister` (`Task kind: citation-verifier`), a recount, a failing check, or the user pointing it out), and the run:
 
 - stated a fact that is false, or a `path:line` that does not hold;
 - gave a wrong count or total, or left out items that were in scope (`partial` or `missed`);
@@ -160,7 +166,7 @@ An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is se
 ## Health and approvals
 
 - `/agent-guards:kit-doctor` checks that the data folder is writable, the policy files are valid, hook errors, pending blocked hosts, and that the running plugin versions are the installed ones. Run it after an update or when records seem missing.
-- `guard-task-kind` (a hook of `haiku-delegation`) blocks briefs for the merged agents that lack a valid `Task kind:` first line. The user can switch it off for a session by setting `TASK_KIND_GUARD=off`; it never blocks other agents and it fails open if it cannot read its input.
+- `guard-task-kind` (a hook of `haiku-delegation`) blocks briefs for the topic agents that lack a valid `Task kind:` first line. The user can switch it off for a session by setting `TASK_KIND_GUARD=off`; it never blocks other agents and it fails open if it cannot read its input.
 - `/agent-guards:kit-allow` (only the user can start it) records the user's approval of a blocked browser host in `browser-policy.json`, with a reason and file hashes in `audit/policy-changes.jsonl`.
 
 ## Close-out

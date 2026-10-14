@@ -58,8 +58,17 @@ function Get-Flags {
     # merged agents: the `Task kind:` line of the brief says which contract applies ($kd is that line, lower case, at most 40 characters)
     # whole words only: `roadmap` is not `map`; text after the kind words (the pattern may run on into the sentence) is ignored by the exact comparison
     $kw = @($TaskKind.ToLowerInvariant() -split '[, ]+' | Where-Object { $_ })
-    if ($AgentType -eq 'contracts-reader') { $recon = ($kw -contains 'schema' -or $kw -contains 'api-spec'); $cov = $recon }
-    elseif ($AgentType -eq 'code-explorer') { $recon = $false; $cov = ($kw -contains 'locate' -or $kw -contains 'map' -or $kw -contains 'inventory') }
+    # topic agents: kinds.txt rows "<agent> <kind> <footers>"; the footers of every kind named in the brief apply
+    $known = $false; $recon = $false; $cov = $false
+    try {
+        foreach ($row in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'kinds.txt') -ErrorAction Stop)) {
+            $f = @($row.Trim() -split '\s+')
+            if ($f.Count -lt 2 -or $f[0].StartsWith('#') -or $f[0] -cne $AgentType) { continue }
+            $known = $true
+            if ($kw -contains $f[1] -and $f.Count -ge 3) { if ($f[2] -match 'reconciliation') { $recon = $true }; if ($f[2] -match 'coverage') { $cov = $true } }
+        }
+    } catch { }
+    if ($known) { }
     else {
         $recon = @('schema-reader', 'contract-reader', 'pipeline-reader') -contains $AgentType
         $cov = @('schema-reader', 'contract-reader', 'pipeline-reader', 'inventory-extractor', 'module-mapper', 'repo-scout') -contains $AgentType

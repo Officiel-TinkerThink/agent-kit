@@ -8,7 +8,7 @@ function Test-AgentIs([string]$Type, [string[]]$Names) {
 # Example/template env files (.env.example, .env.sample, .env.template) stay readable.
 try {
     $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    $guarded = @('secret-candidate-lister', 'config-drift-checker', 'annotator')
+    $guarded = @('secret-candidate-lister', 'config-drift-checker', 'infra-reader', 'compliance-lister', 'annotator')
     if (-not (Test-AgentIs ([string]$in.agent_type) $guarded)) { exit 0 }
 
     $ti = $in.tool_input

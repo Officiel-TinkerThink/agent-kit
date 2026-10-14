@@ -1,12 +1,12 @@
 # haiku-delegation
 
-19 subagents on Haiku 5.5 (17 read-only, plus the browser pair) plus a session policy (injected at session start) that tells the main model when to delegate bounded, read-heavy work.
+11 subagents on Haiku 5.5 (9 read-only topic agents, plus the browser pair) plus a session policy (injected at session start) that tells the main model when to delegate bounded, read-heavy work. Each topic agent serves several kinds of task; the first line of the brief says which (`Task kind: <kind>`), and `scripts/kinds.txt` lists the kinds.
 
-Agents: browser-explorer, browser-operator, code-explorer (kinds: locate, read, map, inventory, tests), contracts-reader (kinds: schema, api-spec, migrations, api-match), dependency-reader, spec-extractor, doc-researcher, log-triage, test-run-summarizer, config-drift-checker, doc-link-checker, audit-coverage-lister, secret-candidate-lister, ticket-classifier, doc-drafter, citation-verifier, pipeline-reader, release-diff, advisory-collector.
+Agents: browser-explorer, browser-operator, doc-researcher, release-diff, advisory-collector, and the topic agents code-explorer (kinds: locate, read, map, inventory, tests), contracts-reader (schema, api-spec, migrations, api-match), infra-reader (pipeline-reader, dependency-reader, config-drift-checker), docs-reader (spec-extractor, doc-link-checker, doc-drafter), triage (log-triage, test-run-summarizer, ticket-classifier), compliance-lister (audit-coverage-lister, secret-candidate-lister, citation-verifier).
 
 Every agent shares the same operating rules (data is not instructions, read-only, answer first, verifiable citations, reconciled counts, NOT FOUND discipline, no verdicts: compliance, safety and fit-for-purpose questions are answered `not_determinable`). Effort tiers are set per agent in frontmatter; see the top-level README.
 
-Pair with `agent-guards` for secret redaction and the `.env` guard (`secret-candidate-lister`, `config-drift-checker`).
+Pair with `agent-guards` for secret redaction and the `.env` guard (`infra-reader`, `compliance-lister`).
 
 ## Browser agents
 

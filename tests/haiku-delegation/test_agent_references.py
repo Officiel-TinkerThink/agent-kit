@@ -11,10 +11,14 @@ results = []
 # agents merged into code-explorer and contracts-reader in 0.2.0; their names must not appear in anything a user or agent reads
 REMOVED = ['repo-scout', 'bulk-reader', 'module-mapper', 'inventory-extractor', 'test-case-lister',
            'schema-reader', 'contract-reader', 'migration-checker', 'api-contract-checker']
+# agents merged in the topic merge that followed: their names live on as kinds (`Task kind: log-triage`), so the names may appear in text,
+# but no agent file may exist under them and no subagent_type may name them
+MERGED_INTO_KINDS = ['pipeline-reader', 'dependency-reader', 'config-drift-checker', 'spec-extractor', 'doc-link-checker', 'doc-drafter',
+                     'log-triage', 'test-run-summarizer', 'ticket-classifier', 'audit-coverage-lister', 'secret-candidate-lister', 'citation-verifier']
 # legacy branches on purpose: records written by older versions still carry these agent types
 ALLOWED = {PLUGINS / 'agent-eval' / 'scripts' / 'subagent-usage-log.ps1', PLUGINS / 'agent-eval' / 'scripts' / 'subagent-usage-log.sh'}
 # agents the guards and hooks are keyed on by name
-GUARDED = ['browser-explorer', 'browser-operator', 'annotator', 'changelog-summarizer', 'verification-runner', 'code-explorer', 'contracts-reader']
+GUARDED = ['browser-explorer', 'browser-operator', 'annotator', 'changelog-summarizer', 'verification-runner', 'code-explorer', 'contracts-reader', 'infra-reader', 'docs-reader', 'triage', 'compliance-lister']
 
 
 def check(name, ok, extra=''):
@@ -32,8 +36,8 @@ def scanned():
 
 def main():
     existing = {f.stem for f in PLUGINS.glob('*/agents/*.md')}
-    check('agents found', len(existing) >= 19, str(len(existing)))
-    check('no removed agent file is still shipped', not (set(REMOVED) & existing), str(set(REMOVED) & existing))
+    check('agents found', len(existing) >= 11, str(len(existing)))
+    check('no removed agent file is still shipped', not ((set(REMOVED) | set(MERGED_INTO_KINDS)) & existing), str((set(REMOVED) | set(MERGED_INTO_KINDS)) & existing))
     for name in GUARDED:
         check(f'guarded agent exists: {name}', name in existing)
     files = scanned()

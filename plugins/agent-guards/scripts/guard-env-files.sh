@@ -31,7 +31,7 @@ INPUT=$(cat)
 json_ok "$INPUT" || { printf '%s\n' "BLOCKED: env guard error" >&2; exit 2; }
 
 TYPE=$(json_get "$INPUT" agent_type)
-agent_is "$TYPE" secret-candidate-lister config-drift-checker annotator || exit 0
+agent_is "$TYPE" secret-candidate-lister config-drift-checker infra-reader compliance-lister annotator || exit 0
 
 TOOL=$(json_get "$INPUT" tool_name)
 TOOL_L=$(printf '%s' "$TOOL" | tr 'A-Z' 'a-z')

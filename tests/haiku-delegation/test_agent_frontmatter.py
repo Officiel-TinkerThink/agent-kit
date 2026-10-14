@@ -41,7 +41,7 @@ def check(name, ok, extra=''):
 
 def main():
     files = sorted(PLUGINS.glob('*/agents/*.md'))
-    check('agent files found', len(files) >= 14, str(len(files)))
+    check('agent files found', len(files) >= 12, str(len(files)))
     for f in files:
         rel = f.relative_to(PLUGINS)
         fm = frontmatter(f.read_text(encoding='utf-8'))

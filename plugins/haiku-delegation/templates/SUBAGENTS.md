@@ -15,7 +15,7 @@ Your context is the scarce resource. A subagent returns facts with `path:line` i
 
 ## One agent per topic: say which kind of task
 
-A topic agent replaces several narrower agents (14 agents in all). Each kind of task is one section of the agent with its own rules, output format and "will not" list; kinds named after an old agent (`log-triage`, `secret-candidate-lister`, ...) keep that agent's rules word for word. **The first line of your brief names the kind** (`Task kind: <kind>`), then the question follows. Name several kinds, separated by commas, when a task mixes them (`Task kind: locate, inventory`).
+A topic agent replaces several narrower agents (12 agents in all). Each kind of task is one section of the agent with its own rules, output format and "will not" list; kinds named after an old agent (`log-triage`, `secret-candidate-lister`, ...) keep that agent's rules word for word. **The first line of your brief names the kind** (`Task kind: <kind>`), then the question follows. Name several kinds, separated by commas, when a task mixes them (`Task kind: locate, inventory`).
 
 | Agent | Kinds | Default effort |
 |---|---|---|
@@ -25,6 +25,7 @@ A topic agent replaces several narrower agents (14 agents in all). Each kind of 
 | `docs-reader` | `spec-extractor`, `doc-link-checker`, `doc-drafter` | low; `effort: medium` for `spec-extractor` and `doc-drafter` |
 | `triage` | `log-triage`, `test-run-summarizer`, `ticket-classifier` | low; `effort: medium` for `ticket-classifier` |
 | `compliance-lister` | `audit-coverage-lister`, `secret-candidate-lister`, `citation-verifier` | low; `effort: medium` for `audit-coverage-lister`, `high` for the other two |
+| `researcher` | `doc-researcher`, `release-diff`, `advisory-collector` | low; `effort: medium` for `doc-researcher`, `high` for `release-diff`, `max` for `advisory-collector` |
 
 The effort of each kind is the one its old agent ran at, listed in `kinds.txt` (a plugin file). The Agent tool's `effort` parameter sets it for one call.
 
@@ -65,8 +66,8 @@ Rows name the agent and the kind to put on the first line of the brief (see "One
 | Read `Jenkinsfile`, `Dockerfile`, compose files, GitHub Actions or other CI files | `infra-reader` (`Task kind: pipeline-reader`) | The file paths | Print secret values (names only); say the pipeline is good or safe |
 | Compare config keys across `.env.example`, compose files and a settings class | `infra-reader` (`Task kind: config-drift-checker`) | Named files only; list the real `.env*` files and `*.bak` as exclusions | Open real `.env` files; say which source is right |
 | Read dependency manifests (`pyproject.toml`, `package.json`, `pom.xml`, `go.mod`, Dockerfile base images) | `infra-reader` (`Task kind: dependency-reader`) | The manifest paths; ask for lockfile-resolved versions explicitly, it skips them otherwise | Assess security, licences or upgrade needs |
-| Look up CVEs and advisories for pinned versions | `advisory-collector` | Exact `package@version` pairs | Say a version is "safe" or judge exploitability |
-| Read a changelog between two versions | `release-diff` | The package and versions A and B | Conclude that an upgrade is safe; substitute nearby versions |
+| Look up CVEs and advisories for pinned versions | `researcher` (`Task kind: advisory-collector`) | Exact `package@version` pairs | Say a version is "safe" or judge exploitability |
+| Read a changelog between two versions | `researcher` (`Task kind: release-diff`) | The package and versions A and B | Conclude that an upgrade is safe; substitute nearby versions |
 | Scan a directory for hardcoded-credential candidates | `compliance-lister` (`Task kind: secret-candidate-lister`) | One source directory (never the repo root) | Print any part of a value; say a candidate is or is not real |
 
 ### Specs, tickets and documents
@@ -82,7 +83,7 @@ Rows name the agent and the kind to put on the first line of the brief (see "One
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
-| Any other web search or fetch: vendor docs, API references, standards and guidance lookups, release notes, how-to questions | `doc-researcher` | One clear question and the primary sources to prefer | Give compliance, validation or architecture recommendations; cite a URL it did not open |
+| Any other web search or fetch: vendor docs, API references, standards and guidance lookups, release notes, how-to questions | `researcher` (`Task kind: doc-researcher`) | One clear question and the primary sources to prefer | Give compliance, validation or architecture recommendations; cite a URL it did not open |
 
 ### Browser (needs Claude in Chrome connected)
 
@@ -121,7 +122,7 @@ Which commands the runner may run is decided by **Claude Code's own permissions*
 
 - **After every batch of code edits:** `verification-runner`, once per gate (tests, lint, types, build), in parallel.
 - **Before editing from an agent's result:** `compliance-lister` (`Task kind: citation-verifier`) on the claims you will rely on.
-- **Dependency question:** `infra-reader` (`Task kind: dependency-reader`) first, then `advisory-collector` and `release-diff` in parallel on the versions it returned.
+- **Dependency question:** `infra-reader` (`Task kind: dependency-reader`) first, then `researcher` (`Task kind: advisory-collector`) and `researcher` (`Task kind: release-diff`) in parallel on the versions it returned.
 - **Task touched documents:** `docs-reader` (`Task kind: doc-link-checker`). **Task touched audit-relevant code:** `compliance-lister` (`Task kind: audit-coverage-lister`).
 - **Agent result wrong or partial (you verified it):** fix the task, then `annotator` once, without being asked. See "Report agent failures to the annotator" below.
 

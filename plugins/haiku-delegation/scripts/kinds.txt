@@ -24,3 +24,6 @@ triage ticket-classifier - medium
 compliance-lister audit-coverage-lister - medium
 compliance-lister secret-candidate-lister - high
 compliance-lister citation-verifier - high
+researcher doc-researcher - medium
+researcher release-diff - high
+researcher advisory-collector reconciliation max

@@ -77,6 +77,20 @@ MERGES = {
                         "Start the task with a line `Task kind: log-triage`, `test-run-summarizer` or `ticket-classifier` (several kinds when it mixes them). "
                         "Root cause stays with the main model; a human confirms the classification."),
     },
+    "researcher": {
+        "role": "web and documentation researcher",
+        "tools": "WebSearch, WebFetch, Read, Grep, Glob",
+        "effort": "low",
+        "kinds": [
+            ("doc-researcher", "doc-researcher", "web and documentation research with a clear question: vendor docs, API references, library comparisons, standards and guidance lookups, with source URLs"),
+            ("release-diff", "release-diff", "every release between two versions of a package or tool, and the entries its official changelog marks as breaking, deprecated, removed or changed behaviour, quoted verbatim with the URL"),
+            ("advisory-collector", "advisory-collector", "published security advisories (CVE, GHSA, OSV, PYSEC) that apply to exact package versions, as published; never says a version is safe"),
+        ],
+        "description": ("Use proactively for web research with a clear question: vendor and API documentation, library comparisons, standards and guidance lookups (the answer with source URLs); "
+                        "the changelog entries between two versions that are marked breaking, deprecated or removed (quoted with the URL); or published advisories for exact package versions (as published). "
+                        "Start the task with a line `Task kind: doc-researcher`, `release-diff` or `advisory-collector` (several kinds when it mixes them). "
+                        "Never concludes that an upgrade or a version is safe and never judges compliance or architecture; those stay with the main model and humans."),
+    },
     "compliance-lister": {
         "role": "read-only lister of evidence for compliance and quality review",
         "effort": "low",
@@ -100,7 +114,7 @@ def build(name, spec):
     shared = {p[2] for p in parts}
     assert len(shared) == 1, f"{name}: operating-rule blocks differ"
     turns = max(int(p[0]["maxTurns"]) for p in parts)
-    lines = ["---", f"name: {name}", f'description: "{spec["description"]}"', "tools: Read, Grep, Glob", "model: claude-haiku-5-5", f"effort: {spec['effort']}", "omitClaudeMd: true", f"maxTurns: {turns}", "---", ""]
+    lines = ["---", f"name: {name}", f'description: "{spec["description"]}"', f"tools: {spec.get('tools', 'Read, Grep, Glob')}", "model: claude-haiku-5-5", f"effort: {spec['effort']}", "omitClaudeMd: true", f"maxTurns: {turns}", "---", ""]
     kinds = ", ".join(f"`{k}`" for k, _, _ in spec["kinds"])
     lines += [f"You are a {spec['role']}. You handle {len(agents)} kinds of task: {kinds}. The first line of the task names the kind (`Task kind: <kind>`); apply that section first and follow every rule of it. "
               "If the task names several kinds, apply each section. If it names none, choose the section that fits the question.", ""]

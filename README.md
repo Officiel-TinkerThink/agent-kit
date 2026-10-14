@@ -4,7 +4,7 @@ Claude Code plugins for cost-aware, auditable use of subagents in GxP-regulated 
 
 | Plugin | What it gives you | Standalone? |
 |---|---|---|
-| `haiku-delegation` | 9 read-only Haiku 5.5 topic agents (code, contracts, infra, docs, triage, compliance, research, advisory collection) each serving several kinds of task named on the first line of the brief, with per-kind effort tiers, two browser agents for Claude in Chrome (`browser-explorer` read-only, `browser-operator` for named steps), and a session policy telling the main model when to delegate | yes |
+| `haiku-delegation` | 7 read-only Haiku 5.5 topic agents (code, contracts, infra, docs, triage, compliance, web research) each serving several kinds of task named on the first line of the brief, with per-kind effort tiers, two browser agents for Claude in Chrome (`browser-explorer` read-only, `browser-operator` for named steps), and a session policy telling the main model when to delegate | yes |
 | `agent-guards` | Deterministic hooks: secret redaction at hand-back and web-exfiltration block, `.env` protection, bulk-read redirect, monitor/poll blocking, read-only git for `changelog-summarizer` | yes (best with `haiku-delegation`) |
 | `agent-eval` | Per-run usage log with deterministic contract checks, an `annotator` agent for warm failure annotations, operator CLIs for judging and human review | yes (best with the others) |
 | `verification-runner` | A Haiku agent that runs tests / linters / builds (Claude Code's permissions decide which commands) and reports only the verdict; deletes go through safe-rm (quarantine, audit, restore) | yes |

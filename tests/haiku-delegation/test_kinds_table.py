@@ -28,7 +28,7 @@ def main():
         if len(f) == 4:
             rows.append(f)
             check(f'row {n} ({f[0]} {f[1]}): agent and kind are plain lower-case words', all(re.fullmatch(r'[a-z][a-z0-9-]*', x) for x in f[:2]), line)
-            check(f'row {n}: effort is low, medium or high', f[3] in ('low', 'medium', 'high'), f[3])
+            check(f'row {n}: effort is low, medium, high or max', f[3] in ('low', 'medium', 'high', 'max'), f[3])
             check(f'row {n}: footers are - or known words', f[2] == '-' or set(f[2].split(',')) <= {'coverage', 'reconciliation'}, f[2])
     check('no duplicate rows', len({(r[0], r[1]) for r in rows}) == len(rows))
     by_agent = {}

@@ -20,6 +20,7 @@ def kit_data():
 
 DATA_ROOT = kit_data()
 USAGE_LOG = DATA_ROOT / 'usage' / 'agent-usage.jsonl'
+START_LOG = pathlib.Path(os.environ['AGENT_START_LOG']) if os.environ.get('AGENT_START_LOG') else DATA_ROOT / 'usage' / 'agent-starts.jsonl'
 ANN_LOG = DATA_ROOT / 'eval' / 'annotations.jsonl'
 INBOX = DATA_ROOT / 'eval' / 'inbox'
 
@@ -43,6 +44,15 @@ def runs():
                 continue
             if r.get('type') == 'run':
                 out[r['agent_id']] = r
+    # a run the user stopped never reaches SubagentStop, so it has a start record (subagent-start-log) but no run record: it can still be annotated
+    if START_LOG.exists():
+        for line in START_LOG.read_text(encoding='utf-8-sig').splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(r, dict) and r.get('type') == 'start' and r.get('agent_id') and r['agent_id'] not in out:
+                out[r['agent_id']] = {'type': 'start-only', 'agent_id': r['agent_id'], 'agent_type': r.get('agent_type') or 'unknown', 'effort': None}
     return out
 
 
@@ -122,7 +132,7 @@ def main():
     ann_id = 'ann-' + dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%S%f') + '-' + hashlib.sha256(raw).hexdigest()[:6]
     rec = {'schema': 'agent-annotation/1', 'type': 'annotation', 'annotation_id': ann_id,
            'ts': dt.datetime.now(dt.timezone.utc).isoformat(), 'run_agent_id': a['run_agent_id'], 'agent_type': run['agent_type'],
-           'effort': run.get('effort'), 'outcome': a['outcome'], 'code': a['code'], 'severity': a['severity'], 'summary': a['summary'].strip(),
+           'effort': run.get('effort'), 'run_record': run.get('type', 'run'), 'outcome': a['outcome'], 'code': a['code'], 'severity': a['severity'], 'summary': a['summary'].strip(),
            'expected': a['expected'].strip(), 'evidence': a['evidence'], 'suggested_fix': (a.get('suggested_fix') or '').strip(),
            'verified': a['verified'], 'claim': a['claim'].strip(), 'claimed_by': 'main-model', 'annotated_by': 'annotator-agent',
            'source_file': p.name, 'source_sha256': hashlib.sha256(raw).hexdigest()}

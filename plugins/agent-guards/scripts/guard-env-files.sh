@@ -40,7 +40,7 @@ case "$TOOL_L" in
   read)
     P=$(json_get "$INPUT" tool_input.file_path)
     if is_env "$P"; then
-      printf 'BLOCKED: real env files must not be read by this agent (%s). Example files (.env.example) are allowed.\n' "$P" >&2
+      printf 'BLOCKED (intentional guard, not a hook failure): real env files must not be read by this agent (%s). Example files (.env.example) are allowed.\n' "$P" >&2
       exit 2
     fi
     exit 0
@@ -49,7 +49,7 @@ case "$TOOL_L" in
     PATH_ARG=$(json_get "$INPUT" tool_input.path)
     GLOB=$(json_get "$INPUT" tool_input.glob)
     if [ -n "$PATH_ARG" ] && is_env "$PATH_ARG"; then
-      printf 'BLOCKED: real env files must not be searched by this agent (%s).\n' "$PATH_ARG" >&2
+      printf 'BLOCKED (intentional guard, not a hook failure): real env files must not be searched by this agent (%s).\n' "$PATH_ARG" >&2
       exit 2
     fi
     # A path with a short extension is a single file; anything else is a directory-wide search and must exclude env files.
@@ -58,7 +58,7 @@ case "$TOOL_L" in
       case "$GLOB_L" in
         '!**/.env'*) ;;
         *)
-          printf '%s\n' 'BLOCKED: a directory-wide Grep must exclude real env files. Re-run with glob `"!**/.env*`" (or search named files individually).' >&2
+          printf '%s\n' 'BLOCKED (intentional guard, not a hook failure): a directory-wide Grep must exclude real env files. Re-run with glob `"!**/.env*`" (or search named files individually).' >&2
           exit 2
           ;;
       esac

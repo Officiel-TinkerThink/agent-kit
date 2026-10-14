@@ -70,9 +70,9 @@ try {
 
     Write-Audit $in.tool_name $full $lines 'blocked' $in.session_id
     [Console]::Error.WriteLine(
-        "BLOCKED: '$full' has $lines lines (limit $MinLines). Do not read it whole in the main context. " +
+        "BLOCKED (intentional guard, not a hook failure): '$full' has $lines lines (limit $MinLines). Do not read it whole in the main context. " +
         "Delegate with the Agent tool: subagent_type='bulk-reader', prompt = the exact question + absolute file path(s). " +
-        "For edits or exact line numbers, re-issue Read with offset/limit on the relevant section instead.")
+        "Reading the file in chunks is always allowed, for any purpose (edits, exact line numbers, a code review or quality check): re-issue Read with offset/limit on the sections you need. Only whole-file reads over the limit are redirected.")
     exit 2
 }
 catch {

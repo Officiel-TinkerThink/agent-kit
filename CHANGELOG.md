@@ -6,6 +6,12 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Fixed
+- The secret guard (`agent-guards`, `guard-secret-leak`) no longer replaces TypeScript generic types with `<redacted:secret>`. A line such as `const SECRET_LABELS: Record<string, string> = {}` lost `Record<string` because the key contains `SECRET` and the key/value rule took the type as the value; a generic type (`Record<`, `Map<`, `Promise<`) is now never a value, and plural key names (`labels`, `names`, `types` ...) are excluded like their singular forms. Real passwords and tokens are still redacted. Both the PowerShell and the shell guard; the shell guard now has its own test (`tests/agent-guards/test_guard_secret_leak_sh.py`).
+- A subagent the user stopped could not be annotated: it never reaches the `SubagentStop` hook, so `usage/agent-usage.jsonl` had no record of it and the `annotator` found 0 matches. A new `SubagentStart` hook in `agent-eval` (`subagent-start-log`, PowerShell and shell) now writes a small start record (ids, agent type, time, transcript path; no prompt or answer) to `usage/agent-starts.jsonl`. The `annotator` falls back to it when there is no usage record, notes in the summary that the run was unfinished, and `annotate.py` records `run_record: start-only`. Nothing that reads `agent-usage.jsonl` changes. (`tests/agent-eval/test_stopped_run.py`)
+- The bulk-read redirect (`check-bulk-read`) wrongly implied that a chunked read (`offset`/`limit`) is only for edits or exact line numbers. The message now says chunked reads are always allowed, for any purpose including reviews, and that only whole-file reads over the limit are redirected; the block texts of `check-bulk-read` and `guard-env-files` also say they are an intentional guard, not a hook failure. Claude Code itself prefixes every hook block with "hook error"; the kit cannot change that label. (`tests/agent-guards/test_guard_messages.py`)
+- `tests/linux/pwsh` (the Linux test shim) is now pinned to LF in `.gitattributes`; a Windows clone with `core.autocrlf=true` checked it out with CRLF and the container suite failed with `FileNotFoundError: 'pwsh'`.
+
 ## [0.1.14] - 2026-10-14
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "agent-eval",
-  "version": "0.1.14",
+  "version": "0.2.0",
   "description": "Evaluation pipeline for subagents: per-run usage log with deterministic contract checks, an annotator agent for warm failure annotations, and operator CLIs for judging and human review. Judge and review never run automatically.",
   "author": {
     "name": "Unidentified"

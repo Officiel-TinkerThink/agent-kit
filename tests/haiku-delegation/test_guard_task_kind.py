@@ -53,6 +53,11 @@ CASES = [  # label, stdin, env, expected exit
     ('empty kind is blocked', hook('code-explorer', 'Task kind:\nRead'), {}, 2),
     ('empty prompt is blocked', hook('code-explorer', ''), {}, 2),
     ('TASK_KIND_GUARD=off allows', hook('code-explorer', 'no kind line'), {'TASK_KIND_GUARD': 'off'}, 0),
+    ('TASK_KIND_GUARD=OFF (other case) does not disable', hook('code-explorer', 'no kind line'), {'TASK_KIND_GUARD': 'OFF'}, 2),
+    ('uppercase TASK KIND is blocked (case-sensitive)', hook('code-explorer', 'TASK KIND: locate\nq'), {}, 2),
+    ('lowercase task kind is blocked (case-sensitive)', hook('code-explorer', 'task kind: locate\nq'), {}, 2),
+    ('subagent type in other case is not guarded', hook('Code-Explorer', 'no kind line'), {}, 0),
+    ('CRLF line endings are fine', hook('code-explorer', 'Task kind: locate\r\nq'), {}, 0),
     ('unparseable input fails open', 'not json at all', {}, 0),
     ('empty input fails open', '', {}, 0),
 ]
@@ -72,6 +77,16 @@ def main():
         check(f'[{tool}] the block message names the valid kinds and an example', all(k in p.stderr for k in ('schema', 'api-spec', 'migrations', 'api-match', 'Task kind:')), p.stderr)
     if len(ts) == 2:
         check('sh and ps1 return the same exit codes', seen['sh'] == seen['ps1'], f"{seen['sh']} vs {seen['ps1']}")
+    # the kind words come from the brief (untrusted text): a glob character must not list the working folder, and a bad word is echoed only in a short plain form
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='kindguard_') as td:
+        (pathlib.Path(td) / 'zzz_sentinel_file.txt').write_text('x', encoding='utf-8')
+        for tool, cmd in ts.items():
+            for label, kind_line in (('star', 'Task kind: *'), ('question mark', 'Task kind: ?'), ('bracket', 'Task kind: [a-z]*')):
+                p = subprocess.run(cmd, input=hook('code-explorer', kind_line + '\nq'), capture_output=True, text=True, timeout=60, cwd=td)
+                check(f'[{tool}] {label} in the kind line: blocked and the working folder is not listed', p.returncode == 2 and 'zzz_sentinel_file' not in p.stderr, p.stderr[:200])
+            p = subprocess.run(cmd, input=hook('code-explorer', 'Task kind: <b>' + 'a' * 100 + '</b>\nq'), capture_output=True, text=True, timeout=60, cwd=td)
+            check(f'[{tool}] a bad kind word is echoed short and without markup', p.returncode == 2 and '<b>' not in p.stderr and 'a' * 21 not in p.stderr, p.stderr[:200])
     hooks = json.loads((ROOT / 'plugins' / 'haiku-delegation' / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))
     pre = hooks['hooks'].get('PreToolUse', [])
     check('hooks.json registers guard-task-kind on the Agent tool through run.sh',

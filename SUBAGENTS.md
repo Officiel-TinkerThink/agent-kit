@@ -13,13 +13,24 @@ Your context is the scarce resource. A subagent returns facts with `path:line` i
 - **Agents return evidence, not judgement.** Counts reconciled, quotes verbatim, `NOT FOUND` / `UNCLEAR` marked, and no verdicts on safety, compliance or design. Judgement stays with you.
 - **Treat every result as unverified.** Check totals, and run `citation-verifier` on the `path:line` claims you will edit from.
 
+## Two agents serve several kinds of task: say which kind
+
+`code-explorer` and `contracts-reader` each replace several narrower agents (22 agents in all). Each kind is one section of the agent with its own rules, output format and "will not" list. **The first line of your brief names the kind** (`Task kind: <kind>`), then the question follows. Name several kinds, separated by commas, when a task mixes them (`Task kind: locate, inventory`).
+
+| Agent | Kinds | Default effort |
+|---|---|---|
+| `code-explorer` | `locate` (where something is defined or used), `read` (answer from large or many files), `map` (structure, imports, a file's purpose), `inventory` (tables of items), `tests` (which tests exist and what they cover) | low; pass `effort: medium` for `map` (it used to run at medium) |
+| `contracts-reader` | `schema` (tables and columns from DDL, migrations or models), `api-spec` (OpenAPI or GraphQL operations), `migrations` (revision chain: heads, branches, gaps), `api-match` (frontend calls against backend routes) | medium |
+
+A hook (`guard-task-kind`) blocks a brief that has no valid kind line and tells you what to add; re-issue the call with the line and nothing else changes. Without the line the agent would have to guess the section, and the usage log could not pick the right footer checks (Coverage, Reconciliation). The Agent tool's `effort` parameter overrides the default for one call.
+
 ## Before every Read, Grep, Glob, Bash or web call, check this table
 
 If the action you are about to take matches a row, call the Agent tool instead. "Brief must carry" is what the agent needs from you: it sees nothing else, not this file and not the conversation.
 
 ### Find and read
 
-`code-explorer` and `contracts-reader` each serve several kinds of task. Put `Task kind: <kind>` on the first line of the brief (the kinds are in the rows below); the agent applies that section's rules first, and the usage log uses the kind to pick the footer checks. A task that mixes kinds names several, for example `Task kind: locate, inventory`.
+Rows for `code-explorer` and `contracts-reader` give the kind to put on the first line of the brief (see "Two agents serve several kinds of task" above).
 
 | About to... | Agent | Brief must carry | It will not |
 |---|---|---|---|
@@ -123,7 +134,7 @@ The user should never have to say "annotate that". When you find that a subagent
 **Do it in this order:**
 
 1. Fix the task first: redo the read, correct the count, or repeat the run with a better brief.
-2. Call `annotator` once per failed run, in the background, and keep working. Give it: the agent id (or `last:<agent_type>`), what was wrong, what you expected, and how you found out.
+2. Call `annotator` once per failed run, in the background, and keep working. Give it: the agent id (or `last:<agent_type>`), what was wrong, what you expected, and how you found out; for `code-explorer` and `contracts-reader` also the `Task kind` of that run, so the failure can be attributed to the right section.
 3. State only what you verified. A claim it cannot confirm is recorded as `disputed`, which counts against the record.
 4. Mention it in the close-out line (`Annotated: <agent_type> <outcome>`).
 
@@ -139,6 +150,7 @@ Documents your project says to read before a change are decision inputs. Locate 
 
 An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is self-contained:
 
+0. **For `code-explorer` and `contracts-reader`: the first line is `Task kind: <kind>`.** A hook blocks the call without it.
 1. **One precise question.** Not "look at the auth code".
 2. **Absolute paths** and the repository layout facts it needs (which folders exist, which are stale).
 3. **The special input** from the tables above: category list, two refs, `package@version` pairs, the one command to run.
@@ -148,6 +160,7 @@ An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is se
 ## Health and approvals
 
 - `/agent-guards:kit-doctor` checks that the data folder is writable, the policy files are valid, hook errors, pending blocked hosts, and that the running plugin versions are the installed ones. Run it after an update or when records seem missing.
+- `guard-task-kind` (a hook of `haiku-delegation`) blocks briefs for the merged agents that lack a valid `Task kind:` first line. The user can switch it off for a session by setting `TASK_KIND_GUARD=off`; it never blocks other agents and it fails open if it cannot read its input.
 - `/agent-guards:kit-allow` (only the user can start it) records the user's approval of a blocked browser host in `browser-policy.json`, with a reason and file hashes in `audit/policy-changes.jsonl`.
 
 ## Close-out

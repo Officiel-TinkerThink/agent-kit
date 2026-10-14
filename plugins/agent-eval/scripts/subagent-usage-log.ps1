@@ -56,9 +56,10 @@ function Get-Flags {
         if ($m.Groups[1].Value -ne $m.Groups[2].Value) { Add-Flag 'reconciliation_mismatch' 'fail' ('expected ' + $m.Groups[1].Value + ' / listed ' + $m.Groups[2].Value) }
     }
     # merged agents: the `Task kind:` line of the brief says which contract applies ($kd is that line, lower case, at most 40 characters)
-    $kd = $TaskKind.ToLowerInvariant()
-    if ($AgentType -eq 'contracts-reader') { $recon = ($kd.Contains('schema') -or $kd.Contains('api-spec')); $cov = $recon }
-    elseif ($AgentType -eq 'code-explorer') { $recon = $false; $cov = ($kd.Contains('locate') -or $kd.Contains('map') -or $kd.Contains('inventory')) }
+    # whole words only: `roadmap` is not `map`; text after the kind words (the pattern may run on into the sentence) is ignored by the exact comparison
+    $kw = @($TaskKind.ToLowerInvariant() -split '[, ]+' | Where-Object { $_ })
+    if ($AgentType -eq 'contracts-reader') { $recon = ($kw -contains 'schema' -or $kw -contains 'api-spec'); $cov = $recon }
+    elseif ($AgentType -eq 'code-explorer') { $recon = $false; $cov = ($kw -contains 'locate' -or $kw -contains 'map' -or $kw -contains 'inventory') }
     else {
         $recon = @('schema-reader', 'contract-reader', 'pipeline-reader') -contains $AgentType
         $cov = @('schema-reader', 'contract-reader', 'pipeline-reader', 'inventory-extractor', 'module-mapper', 'repo-scout') -contains $AgentType
@@ -121,7 +122,8 @@ function Get-SubagentRecord {
     $sha = $null; if ($tp -and (Test-Path -LiteralPath $tp)) { $sha = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash }
     # the first `Task kind: ...` in the transcript is the brief's own line; empty when there is none
     $taskKind = ''
-    if ($tp -and (Test-Path -LiteralPath $tp)) { try { $hit = Select-String -LiteralPath $tp -Pattern 'Task kind: [a-z, -]{1,40}' -List | Select-Object -First 1; if ($hit) { $taskKind = [regex]::Match($hit.Line, 'Task kind: ([a-z, -]{1,40})').Groups[1].Value } } catch { } }
+    # only the first lines are read (the brief is the first user message; a transcript can be large); case-sensitive, like the shell version
+    if ($tp -and (Test-Path -LiteralPath $tp)) { try { $m = [regex]::Match((@(Get-Content -LiteralPath $tp -TotalCount 20) -join "`n"), 'Task kind: ([a-z, -]{1,40})'); if ($m.Success) { $taskKind = $m.Groups[1].Value } } catch { } }
     $flags = [System.Collections.ArrayList]@(Get-Flags -Output $output -AgentType ([string]$In.agent_type) -Cwd ([string]$In.cwd) -HasHandback $hasHandback -BlockedCount $blocked -TaskKind $taskKind)
     # secret-guard events for this agent (hooks/secret-guard-audit.jsonl holds kinds and counts only)
     try {

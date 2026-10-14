@@ -50,13 +50,16 @@ RUN_CAP = 0.25
 # ---------- corpus ----------
 def build_fixture():
     if FX.exists():
-        shutil.rmtree(FX)
+        TG.safe_rmtree(FX)
     FX.mkdir(parents=True)
     p = subprocess.run(["git", "archive", TAG, "--format=tar"], cwd=REPO, capture_output=True, check=True)
     import io
     with tarfile.open(fileobj=io.BytesIO(p.stdout)) as t:
         members = [m for m in t.getmembers() if not (m.name == "bench" or m.name.startswith("bench/") or m.name == "CLAUDE.md")]
-        t.extractall(FX, members=members)
+        try:
+            t.extractall(FX, members=members, filter="data")   # no absolute paths, no links out of the folder
+        except TypeError:   # Python without the extraction filters
+            t.extractall(FX, members=members)
     TG.build_corpora()
     build_skills()
     (FX / "docs-extra").mkdir(exist_ok=True)

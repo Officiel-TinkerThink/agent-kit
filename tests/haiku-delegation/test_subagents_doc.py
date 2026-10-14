@@ -22,10 +22,19 @@ def main():
         check(f'{name}: has a row in SUBAGENTS.md', any(f'`{name}`' in r.split('|')[2] if len(r.split('|')) > 2 else False for r in rows) or any(f'`{name}`' in r for r in rows), 'missing')
     # backticked names in the first column of the roster tables that look like agent names must exist
     first_cols = []
-    for r in rows:
-        cells = r.split('|')
-        if len(cells) > 3:
-            first_cols += re.findall(r'`([a-z][a-z0-9-]+)`', cells[2])   # the Agent column
+    lines = DOC.splitlines()
+    agent_col = None   # index of the Agent column of the table the current row belongs to (the header row names it)
+    for i, line in enumerate(lines):
+        if not line.startswith('|'):
+            agent_col = None
+            continue
+        cells = line.split('|')
+        if i + 1 < len(lines) and lines[i + 1].startswith('|---'):   # header row of a table
+            names = [c.strip() for c in cells]
+            agent_col = names.index('Agent') if 'Agent' in names else None
+            continue
+        if agent_col is not None and len(cells) > agent_col:
+            first_cols += re.findall(r'`([a-z][a-z0-9-]+)`', cells[agent_col])
     unknown = sorted({n for n in first_cols if n not in agents and '-' in n and n not in ('last:<agent_type>',)})
     check('every agent named in an Agent column exists', not unknown, ', '.join(unknown))
     check('has the sections a project needs', all(h in DOC for h in ('## Stance', '## Writing a brief', '## Close-out', '## Project facts')))

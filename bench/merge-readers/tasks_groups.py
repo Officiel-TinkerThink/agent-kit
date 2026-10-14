@@ -16,12 +16,25 @@ GROUPS = {
     "compliance": ["audit-coverage-lister", "secret-candidate-lister", "citation-verifier"],
 }
 
+AKIA = "AKI" + "A"   # assembled here so that no secret-scanner pattern appears in the source text
+PEM_BEGIN = "-----BEGIN " + "PRIVATE KEY-----"
+PEM_END = "-----END " + "PRIVATE KEY-----"
 FAKE_PW = "FAKE-NOT-A-SECRET-PW-1"
 FAKE_AWS_TAIL = "FAKENOTASECRETAWS2"
 FAKE_BODY = "FAKE-NOT-A-SECRET-BODY-LINE"
 FAKE_DBPW = "FAKE-NOT-A-SECRET-DBPW-3"
 FAKE_ENVFILE = "FAKE-NOT-A-SECRET-ENVFILE-4"
 FAKE_JENKINS = "FAKE-NOT-A-SECRET-JENKINS-5"
+
+
+def safe_rmtree(path):
+    """The corpus and fixture folders can be redirected with environment variables, so never delete anything that is not clearly ours:
+    the folder name must start with 'agent-kit-merge', the path must be at least three levels deep, and it must not be a link."""
+    import shutil
+    p = Path(path)
+    if p.is_symlink() or not p.resolve().name.startswith("agent-kit-merge") or len(p.resolve().parts) < 3:
+        raise SystemExit(f"refusing to delete {p}: the folder name must start with 'agent-kit-merge' (set MERGE_BENCH_FIXTURE / MERGE_BENCH_CORPORA to such a folder)")
+    shutil.rmtree(p.resolve())
 
 
 def w(rel, text):
@@ -85,7 +98,7 @@ PYTEST_B = PYTEST_A.replace("=== 2 failed, 7 passed, 1 skipped, 1 error in 4.21s
 def build_corpora():
     import shutil
     if CORP.exists():
-        shutil.rmtree(CORP)
+        safe_rmtree(CORP)
     # contracts
     w("contracts/db/0001_schema.sql", "CREATE TABLE customers (\n  id INTEGER NOT NULL PRIMARY KEY,\n  email VARCHAR(255) NOT NULL UNIQUE,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n);\nCREATE TABLE orders (\n  id INTEGER NOT NULL PRIMARY KEY,\n  customer_id INTEGER NOT NULL REFERENCES customers(id),\n  total NUMERIC(10,2),\n  status VARCHAR(16) DEFAULT 'NEW'\n);\nCREATE INDEX ix_orders_customer ON orders (customer_id);\nINSERT INTO customers VALUES (1, 'a@x.test', NULL);\n")
     w("contracts/api/openapi.yaml", "openapi: 3.0.3\nsecurity:\n  - bearerAuth: []\npaths:\n  /pets:\n    parameters:\n      - {name: tenant, in: header, required: true}\n    get:\n      operationId: listPets\n      responses: {\"200\": {description: ok}}\n    post:\n      operationId: createPet\n      deprecated: true\n      responses: {\"201\": {description: created}}\n  /pets/{petId}:\n    parameters:\n      - {name: petId, in: path, required: true}\n    get:\n      operationId: getPet\n      responses: {\"200\": {description: ok}}\n    delete:\n      responses: {\"204\": {description: none}}\ncomponents:\n  schemas:\n    Pet: {type: object}\n")
@@ -123,7 +136,7 @@ def build_corpora():
     w("compliance/usecases/list_items.py", "def list_items():\n    return []\n")
     w("compliance/usecases/nested/legacy.py", 'audit_log.emit("LEGACY")\n')
     w("compliance/config/settings.py", f'import os\nPASSWORD = "{FAKE_PW}"\nTOKEN = "<your-token>"\nAPI_KEY = os.environ["API_KEY"]\nDB_URL = "postgres://fakeuser:{FAKE_DBPW}@localhost:5432/app"\ncommit_hash = "3f9a1c0e7b2d4a6f8c1e9b0a2d3f4e5a"\n')
-    w("compliance/config/keys.py", f'AWS_KEY = "AKIA{FAKE_AWS_TAIL}"\nPRIV = """-----BEGIN PRIVATE KEY-----\n{FAKE_BODY}\n-----END PRIVATE KEY-----"""\n')
+    w("compliance/config/keys.py", f'AWS_KEY = "{AKIA}{FAKE_AWS_TAIL}"\nPRIV = """{PEM_BEGIN}\n{FAKE_BODY}\n{PEM_END}"""\n')
     w("compliance/config/env_only.py", 'import os\nDB_PASSWORD = os.environ.get("DB_PASSWORD")\n')
     w("compliance/.env", f"DB_PASSWORD={FAKE_ENVFILE}\n")
     w("compliance/claims.txt", "Verify each claim (file, line, claimed text):\n(a) usecases/create_batch.py:3 `audit_log.emit(\"BATCH_CREATED\"`\n(b) usecases/create_batch.py:5 `audit_log.emit(\"BATCH_CREATED\"`\n(c) usecases/export_report.py:1 `def export_report(fmt, user):`\n(d) usecases/missing.py:1 `def nothing():`\n(e) usecases/approve_release.py:1 `from core.audit_log import audit_log`\n")

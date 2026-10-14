@@ -22,7 +22,7 @@ esac
 
 PROMPT=$(json_get "$INPUT" tool_input.prompt) || exit 0
 FIRST=$(printf '%s\n' "$PROMPT" | awk 'NF { print; exit }')
-KINDS=$(printf '%s' "$FIRST" | sed -n 's/^[[:space:]]*Task kind:[[:space:]]*//p' | tr ',' ' ')
+KINDS=$(printf '%s' "$FIRST" | tr -d '\r' | sed -n 's/^[[:space:]]*Task kind:[[:space:]]*//p' | tr ',' ' ')
 
 fail() {
   printf '%s\n' "BLOCKED: the brief for $BASE must start with a first line 'Task kind: <kind>'. $1 Valid kinds: $(printf '%s' "$VALID" | sed 's/ /, /g') (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: $(printf '%s' "$VALID" | awk '{ print $1 }')'. Re-issue the call with that line added; nothing else changes." >&2
@@ -30,7 +30,13 @@ fail() {
 }
 
 [ -n "$KINDS" ] || fail "No such line was found."
+# the kind words come from the brief (untrusted text): no pathname expansion of them (a `*` would list the working folder into the message),
+# and only a short, plain-character copy of a bad word goes back to the model
+set -f
 for k in $KINDS; do
-  case " $VALID " in *" $k "*) ;; *) fail "'$k' is not a kind of this agent." ;; esac
+  case " $VALID " in *" $k "*) ;; *)
+    shown=$(printf '%s' "$k" | tr -cd 'a-z0-9-' | cut -c1-20)
+    fail "'$shown' is not a kind of this agent." ;;
+  esac
 done
 exit 0

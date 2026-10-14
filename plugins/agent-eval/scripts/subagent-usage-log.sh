@@ -390,10 +390,12 @@ function recon(   pos, mt, g1, g2, rest) {
     if (g1 != g2) emit("reconciliation_mismatch", "fail", "expected " g1 " / listed " g2)
   }
 }
-function footers(AT, KD,   need_rec, need_cov) {
+function footers(AT, KD,   need_rec, need_cov, nk, KW, kset, ki) {
   # merged agents: the `Task kind:` line of the brief says which contract applies (KD is that line, lower case, at most 40 characters)
-  if (AT == "contracts-reader") { need_rec = (index(KD, "schema") > 0 || index(KD, "api-spec") > 0); need_cov = need_rec }
-  else if (AT == "code-explorer") { need_rec = 0; need_cov = (index(KD, "locate") > 0 || index(KD, "map") > 0 || index(KD, "inventory") > 0) }
+  # whole words only: `roadmap` is not `map`; the text after the kind words (the pattern may run on into the sentence) is ignored by the exact comparison
+  nk = split(KD, KW, /[, ]+/); kset = " "; for (ki = 1; ki <= nk; ki++) kset = kset KW[ki] " "
+  if (AT == "contracts-reader") { need_rec = (index(kset, " schema ") > 0 || index(kset, " api-spec ") > 0); need_cov = need_rec }
+  else if (AT == "code-explorer") { need_rec = 0; need_cov = (index(kset, " locate ") > 0 || index(kset, " map ") > 0 || index(kset, " inventory ") > 0) }
   else {
     need_rec = (AT == "schema-reader" || AT == "contract-reader" || AT == "pipeline-reader")
     need_cov = need_rec || AT == "inventory-extractor" || AT == "module-mapper" || AT == "repo-scout"
@@ -600,7 +602,8 @@ done < "$WORK/stats"
 ATYPE="$(printf '%s' "$AGENT_TYPE" | sed 's/^.*://')"
 # the first `Task kind: ...` in the transcript is the brief's own line (merged agents: code-explorer, contracts-reader); empty when there is none
 KIND=""
-if [ -n "$TP" ] && [ -f "$TP" ]; then KIND="$(grep -m1 -o 'Task kind: [a-z, -]\{1,40\}' "$TP" 2>/dev/null | head -n 1 | sed 's/^Task kind: //')"; fi
+# only the first lines are read (the brief is the first user message; a transcript can be large), and the file is read from stdin so a path that starts with '-' is never an option
+if [ -n "$TP" ] && [ -f "$TP" ]; then KIND="$(head -n 20 < "$TP" 2>/dev/null | grep -m1 -o 'Task kind: [a-z, -]\{1,40\}' | head -n 1 | sed 's/^Task kind: //')"; fi
 if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" KIND="$KIND" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
   # The awk error says why (it used to go to /dev/null, which hid a whole class of failures).
   hook_error "$SCRIPT_NAME" "run record not written: output checks failed ($(head -c 200 "$WORK/checks.err" | tr '\n' ' '))"

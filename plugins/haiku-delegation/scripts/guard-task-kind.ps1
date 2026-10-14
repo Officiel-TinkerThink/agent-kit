@@ -4,11 +4,11 @@
 # PowerShell twin of guard-task-kind.sh. Convenience guard, not a safety guard: any parse problem allows the call (fail-open).
 # Set TASK_KIND_GUARD=off in the environment to disable it.
 try {
-    if ($env:TASK_KIND_GUARD -eq 'off') { exit 0 }
+    if ($env:TASK_KIND_GUARD -ceq 'off') { exit 0 }
     $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
     $type = [string]$in.tool_input.subagent_type
     $base = $type -replace '^.*:', ''
-    $valid = switch ($base) {
+    $valid = switch -CaseSensitive ($base) {
         'code-explorer'    { @('locate', 'read', 'map', 'inventory', 'tests') }
         'contracts-reader' { @('schema', 'api-spec', 'migrations', 'api-match') }
         default            { exit 0 }
@@ -16,10 +16,18 @@ try {
     $prompt = [string]$in.tool_input.prompt
     $first = ($prompt -split "`r?`n" | Where-Object { $_.Trim() -ne '' } | Select-Object -First 1)
     $kinds = @()
-    if ($first -match '^\s*Task kind:\s*(.*)$') { $kinds = @($Matches[1] -split '[,\s]+' | Where-Object { $_ }) }
+    if ($first -cmatch '^\s*Task kind:\s*(.*)$') { $kinds = @($Matches[1] -split '[,\s]+' | Where-Object { $_ }) }   # case-sensitive, like the shell version and the usage log
     $problem = $null
     if ($kinds.Count -eq 0) { $problem = 'No such line was found.' }
-    else { foreach ($k in $kinds) { if ($valid -notcontains $k) { $problem = "'$k' is not a kind of this agent."; break } } }
+    else {
+        foreach ($k in $kinds) {
+            if ($valid -cnotcontains $k) {
+                # the kind words come from the brief (untrusted text): only a short, plain-character copy of a bad word goes back to the model
+                $shown = ($k -creplace '[^a-z0-9-]', ''); if ($shown.Length -gt 20) { $shown = $shown.Substring(0, 20) }
+                $problem = "'$shown' is not a kind of this agent."; break
+            }
+        }
+    }
     if ($problem) {
         [Console]::Error.WriteLine("BLOCKED: the brief for $base must start with a first line 'Task kind: <kind>'. $problem Valid kinds: $($valid -join ', ') (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: $($valid[0])'. Re-issue the call with that line added; nothing else changes.")
         exit 2

@@ -42,10 +42,22 @@ You do not need all four. `haiku-delegation` is the core; `agent-guards` is stro
 1. **Restart Claude Code.** New agents and hooks are loaded at session start.
 2. Run `/agents`: you should see the `haiku-delegation` agents (for example `bulk-reader`, `repo-scout`, `browser-explorer`) with their descriptions.
 3. Run `/agent-guards:kit-doctor`. Expect `0 FAIL`. A `WARN` on the first run is normal when no policy files exist yet; it tells you what each line means.
-4. Ask for something a subagent should do, for example "find where `main` is defined in this repo", and watch the main agent delegate to `repo-scout`. The session policy that tells the main model when to delegate is injected automatically at session start by the plugin; you do not need to edit `CLAUDE.md`.
+4. Ask for something a subagent should do, for example "find where `main` is defined in this repo", and watch the main agent delegate to `repo-scout`. The session policy that tells the main model when to delegate is injected automatically at session start by the plugin; you do not need to edit `CLAUDE.md` for that (for the per-project roster see the next section).
+
+### Set up each project (once per project)
+Installing the plugins is per machine; the project roster is per project. In every project where you want the main agent to delegate consistently, open Claude Code in that project and run:
+```
+/haiku-delegation:subagents-init
+```
+It copies [`SUBAGENTS.md`](SUBAGENTS.md) (which agent for which job, what each brief must carry, the standing handoffs, and the duty to report a failed agent run to the `annotator` without being asked) to the project root and adds an `@SUBAGENTS.md` import to `CLAUDE.md` (or `AGENTS.md` when that is the file the project has; a new `CLAUDE.md` if there is neither). Then fill in the "Project facts" section at the bottom of `SUBAGENTS.md`: layout and stale folders, files agents must never read, the one command per verification gate. Commit both files so the whole team gets them.
+
+- **Safe to repeat.** Running it again changes nothing: an identical `SUBAGENTS.md` is reported `UNCHANGED`, the import is never added twice, and a `SUBAGENTS.md` you edited is kept as it is.
+- **After a kit update** (new `SUBAGENTS.md` text): run `/haiku-delegation:subagents-init update`. It replaces everything above "Project facts" with the shipped text, keeps your own facts and writes `SUBAGENTS.md.bak-<timestamp>` first. Running `update` twice is also a no-op.
+- **Options:** `dry-run` shows what would happen and writes nothing; `claude` or `agents` forces the import target; a folder path sets the project (default: the git top level of the current folder).
+- **By hand:** copy the file and add the line `@SUBAGENTS.md` to `CLAUDE.md` yourself. If you edit the root `SUBAGENTS.md` in this repository, copy it to `plugins/haiku-delegation/templates/SUBAGENTS.md` too (a test checks they match).
+- The session policy injected by the plugins works without this step; the roster makes the choice concrete per project and is what makes the main agent report agent failures on its own.
 
 ### Optional setup
-- **Make the main agent delegate consistently:** copy [`SUBAGENTS.md`](SUBAGENTS.md) into your project and import it from `CLAUDE.md` with `@SUBAGENTS.md`. It lists every agent, what it returns, what its brief must carry and what it will not do, plus the standing handoffs (for example run the verification runner after edits). Fill in its "Project facts" section.
 - **Browser agents:** install the Claude in Chrome extension and connect it to Claude Code. The main thread cannot call the browser tools itself; a hook redirects it to `browser-explorer` (read-only) or `browser-operator` (named click and fill steps, which stops before submit, delete, send, pay, approve and export). Details and benchmark results: `plugins/haiku-delegation/README.md`.
 - **Which commands the test runner may run:** Claude Code's own permissions decide. Add allow rules for the commands you trust to your Claude Code settings (for example `Bash(pytest:*)` or `Bash(npm run test:*)`), or approve the prompt when it appears. The kit adds no command list of its own.
 - **Where the kit keeps its data** (audit logs, usage records, policy files): see "Where data lives" below. Set `AGENT_KIT_DATA` to put it somewhere specific.
@@ -114,8 +126,12 @@ The judge (a stronger model through `claude -p`, about $0.10 per case) and your 
 ## About the secret-looking strings in tests
 The files under `tests/` contain deliberately fake credentials (AWS-, GitHub-, Slack- and Sonar-shaped tokens, a PEM header, test passwords) used to prove that redaction works. They are fixtures, not secrets; if your organisation runs a secret scanner on shared repositories, mark `tests/` as test fixtures there. Shipped code under `plugins/` contains none.
 
+## Changelog
+
+[`CHANGELOG.md`](CHANGELOG.md) lists what changed in every release and what is waiting under `[Unreleased]`. Each pull request adds its line there and does not bump a version; releases are cut in a separate step. Rules, release steps and the PR template: [`CONTRIBUTING.md`](CONTRIBUTING.md). A test keeps the changelog in step with the version numbers.
+
 ## Tests
-`python tests/run_all.py` runs 16 suites (about 820 checks: agent frontmatter, the SUBAGENTS.md roster, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
+`python tests/run_all.py` runs 18 suites (about 870 checks: agent frontmatter, the SUBAGENTS.md roster, the `subagents-init` project setup tool, the changelog, browser guard, other guards, secret leak, kit tools, launcher, hook smoke, shell-helper and shell-purity tests, benchmark case loop, usage log checks, evaluation pipeline, safe-rm, rm routing, runner guard) four at a time; `--serial` runs them one after another and `-j N` sets the number at once. Each suite uses its own temporary data folder and never touches your real one. A parallel run takes about 3 minutes (several times longer in order) because each case starts a PowerShell process.
 
 **On Ubuntu in Docker** (from a Linux shell or WSL with Docker; nothing is installed on the host and the container is removed afterwards): `sh tests/linux/run-in-docker.sh`. It builds `tests/linux/Dockerfile` (Ubuntu 24.04 + Python for the test runner only; no PowerShell: a test shim maps the PowerShell entry points to the `.sh` scripts), mounts the repository read-only, copies it inside the container and runs the same suites. Remove the image with `docker rmi agent-kit-ubuntu-test`.
 

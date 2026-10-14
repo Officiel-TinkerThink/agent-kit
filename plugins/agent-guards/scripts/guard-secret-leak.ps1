@@ -25,6 +25,7 @@ function Test-IsReference([string]$v) {
     if ($v -match '\$\{|\{\{') { return $true }
     if ($v -match '(?i)^(x{3,}|\*{3,}|\.{3,}|changeme|change_me|your[-_].*|example.*|placeholder|redacted|none|null|true|false|string|required|todo|secret|password|token|apikey|api_key)$') { return $true }
     if ($v -match '<redacted') { return $true }
+    if ($v -match '^[A-Za-z_][A-Za-z0-9_.]*<') { return $true }   # a generic type such as Record<string, ...> or Promise<void>, not a value
     return $false
 }
 
@@ -56,7 +57,7 @@ function Find-SecretValues([string]$Text) {
     # key = value where the KEY names a secret (credential ids / variable names / file paths are not secrets)
     $assign = '(?i)([\w.-]*(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credential|auth[_-]?key)[\w.-]*)["'']?\s*[:=]\s*["'']?([^\s"''`,;)}\]]{6,})'
     foreach ($m in [regex]::Matches($Text, $assign)) {
-        if ($m.Groups[1].Value -match '(?i)(id|ids|name|names|file|path|dir|ref|var|variable|env|type|mode|policy|header|field|label|prefix|suffix|url|uri|endpoint|host|provider|store|manager|usage|scope|expiry|expires|ttl)$') { continue }
+        if ($m.Groups[1].Value -match '(?i)(id|ids|name|names|file|path|dir|ref|var|variable|env|type|mode|policy|header|field|label|prefix|suffix|url|uri|endpoint|host|provider|store|manager|usage|scope|expiry|expires|ttl)s?$') { continue }
         Add-Val $m.Groups[2].Value 'secret_assignment'
     }
     foreach ($m in [regex]::Matches($Text, '(?i)(?<![\w-])--?(?:password|passwd|token|secret|api-key|apikey|client-secret)(?:[= ]+)["'']?([^\s"''`]{6,})')) { Add-Val $m.Groups[1].Value 'cli_credential_flag' }

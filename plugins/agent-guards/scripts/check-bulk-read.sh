@@ -152,5 +152,5 @@ fi
 [ "$LINES" -le "$MIN" ] && exit 0
 
 write_audit "$TOOL" "$FULL" "$LINES" blocked "$(session_token "$INPUT")"
-printf "BLOCKED: '%s' has %s lines (limit %s). Do not read it whole in the main context. Delegate with the Agent tool: subagent_type='code-explorer', prompt = a first line 'Task kind: read', then the exact question + absolute file path(s). For edits or exact line numbers, re-issue Read with offset/limit on the relevant section instead.\n" "$FULL" "$LINES" "$MIN" >&2
+printf "BLOCKED (intentional guard, not a hook failure): '%s' has %s lines (limit %s). Do not read it whole in the main context. Delegate with the Agent tool: subagent_type='code-explorer', prompt = a first line 'Task kind: read', then the exact question + absolute file path(s). Reading the file in chunks is always allowed, for any purpose (edits, exact line numbers, a code review or quality check): re-issue Read with offset/limit on the sections you need. Only whole-file reads over the limit are redirected.\n" "$FULL" "$LINES" "$MIN" >&2
 exit 2

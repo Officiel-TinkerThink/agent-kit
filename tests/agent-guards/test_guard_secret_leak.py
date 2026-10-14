@@ -110,6 +110,10 @@ safe = {
     'plain prose': 'Table users has columns id, email, status; see schema.sql:12 and the password column name.',
     'passwordVariable': "usernamePassword(credentialsId: 'x', usernameVariable: 'user', passwordVariable: 'password')",
     'redacted already': 'password = <redacted:secret>',
+    'typescript record type after a secret-named constant': "const SECRET_LABELS: Record<string, string> = { a: 'b' };",
+    'typescript map type after a token-named field': "TOKEN_MAP: Map<string, number>; credentialsCache: Array<string>;",
+    'typescript promise type': "async function getToken(): Promise<void> { } const authKeyFn: Promise<string> = x;",
+    'plural label key': "token_labels: someValueHere and secretNames: anotherValue",
 }
 for name, msg in safe.items():
     rc, new, err = handback(msg, [msg], agent_id='ag-safe')

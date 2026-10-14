@@ -184,6 +184,7 @@ function isref(v) {
   if (index(v, "${") > 0 || index(v, "{{") > 0) return 1
   if (v ~ REF2) return 1
   if (v ~ REF3) return 1
+  if (v ~ /^[A-Za-z_][A-Za-z0-9_.]*</) return 1   # a generic type such as Record<string, ...> or Promise<void>, not a value
   return 0
 }
 # addv: trim, then keep the value when it is worth redacting and not a reference. Later assignments overwrite the kind.
@@ -245,7 +246,7 @@ function find(t, tid,   fi, p, m, v, g1, b, en, name, rl) {
     match(m, ASGNAME); g1 = RLENGTH; name = substr(m, 1, g1)
     if (match(substr(m, g1 + 1), ASGSEP) == 0) continue
     v = substr(m, g1 + RLENGTH + 1)
-    if (tolower(name) ~ /(id|ids|name|names|file|path|dir|ref|var|variable|env|type|mode|policy|header|field|label|prefix|suffix|url|uri|endpoint|host|provider|store|manager|usage|scope|expiry|expires|ttl)$/) continue
+    if (tolower(name) ~ /(id|ids|name|names|file|path|dir|ref|var|variable|env|type|mode|policy|header|field|label|prefix|suffix|url|uri|endpoint|host|provider|store|manager|usage|scope|expiry|expires|ttl)s?$/) continue
     addv(tid, v, "secret_assignment")
   }
   p = 1

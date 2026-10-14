@@ -53,6 +53,31 @@ redirect_targets() {
 agent=$(json_get "$INPUT" agent_type) || agent=""
 agent_is "$agent" verification-runner || exit 0
 tool=$(json_get "$INPUT" tool_name) || tool=""
+# --- Monitor: the runner may wait for a log and nothing else. A Monitor call is a shell command (or a WebSocket), so it gets the same care as Bash:
+# only `until grep -q [-E] 'PATTERN' <log inside verification-logs>; do sleep N; done`, optionally followed by `; tail -n K <the same log>`.
+# No WebSocket source, no redirects, no other command, and the path is built from a short list of plain characters (no quotes, no expansions).
+if [ "$tool" = Monitor ]; then
+  MON_ROOT="$(kit_data)/verification-logs"
+  mon_block() {
+    printf '%s\n' "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside $MON_ROOT>; do sleep N; done [; tail -n K <same log>]. ($1)" >&2
+    exit 2
+  }
+  if json_has "$INPUT" tool_input.ws; then mon_block "a WebSocket source is not allowed"; fi
+  mcmd=$(json_get "$INPUT" tool_input.command) || mcmd=""
+  mcmd=$(printf '%s' "$mcmd" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  MON_PATH='[A-Za-z0-9._/:~-]+'
+  MON_SHAPE="^until grep -q( -E)? '[A-Za-z0-9^._|:=-]{1,120}' $MON_PATH; do sleep ([1-9]|[1-5][0-9]|60); done(; tail -n ([1-9]|[1-4][0-9]|50) $MON_PATH)?\$"
+  printf '%s\n' "$mcmd" | grep -Eq "$MON_SHAPE" || mon_block "the command does not have that shape"
+  mp1=$(printf '%s\n' "$mcmd" | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /;$/) { sub(/;$/, "", $i); print $i; exit } }')
+  mp2=$mp1
+  case "$mcmd" in *"; tail -n "*) mp2=$(printf '%s\n' "$mcmd" | awk '{ print $NF }') ;; esac
+  [ "$mp1" = "$mp2" ] || mon_block "tail must read the same log"
+  case "$mp1" in "$MON_ROOT"/*) ;; *) mon_block "the log must be inside the verification-logs folder" ;; esac
+  mname=${mp1#"$MON_ROOT"/}
+  case "$mname" in */*|.|..|"") mon_block "the log must be a file directly inside the folder" ;; esac
+  printf '%s\n' "$mname" | grep -Eq '^[A-Za-z0-9._-]{1,100}$' || mon_block "the log name has characters that are not allowed"
+  exit 0
+fi
 [ "$tool" = Bash ] || exit 0
 cmd=$(json_get "$INPUT" tool_input.command) || cmd=""
 cmd=$(printf '%s' "$cmd" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')

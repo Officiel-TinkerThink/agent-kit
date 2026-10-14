@@ -20,6 +20,27 @@ try {
     $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
     if (-not (Test-AgentIs ([string]$in.agent_type) @('verification-runner'))) { exit 0 }
     $isRunner = $true
+    if ($in.tool_name -eq 'Monitor') {
+        # the runner may wait for a log and nothing else: until grep -q [-E] 'PATTERN' <log inside verification-logs>; do sleep N; done [; tail -n K <same log>]
+        # (a Monitor call is a shell command or a WebSocket: no ws source, no redirects, a path built from plain characters only)
+        $monRoot = (Get-KitData) + '/verification-logs'
+        $monGit = if ($monRoot -match '^[A-Za-z]:') { '/' + $monRoot.Substring(0, 1).ToLower() + $monRoot.Substring(2) } else { $monRoot }
+        function Block-Monitor([string]$why) { [Console]::Error.WriteLine("BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside $monRoot>; do sleep N; done [; tail -n K <same log>]. ($why)"); exit 2 }
+        if ($in.tool_input.PSObject.Properties.Name -contains 'ws') { Block-Monitor 'a WebSocket source is not allowed' }
+        $mcmd = ([string]$in.tool_input.command).Trim()
+        $pathRe = '[A-Za-z0-9._/:~-]+'
+        $shape = "^until grep -q( -E)? '[A-Za-z0-9^._|:=-]{1,120}' ($pathRe); do sleep ([1-9]|[1-5][0-9]|60); done(?:; tail -n ([1-9]|[1-4][0-9]|50) ($pathRe))?$"
+        $m = [regex]::Match($mcmd, $shape)
+        if (-not $m.Success) { Block-Monitor 'the command does not have that shape' }
+        $p1 = $m.Groups[2].Value
+        $p2 = if ($m.Groups[5].Success) { $m.Groups[5].Value } else { $p1 }
+        if ($p1 -cne $p2) { Block-Monitor 'tail must read the same log' }
+        $rest = $null
+        foreach ($root in @($monRoot, $monGit)) { if ($p1.StartsWith($root + '/', [StringComparison]::Ordinal)) { $rest = $p1.Substring($root.Length + 1); break } }
+        if ($null -eq $rest) { Block-Monitor 'the log must be inside the verification-logs folder' }
+        if ($rest -eq '.' -or $rest -eq '..' -or $rest.Contains('/') -or $rest -cnotmatch '^[A-Za-z0-9._-]{1,100}$') { Block-Monitor 'the log must be a plain file name directly inside the folder' }
+        exit 0
+    }
     if ($in.tool_name -ne 'Bash') { exit 0 }
     $cmd = ([string]$in.tool_input.command).Trim()
 

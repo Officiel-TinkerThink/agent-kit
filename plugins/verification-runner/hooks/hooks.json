@@ -34,7 +34,7 @@
             "onFailure": "block"
           }
         ],
-        "matcher": "Bash"
+        "matcher": "Bash|Monitor"
       }
     ]
   }

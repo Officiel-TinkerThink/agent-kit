@@ -15,7 +15,7 @@ function Test-AgentIs([string]$Type, [string[]]$Names) {
     return $false
 }
 function Get-Flags {
-    param([string]$Output, [string]$AgentType, [string]$Cwd, [bool]$HasHandback, [int]$BlockedCount)
+    param([string]$Output, [string]$AgentType, [string]$Cwd, [bool]$HasHandback, [int]$BlockedCount, [string]$TaskKind = '')
     $flags = New-Object System.Collections.ArrayList
     $AgentType = ($AgentType -replace '^.*:', '')
     function Add-Flag($code, $sev, $detail) { [void]$flags.Add([ordered]@{ code = $code; sev = $sev; detail = $detail }) }
@@ -55,10 +55,16 @@ function Get-Flags {
     foreach ($m in [regex]::Matches($Output, '(?i)expected\s+(\d+)\s*/\s*listed\s+(\d+)')) {
         if ($m.Groups[1].Value -ne $m.Groups[2].Value) { Add-Flag 'reconciliation_mismatch' 'fail' ('expected ' + $m.Groups[1].Value + ' / listed ' + $m.Groups[2].Value) }
     }
-    $needRecon = @('schema-reader', 'contract-reader', 'pipeline-reader')
-    if (-not $looksJson -and $needRecon -contains $AgentType -and $Output -notmatch '(?i)reconciliation') { Add-Flag 'footer_missing' 'warn' 'no Reconciliation line' }
-    $needCov = @('schema-reader', 'contract-reader', 'pipeline-reader', 'inventory-extractor', 'module-mapper', 'repo-scout')
-    if (-not $looksJson -and $needCov -contains $AgentType -and $Output -notmatch '(?i)coverage') { Add-Flag 'footer_missing' 'warn' 'no Coverage line' }
+    # merged agents: the `Task kind:` line of the brief says which contract applies ($kd is that line, lower case, at most 40 characters)
+    $kd = $TaskKind.ToLowerInvariant()
+    if ($AgentType -eq 'contracts-reader') { $recon = ($kd.Contains('schema') -or $kd.Contains('api-spec')); $cov = $recon }
+    elseif ($AgentType -eq 'code-explorer') { $recon = $false; $cov = ($kd.Contains('locate') -or $kd.Contains('map') -or $kd.Contains('inventory')) }
+    else {
+        $recon = @('schema-reader', 'contract-reader', 'pipeline-reader') -contains $AgentType
+        $cov = @('schema-reader', 'contract-reader', 'pipeline-reader', 'inventory-extractor', 'module-mapper', 'repo-scout') -contains $AgentType
+    }
+    if (-not $looksJson -and $recon -and $Output -notmatch '(?i)reconciliation') { Add-Flag 'footer_missing' 'warn' 'no Reconciliation line' }
+    if (-not $looksJson -and $cov -and $Output -notmatch '(?i)coverage') { Add-Flag 'footer_missing' 'warn' 'no Coverage line' }
 
     # --- citations: absolute paths only; the file must exist and the line must be inside it
     $seen = @{}; $n = 0
@@ -113,7 +119,10 @@ function Get-SubagentRecord {
     $cost = [math]::Round(($inT * 0.10 + $cw * 0.125 + $cr * 0.01 + $outT * 0.50) / 1e6, 5)
     $dur = $null; if ($first -and $last) { $dur = [math]::Round(($last - $first).TotalSeconds, 1) }
     $sha = $null; if ($tp -and (Test-Path -LiteralPath $tp)) { $sha = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash }
-    $flags = [System.Collections.ArrayList]@(Get-Flags -Output $output -AgentType ([string]$In.agent_type) -Cwd ([string]$In.cwd) -HasHandback $hasHandback -BlockedCount $blocked)
+    # the first `Task kind: ...` in the transcript is the brief's own line; empty when there is none
+    $taskKind = ''
+    if ($tp -and (Test-Path -LiteralPath $tp)) { try { $hit = Select-String -LiteralPath $tp -Pattern 'Task kind: [a-z, -]{1,40}' -List | Select-Object -First 1; if ($hit) { $taskKind = [regex]::Match($hit.Line, 'Task kind: ([a-z, -]{1,40})').Groups[1].Value } } catch { } }
+    $flags = [System.Collections.ArrayList]@(Get-Flags -Output $output -AgentType ([string]$In.agent_type) -Cwd ([string]$In.cwd) -HasHandback $hasHandback -BlockedCount $blocked -TaskKind $taskKind)
     # secret-guard events for this agent (hooks/secret-guard-audit.jsonl holds kinds and counts only)
     try {
         $sg = Join-Path (Get-KitData) 'audit/secret-guard-audit.jsonl'

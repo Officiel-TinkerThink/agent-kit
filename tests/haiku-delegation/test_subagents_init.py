@@ -24,7 +24,7 @@ def runners():
     out = {}
     if shutil.which('sh'):
         out['sh'] = lambda args: ['sh', str(SCRIPTS / 'subagents-init.sh')] + args
-    ps = shutil.which('powershell.exe') or shutil.which('powershell')
+    ps = (shutil.which('powershell.exe') or shutil.which('powershell')) if sys.platform == 'win32' else shutil.which('pwsh')   # not the Windows powershell.exe that WSL exposes through interop: it cannot open Linux paths
     if ps:
         out['ps1'] = lambda args: [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPTS / 'subagents-init.ps1')] + args
     return out

@@ -390,9 +390,14 @@ function recon(   pos, mt, g1, g2, rest) {
     if (g1 != g2) emit("reconciliation_mismatch", "fail", "expected " g1 " / listed " g2)
   }
 }
-function footers(AT,   need_rec, need_cov) {
-  need_rec = (AT == "schema-reader" || AT == "contract-reader" || AT == "pipeline-reader")
-  need_cov = need_rec || AT == "inventory-extractor" || AT == "module-mapper" || AT == "repo-scout"
+function footers(AT, KD,   need_rec, need_cov) {
+  # merged agents: the `Task kind:` line of the brief says which contract applies (KD is that line, lower case, at most 40 characters)
+  if (AT == "contracts-reader") { need_rec = (index(KD, "schema") > 0 || index(KD, "api-spec") > 0); need_cov = need_rec }
+  else if (AT == "code-explorer") { need_rec = 0; need_cov = (index(KD, "locate") > 0 || index(KD, "map") > 0 || index(KD, "inventory") > 0) }
+  else {
+    need_rec = (AT == "schema-reader" || AT == "contract-reader" || AT == "pipeline-reader")
+    need_cov = need_rec || AT == "inventory-extractor" || AT == "module-mapper" || AT == "repo-scout"
+  }
   if (need_rec && index(LO, "reconciliation") == 0) emit("footer_missing", "warn", "no Reconciliation line")
   if (need_cov && index(LO, "coverage") == 0) emit("footer_missing", "warn", "no Coverage line")
 }
@@ -455,7 +460,7 @@ function citations(   pos, a, endp, key, nuniq) {
 BEGIN { RS = "\001" }
 { O = (NR > 1) ? O "\001" $0 : $0 }
 END {
-  HBv = (ENVIRON["HB"] == "1"); BL = ENVIRON["BLOCKED"] + 0; AT = tolower(ENVIRON["ATYPE"])
+  HBv = (ENVIRON["HB"] == "1"); BL = ENVIRON["BLOCKED"] + 0; AT = tolower(ENVIRON["ATYPE"]); KD = tolower(ENVIRON["KIND"])
   T = trim(O); tl = u16(T); ol = u16(O)
   LO = tolower(O); Ln = length(O)
   if (!HBv) emit("no_final_answer", "fail", "run ended without a SubagentHandback result")
@@ -467,7 +472,7 @@ END {
     forbidden()
     lk = json_part()
     recon()
-    if (!lk) footers(AT)
+    if (!lk) footers(AT, KD)
     citations()
   }
   printf "OUTCHARS\t%d\n", ol
@@ -593,7 +598,10 @@ done < "$WORK/stats"
 # --- stage C: Get-Flags checks on the hand-back text ----------------------------------------------------------
 [ -f "$OUTF" ] || : > "$OUTF"
 ATYPE="$(printf '%s' "$AGENT_TYPE" | sed 's/^.*://')"
-if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
+# the first `Task kind: ...` in the transcript is the brief's own line (merged agents: code-explorer, contracts-reader); empty when there is none
+KIND=""
+if [ -n "$TP" ] && [ -f "$TP" ]; then KIND="$(grep -m1 -o 'Task kind: [a-z, -]\{1,40\}' "$TP" 2>/dev/null | head -n 1 | sed 's/^Task kind: //')"; fi
+if ! HB="$HB" BLOCKED="$BLOCKED" ATYPE="$ATYPE" KIND="$KIND" awk -f "$WORK/checks_full.awk" "$OUTF" > "$WORK/checks" 2> "$WORK/checks.err"; then
   # The awk error says why (it used to go to /dev/null, which hid a whole class of failures).
   hook_error "$SCRIPT_NAME" "run record not written: output checks failed ($(head -c 200 "$WORK/checks.err" | tr '\n' ' '))"
   exit 0

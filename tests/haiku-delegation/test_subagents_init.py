@@ -1,4 +1,4 @@
-"""/subagents-init: copies SUBAGENTS.md to a project and imports it from CLAUDE.md or AGENTS.md without overwriting anything.
+"""/subagents-init: copies SUBAGENTS.md to a project, imports it from CLAUDE.md or AGENTS.md and adds the shipped AGENTS.md text there as a marked block, without overwriting anything.
 Runs the same scenarios against the POSIX sh tool and the PowerShell tool (whichever exist here) and requires identical stdout.
 Run: python test_subagents_init.py"""
 import pathlib
@@ -13,6 +13,8 @@ PLUGIN = ROOT / 'plugins' / 'haiku-delegation'
 SCRIPTS = PLUGIN / 'scripts'
 TEMPLATE = PLUGIN / 'templates' / 'SUBAGENTS.md'
 results = []
+BEGIN = b'<!-- agent-kit:orchestration:begin'
+END = b'<!-- agent-kit:orchestration:end -->'
 
 
 def check(name, ok, extra=''):
@@ -41,11 +43,129 @@ def read(p):
     return pathlib.Path(p).read_bytes()
 
 
+def agents_text():
+    """the shipped orchestration text as the tools write it: LF only, one final newline"""
+    t = (PLUGIN / 'templates' / 'AGENTS.md').read_bytes().replace(b'\r', b'')
+    return t if t.endswith(b'\n') else t + b'\n'
+
+
+def inner(body):
+    """the text between the two marker lines (LF only)"""
+    b = body.replace(b'\r', b'')
+    i, j = b.index(BEGIN), b.index(END)
+    return b[b.index(b'\n', i) + 1:j]
+
+
+def stamp(lines):
+    return [re.sub(r'bak-\d{8}T\d{6}Z', 'bak-STAMP', l) for l in lines]
+
+
+def orchestration(name, make, log):
+    tpl = agents_text()
+    own = b'# My project\n\nOwn rules.\n- keep me exactly'   # no final newline
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        (proj / 'CLAUDE.md').write_bytes(own)
+        rc, lines, err = run(make, proj)
+        log.append(('orch-add', rc, lines))
+        body = read(proj / 'CLAUDE.md')
+        check(f'[{name}] orchestration: added to CLAUDE.md and the project\'s own text is kept byte for byte', rc == 0 and 'ORCHESTRATION added to CLAUDE.md' in lines and body.startswith(own), str(lines) + repr(body[:120]))
+        check(f'[{name}] orchestration: one begin and one end marker with the shipped text verbatim between them', body.count(BEGIN) == 1 and body.count(END) == 1 and inner(body) == tpl, repr(body[-200:]))
+        check(f'[{name}] orchestration: the SUBAGENTS.md import is there once', body.count(b'@SUBAGENTS.md') == 1)
+        before = body
+        rc, lines, err = run(make, proj)
+        log.append(('orch-again', rc, lines))
+        check(f'[{name}] orchestration: second run changes nothing', rc == 0 and read(proj / 'CLAUDE.md') == before and 'ORCHESTRATION up to date in CLAUDE.md' in lines, str(lines))
+        # the shipped text moved on: an old block with the user's own text after it
+        tail = b'\nMy notes after the block.\n'
+        mine = before.replace(b'Decompose before executing.', b'Decompose first.') + tail
+        (proj / 'CLAUDE.md').write_bytes(mine)
+        rc, lines, err = run(make, proj)
+        log.append(('orch-outdated', rc, lines))
+        check(f'[{name}] orchestration: an outdated block is reported and left alone without -Update', rc == 0 and read(proj / 'CLAUDE.md') == mine and any(l.startswith('ORCHESTRATION outdated in CLAUDE.md; run again with -Update') for l in lines), str(lines))
+        rc, lines, err = run(make, proj, '-Update', '-DryRun')
+        log.append(('orch-dry-update', rc, lines))
+        check(f'[{name}] orchestration: -Update -DryRun writes nothing', rc == 0 and read(proj / 'CLAUDE.md') == mine and not list(proj.glob('CLAUDE.md.bak-*')) and 'WOULD UPDATE orchestration in CLAUDE.md (backup first)' in lines, str(lines))
+        rc, lines, err = run(make, proj, '-Update')
+        log.append(('orch-update', rc, stamp(lines)))
+        new = read(proj / 'CLAUDE.md')
+        baks = list(proj.glob('CLAUDE.md.bak-*'))
+        check(f'[{name}] orchestration: -Update restores the shipped text and keeps everything before and after the block', rc == 0 and inner(new) == tpl and new.startswith(mine[:mine.index(BEGIN)]) and new.endswith(tail), str(lines) + repr(new[-120:]))
+        check(f'[{name}] orchestration: -Update wrote one backup of the previous file', len(baks) == 1 and baks[0].read_bytes() == mine and any(l.startswith('ORCHESTRATION updated in CLAUDE.md (previous version: CLAUDE.md.bak-') for l in lines), str(baks) + str(lines))
+    # the shipped text is already in the file, no markers: nothing is duplicated
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        (proj / 'CLAUDE.md').write_bytes(b'# P\n\n' + tpl + b'\nafter\n')
+        rc, lines, err = run(make, proj)
+        log.append(('orch-verbatim', rc, lines))
+        body = read(proj / 'CLAUDE.md')
+        check(f'[{name}] orchestration: text already in the file verbatim is not added again and gets no markers', rc == 0 and 'ORCHESTRATION already present in CLAUDE.md (verbatim; no markers added)' in lines and BEGIN not in body and body.count(tpl) == 1, str(lines))
+    # a CRLF file gets a CRLF block
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        own = b'# C\r\n\r\nrules\r\n'
+        (proj / 'CLAUDE.md').write_bytes(own)
+        rc, lines, err = run(make, proj)
+        log.append(('orch-crlf', rc, lines))
+        body = read(proj / 'CLAUDE.md')
+        seg = body[body.index(BEGIN):body.index(END) + len(END) + 2]
+        check(f'[{name}] orchestration: a CRLF file keeps its text and gets the block with CRLF line ends', rc == 0 and body.startswith(own) and seg.count(b'\n') > 10 and seg.count(b'\n') == seg.count(b'\r\n') and inner(body) == tpl, str(lines))
+        rc, lines, err = run(make, proj)
+        log.append(('orch-crlf-again', rc, lines))
+        check(f'[{name}] orchestration: a CRLF file is "up to date" on the second run', rc == 0 and 'ORCHESTRATION up to date in CLAUDE.md' in lines and read(proj / 'CLAUDE.md') == body, str(lines))
+    # damaged markers are refused and nothing is written to the file
+    for label, text in (('a begin marker without an end', b'# X\n\n@SUBAGENTS.md\n' + BEGIN + b' -->\nhalf a block\n'),
+                        ('the end marker before the begin marker', b'# X\n\n@SUBAGENTS.md\n' + END + b'\n' + BEGIN + b' -->\n'),
+                        ('a begin marker without an end (no import line yet)', b'# X\n' + BEGIN + b' -->\nhalf a block\n'),
+                        ('two blocks', b'# X\n\n@SUBAGENTS.md\n' + BEGIN + b' -->\na\n' + END + b'\n' + BEGIN + b' -->\nb\n' + END + b'\n')):
+        with tempfile.TemporaryDirectory() as td:
+            proj = pathlib.Path(td) / 'p'
+            proj.mkdir()
+            (proj / 'CLAUDE.md').write_bytes(text)
+            rc, lines, err = run(make, proj)
+            check(f'[{name}] orchestration: {label} is refused and CLAUDE.md is not touched', rc == 1 and 'REFUSED' in err and 'markers' in err and read(proj / 'CLAUDE.md') == text, err)
+    # switches
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        rc, lines, err = run(make, proj, '-NoOrchestration')
+        log.append(('orch-off', rc, lines))
+        check(f'[{name}] orchestration: -NoOrchestration adds the import but no block', rc == 0 and 'ORCHESTRATION skipped (-NoOrchestration)' in lines and BEGIN not in read(proj / 'CLAUDE.md'), str(lines))
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        (proj / 'CLAUDE.md').write_bytes(b'# C\n')
+        rc, lines, err = run(make, proj, '-Import', 'none')
+        log.append(('orch-import-none', rc, lines))
+        check(f'[{name}] orchestration: -Import none adds neither import nor block', rc == 0 and 'ORCHESTRATION skipped (-Import none)' in lines and read(proj / 'CLAUDE.md') == b'# C\n', str(lines))
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        rc, lines, err = run(make, proj, '-DryRun')
+        log.append(('orch-dry-fresh', rc, lines))
+        check(f'[{name}] orchestration: -DryRun on an empty project says what it would do and writes nothing', rc == 0 and lines == ['WOULD CREATE SUBAGENTS.md', 'WOULD CREATE CLAUDE.md with the import', 'WOULD ADD orchestration to CLAUDE.md', 'DONE'] and not list(proj.iterdir()), str(lines))
+    # AGENTS.md as the target: same block there
+    with tempfile.TemporaryDirectory() as td:
+        proj = pathlib.Path(td) / 'p'
+        proj.mkdir()
+        (proj / 'AGENTS.md').write_bytes(b'# Agents\n')
+        rc, lines, err = run(make, proj)
+        log.append(('orch-agents-target', rc, lines))
+        check(f'[{name}] orchestration: goes into AGENTS.md when that is the import target', rc == 0 and 'ORCHESTRATION added to AGENTS.md' in lines and inner(read(proj / 'AGENTS.md')) == tpl and not (proj / 'CLAUDE.md').exists(), str(lines))
+
+
 def main():
     shipped = (ROOT / 'SUBAGENTS.md').read_bytes().replace(b'\r\n', b'\n')
     tmpl = TEMPLATE.read_bytes().replace(b'\r\n', b'\n')
     check('shipped template equals the repo SUBAGENTS.md (copy it again after editing the root file)', shipped == tmpl)
     check('template has a Project facts section and the annotator duty', b'\n## Project facts' in tmpl and b'Report agent failures to the annotator' in tmpl)
+    ag_root = (ROOT / 'AGENTS.md').read_bytes().replace(b'\r\n', b'\n')
+    ag_tmpl = (PLUGIN / 'templates' / 'AGENTS.md').read_bytes().replace(b'\r\n', b'\n')
+    check('shipped AGENTS.md template equals the repo AGENTS.md (copy it again after editing the root file)', ag_root == ag_tmpl)
+    check('AGENTS.md template is the orchestrator text and holds no marker text', ag_tmpl.startswith(b'# Orchestrator-First Execution') and b'agent-kit:orchestration' not in ag_tmpl)
     skill = (PLUGIN / 'skills' / 'subagents-init' / 'SKILL.md').read_text(encoding='utf-8')
     check('skill is user-only and goes through run.sh', 'disable-model-invocation: true' in skill and 'scripts/run.sh' in skill and 'subagents-init' in skill)
 
@@ -111,7 +231,7 @@ def main():
             (proj / 'AGENTS.md').write_bytes(original)
             rc, lines, err = step_run = run(make, proj)
             body = read(proj / 'AGENTS.md')
-            check(f'[{name}] AGENTS.md only: import added there, CLAUDE.md not created', rc == 0 and not (proj / 'CLAUDE.md').exists() and body.startswith(original) and body.endswith(b'@SUBAGENTS.md\n') and body.count(b'@SUBAGENTS.md') == 1, repr(body))
+            check(f'[{name}] AGENTS.md only: import added there, CLAUDE.md not created', rc == 0 and not (proj / 'CLAUDE.md').exists() and body.startswith(original) and body.count(b'@SUBAGENTS.md') == 1 and body.count(BEGIN) == 1 and body.endswith(END + b'\n'), repr(body))
             log.append(('agents-only', rc, lines))
             # both files: CLAUDE.md wins, -Import agents overrides
             (proj / 'CLAUDE.md').write_bytes(b'# C\n')
@@ -126,6 +246,7 @@ def main():
         check(f'[{name}] a missing -Project folder is refused', rc == 1 and 'REFUSED' in err, err)
         p = subprocess.run(make(['-Import', 'bogus']), capture_output=True, text=True, timeout=120)
         check(f'[{name}] a bad -Import value exits 1', p.returncode == 1, p.stderr)
+        orchestration(name, make, log)
         transcripts[name] = log
 
     if len(transcripts) == 2:

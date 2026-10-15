@@ -11,7 +11,7 @@ A pull request **adds its changelog line** under `## [Unreleased]` in `CHANGELOG
 1. Branch from `main`. One topic per PR.
 2. Make the change. Add or update tests; run the suites that cover what you touched (`python tests/run_all.py`, or one file such as `python tests/haiku-delegation/test_changelog.py`).
 3. Add the changelog line (rules below).
-4. If you edited the root `SUBAGENTS.md`, copy it to `plugins/haiku-delegation/templates/SUBAGENTS.md` too (a test fails when they differ).
+4. If you edited the root `SUBAGENTS.md`, copy it to `plugins/haiku-delegation/templates/SUBAGENTS.md` too. If you edited the root `AGENTS.md`, copy it to `plugins/haiku-delegation/templates/AGENTS.md` too. A test fails when either pair differs.
 5. Open the PR with the template filled in: what and why, how it was verified (commands and results, not "tested"), the changelog line, and a link to the change-control record when the team has one.
 6. Do not edit `version` in any `plugin.json` or in `marketplace.json`. Do not rename `[Unreleased]`.
 

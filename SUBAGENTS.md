@@ -2,7 +2,7 @@
 
 Which subagents exist, what each one is for, and when the main agent should hand work to it.
 
-**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root and imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); the plain name also works.
+**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root, imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`, and adds the orchestrator rules (a marked block) to that same file. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); the plain name also works.
 
 ## Stance
 

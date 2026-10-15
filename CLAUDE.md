@@ -1,1 +1,5 @@
+@AGENTS.md
+
+@SUBAGENTS.md
+
 @CONTRIBUTING.md

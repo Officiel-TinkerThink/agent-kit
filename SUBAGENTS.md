@@ -9,7 +9,8 @@ Which subagents exist, what each one is for, and when the main agent should hand
 Your context is the scarce resource. A subagent returns facts with `path:line` in 20-40 lines at about one twentieth of the cost per token; reading inline leaves the raw dump in your context for the rest of the session.
 
 - **Handoff is the default; inline needs a reason.** Hand the reading off first, then keep working on the next independent step while the agent runs. Never sit waiting when there is independent work left.
-- **Fan out.** Independent parts (per module, per file group, per question, per verification gate) go to one agent each, launched in a single message.
+- **A unit of work is the smallest piece of work that cannot be split any further**, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. One agent per unit. A brief with numbered steps, "and then", or several deliverables (read + write + test + document) holds several units; split it, and never hand a whole feature to one agent. Haiku input costs about 5x more once a single prompt passes 100k tokens, so a unit must be small enough to finish far below that.
+- **Fan out.** Independent units (per module, per file group, per question, per verification gate) go to one agent each, launched in a single message; dependent units go one after the other as each result arrives.
 - **Agents return evidence, not judgement.** Counts reconciled, quotes verbatim, `NOT FOUND` / `UNCLEAR` marked, and no verdicts on safety, compliance or design. Judgement stays with you.
 - **Treat every result as unverified.** Check totals, and run `compliance-lister` (`Task kind: citation-verifier`) on the `path:line` claims you will edit from.
 
@@ -168,6 +169,7 @@ An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is se
 
 - `/agent-guards:kit-doctor` checks that the data folder is writable, the policy files are valid, hook errors, pending blocked hosts, and that the running plugin versions are the installed ones. Run it after an update or when records seem missing.
 - `guard-task-kind` (a hook of `haiku-delegation`) blocks briefs for the topic agents that lack a valid `Task kind:` first line. The user can switch it off for a session by setting `TASK_KIND_GUARD=off`; it never blocks other agents and it fails open if it cannot read its input.
+- `guard-agent-model` (a hook of `haiku-delegation`) blocks a call of a non-kit subagent (general-purpose, Explore, Plan, no type) that lacks `model: "haiku"`, and a brief for such an agent with 4 or more numbered steps or over 4000 characters (several units of work). Kit agents are never blocked. The user can switch the two checks off with `AGENT_MODEL_GUARD=off` and `AGENT_BRIEF_GUARD=off`; it only looks at the main agent's calls and fails open if it cannot read its input.
 - `/agent-guards:kit-allow` (only the user can start it) records the user's approval of a blocked browser host in `browser-policy.json`, with a reason and file hashes in `audit/policy-changes.jsonl`.
 
 ## Close-out

@@ -123,10 +123,18 @@ function Get-SubagentRecord {
             }
         }
     }
-    $inT = 0; $outT = 0; $cr = 0; $cw = 0
-    foreach ($u in $calls.Values) { $inT += [int]$u.input_tokens; $outT += [int]$u.output_tokens; $cr += [int]$u.cache_read_input_tokens; $cw += [int]$u.cache_creation_input_tokens }
-    # ESTIMATE ONLY: Haiku 5.5 list price per MTok: input 0.10, output 0.50 (<=100k prompts); cache read assumed 10% of input, cache write assumed 125%.
-    $cost = [math]::Round(($inT * 0.10 + $cw * 0.125 + $cr * 0.01 + $outT * 0.50) / 1e6, 5)
+    $inT = 0; $outT = 0; $cr = 0; $cw = 0; $cost = 0.0; $peak = 0; $over = 0
+    # ESTIMATE ONLY: Haiku 5.5 list price per MTok: input 0.10, output 0.50 for prompts up to 100k tokens; cache read 10% and cache write 125% of input.
+    # A call whose prompt (input + cache write + cache read) is above 100k tokens is priced at the higher tier: the input side x5 (input 0.50), output unchanged (assumption).
+    foreach ($u in $calls.Values) {
+        $ui = [long]$u.input_tokens; $uo = [long]$u.output_tokens; $ucr = [long]$u.cache_read_input_tokens; $ucw = [long]$u.cache_creation_input_tokens
+        $inT += $ui; $outT += $uo; $cr += $ucr; $cw += $ucw
+        $p = $ui + $ucw + $ucr
+        if ($p -gt $peak) { $peak = $p }
+        if ($p -gt 100000) { $over++; $cost += ($ui * 0.50 + $ucw * 0.625 + $ucr * 0.05 + $uo * 0.50) / 1e6 }
+        else { $cost += ($ui * 0.10 + $ucw * 0.125 + $ucr * 0.01 + $uo * 0.50) / 1e6 }
+    }
+    $cost = [math]::Round($cost, 5)
     $dur = $null; if ($first -and $last) { $dur = [math]::Round(($last - $first).TotalSeconds, 1) }
     $sha = $null; if ($tp -and (Test-Path -LiteralPath $tp)) { $sha = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash }
     # the first `Task kind: ...` in the transcript is the brief's own line; empty when there is none
@@ -148,6 +156,8 @@ function Get-SubagentRecord {
             }
         }
     } catch {}
+    # a call whose prompt was above 100k tokens is billed at the higher tier: say so (the cost estimate above already prices it that way)
+    if ($over -gt 0) { [void]$flags.Add([ordered]@{ code = 'context_over_100k'; sev = 'warn'; detail = "$over of $($calls.Count) API calls had a prompt above 100000 tokens (peak $peak); input is billed at the higher tier" }) }
     $flagged = [bool](@($flags | Where-Object { $_.sev -ne 'info' }).Count)
     return [ordered]@{
         schema = 'agent-usage/2'; type = 'run'; ts = (Get-Date).ToUniversalTime().ToString('o')
@@ -155,7 +165,7 @@ function Get-SubagentRecord {
         effort = [string]$In.effort.level; models = @($models.Keys); cwd = [string]$In.cwd
         duration_s = $dur; api_calls = $calls.Count; tool_calls = $toolCalls; tools = $tools
         tokens = [ordered]@{ input = $inT; cache_write = $cw; cache_read = $cr; output = $outT }
-        est_cost_usd = $cost; output_chars = $output.Length; flagged = $flagged; flags = @($flags)
+        est_cost_usd = $cost; peak_context = $peak; output_chars = $output.Length; flagged = $flagged; flags = @($flags)
         transcript = $tp; transcript_sha256 = $sha
     }
 }

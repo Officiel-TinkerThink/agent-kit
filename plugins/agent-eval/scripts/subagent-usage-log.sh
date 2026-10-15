@@ -295,11 +295,19 @@ BEGIN { HB = 0; BLOCKED = 0; TOOLCALLS = 0; NT = 0; NM = 0; HASTS = 0; OUT = "" 
   if (parse_text($0)) endline()
 }
 END {
-  for (key in CK) { CALLS++; TIN += CIN[key]; TOUT += COUT[key]; TCR += CCR[key]; TCW += CCW[key] }
-  COST = (TIN * 0.10 + TCW * 0.125 + TCR * 0.01 + TOUT * 0.50) / 1000000
+  # ESTIMATE ONLY: Haiku 5.5 list price per MTok: input 0.10, output 0.50 for prompts up to 100k tokens; cache read 10% and cache write 125% of input.
+  # A call whose prompt (input + cache write + cache read) is above 100k tokens is priced at the higher tier: the input side x5 (input 0.50), output unchanged (assumption).
+  for (key in CK) {
+    CALLS++; TIN += CIN[key]; TOUT += COUT[key]; TCR += CCR[key]; TCW += CCW[key]
+    P = CIN[key] + CCW[key] + CCR[key]
+    if (P > PEAK) PEAK = P
+    if (P > 100000) { OVER++; COST += (CIN[key] * 0.50 + CCW[key] * 0.625 + CCR[key] * 0.05 + COUT[key] * 0.50) / 1000000 }
+    else COST += (CIN[key] * 0.10 + CCW[key] * 0.125 + CCR[key] * 0.01 + COUT[key] * 0.50) / 1000000
+  }
   if (HASTS) printf "DUR\t%.1f\n", TMAX - TMIN
   else printf "DUR\tnull\n"
   printf "CALLS\t%d\nTOOLCALLS\t%d\nTIN\t%d\nTCW\t%d\nTCR\t%d\nTOUT\t%d\nCOST\t%.5f\n", CALLS, TOOLCALLS, TIN, TCW, TCR, TOUT, COST
+  printf "PEAK\t%d\nOVER\t%d\n", PEAK, OVER
   printf "HB\t%d\nBLOCKED\t%d\n", HB, BLOCKED
   for (j = 1; j <= NM; j++) printf "MODEL\t%s\n", clean(MK[MORD[j]])
   for (j = 1; j <= NT; j++) printf "TOOL\t%d\t%s\n", TCNT[TORD[j]], clean(TK[TORD[j]])
@@ -585,7 +593,7 @@ if ! OUTF="$OUTF" awk -f "$WORK/usage_full.awk" "$SRC" > "$WORK/stats" 2> "$WORK
   exit 0
 fi
 
-DUR=null; CALLS=0; TOOLCALLS=0; TIN=0; TCW=0; TCR=0; TOUT=0; COST=0.00000; HB=0; BLOCKED=0
+DUR=null; CALLS=0; TOOLCALLS=0; TIN=0; TCW=0; TCR=0; TOUT=0; COST=0.00000; PEAK=0; OVER=0; HB=0; BLOCKED=0
 MODELS_JSON=""; TOOLS_JSON=""
 while IFS="$TAB" read -r S_K S_A S_B; do
   case "$S_K" in
@@ -597,6 +605,8 @@ while IFS="$TAB" read -r S_K S_A S_B; do
     TCR) TCR="$S_A" ;;
     TOUT) TOUT="$S_A" ;;
     COST) COST="$S_A" ;;
+    PEAK) PEAK="$S_A" ;;
+    OVER) OVER="$S_A" ;;
     HB) HB="$S_A" ;;
     BLOCKED) BLOCKED="$S_A" ;;
     MODEL) _sj="$(json_str "$S_A")"; MODELS_JSON="${MODELS_JSON:+$MODELS_JSON,}$_sj" ;;
@@ -645,6 +655,10 @@ if [ -f "$SG" ]; then
     esac
   done < "$WORK/sg"
 fi
+# a call whose prompt was above 100k tokens is billed at the higher tier: say so (the cost estimate above already prices it that way)
+if [ "$OVER" -gt 0 ]; then
+  add_flag context_over_100k warn "$OVER of $CALLS API calls had a prompt above 100000 tokens (peak $PEAK); input is billed at the higher tier"
+fi
 
 # --- record ---------------------------------------------------------------------------------------------------
 TS="$(now_utc)"
@@ -653,7 +667,7 @@ FLAGGED=false
 SHA="$(sha256_of "$TP")"
 if [ -n "$SHA" ]; then SHA_J="$(json_str "$SHA")"; else SHA_J=null; fi
 
-REC="{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":$(json_str "$TS"),\"session_id\":$(json_str "$SESSION_ID"),\"agent_id\":$(json_str "$AGENT_ID"),\"agent_type\":$(json_str "$AGENT_TYPE"),\"effort\":$(json_str "$EFFORT"),\"models\":[$MODELS_JSON],\"cwd\":$(json_str "$CWD"),\"duration_s\":$DUR,\"api_calls\":$CALLS,\"tool_calls\":$TOOLCALLS,\"tools\":{$TOOLS_JSON},\"tokens\":{\"input\":$TIN,\"cache_write\":$TCW,\"cache_read\":$TCR,\"output\":$TOUT},\"est_cost_usd\":$COST,\"output_chars\":$OUTCHARS,\"flagged\":$FLAGGED,\"flags\":[$FLAGS],\"transcript\":$(json_str "$TP"),\"transcript_sha256\":$SHA_J}"
+REC="{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":$(json_str "$TS"),\"session_id\":$(json_str "$SESSION_ID"),\"agent_id\":$(json_str "$AGENT_ID"),\"agent_type\":$(json_str "$AGENT_TYPE"),\"effort\":$(json_str "$EFFORT"),\"models\":[$MODELS_JSON],\"cwd\":$(json_str "$CWD"),\"duration_s\":$DUR,\"api_calls\":$CALLS,\"tool_calls\":$TOOLCALLS,\"tools\":{$TOOLS_JSON},\"tokens\":{\"input\":$TIN,\"cache_write\":$TCW,\"cache_read\":$TCR,\"output\":$TOUT},\"est_cost_usd\":$COST,\"peak_context\":$PEAK,\"output_chars\":$OUTCHARS,\"flagged\":$FLAGGED,\"flags\":[$FLAGS],\"transcript\":$(json_str "$TP"),\"transcript_sha256\":$SHA_J}"
 
 if ! append_line "$LOG" "$REC"; then
   hook_error "$SCRIPT_NAME" "run record not written: cannot append to the usage log"

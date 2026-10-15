@@ -126,6 +126,16 @@ def main():
         keep.write_text('3\n')
         r = run(cmd, call('n1', rt), tmp)
         check(f'[{ver}] a new agent clears count files older than a day, keeps recent ones', r.returncode == 0 and not old.exists() and keep.exists(), r.stderr)
+        # a turn-budget.txt checked out with CRLF line ends (Windows, core.autocrlf) must still be read, not ignored (fail-open)
+        sc = pathlib.Path(tempfile.mkdtemp(prefix='gtbcrlf_'))
+        for fn in ('lib.sh', 'guard-turn-budget.sh', 'guard-turn-budget.ps1'):
+            shutil.copy(SCRIPTS / fn, sc / fn)
+        (sc / 'turn-budget.txt').write_bytes((SCRIPTS / 'turn-budget.txt').read_text(encoding='utf-8').replace('\r\n', '\n').replace('\n', '\r\n').encode('utf-8'))
+        ccmd = ['sh', str(sc / 'guard-turn-budget.sh')] if ver == 'sh' else cmd[:-1] + [str(sc / 'guard-turn-budget.ps1')]
+        (bud / 'c1').write_text(f'{n - 1}\n')
+        r = run(ccmd, call('c1', rt), tmp)
+        check(f'[{ver}] a CRLF turn-budget.txt is read: the N-th call is still blocked', r.returncode == 2 and 'PARTIAL' in r.stderr, f'{r.returncode} {r.stderr}')
+        shutil.rmtree(sc, ignore_errors=True)
         shutil.rmtree(tmp, ignore_errors=True)
 
     if len(outputs) == 2:

@@ -21,7 +21,7 @@ TOOL=$(json_get "$INPUT" tool_name)
 TYPE=$(json_get "$INPUT" agent_type)
 BASE="${TYPE##*:}"
 [ -n "$BASE" ] || exit 0
-N=$(awk -v a="$BASE" '$1 !~ /^#/ && $1 == a { print $2; exit }' "$KIT_SCRIPT_DIR/turn-budget.txt" 2>/dev/null)
+N=$(tr -d '\r' < "$KIT_SCRIPT_DIR/turn-budget.txt" 2>/dev/null | awk -v a="$BASE" '$1 !~ /^#/ && $1 == a { print $2; exit }')   # tr: a table checked out with CRLF must still be read
 case "$N" in ''|*[!0-9]*) exit 0 ;; esac
 [ "$N" -gt 0 ] || exit 0
 

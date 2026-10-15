@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-15
+
 ### Changed
 - The delegation prompts were rewritten so the main agent splits work into many small agents instead of handing one agent a whole task. The session policy (`plugins/haiku-delegation/policy/haiku-delegation.md`) now starts with the cost reason (Haiku input costs about 5x more once one prompt passes 100k tokens), defines a **unit of work** as the smallest piece of work that cannot be split any further, in parallel or in sequence, gives five numbered rules (split first, one agent per unit, short brief, full agent names and `model: "haiku"` for other subagent types, what stays with the main agent) and a worked wrong-versus-right example, and lists `verification-runner` with the other agents. `SUBAGENTS.md` (and its template copy) has the same definition and example, and "Writing a brief" now says one question per brief and no numbered list of steps. Projects run `/haiku-delegation:subagents-init` to pick it up.
 - Every kit agent got one operating rule, "One unit": its brief is one unit of work; if it holds several independent questions or deliverables, the agent does the first and lists the others under `NOT DONE (send each to its own agent)` instead of widening its scope. `tests/haiku-delegation/test_agent_references.py` checks that every agent file has it.

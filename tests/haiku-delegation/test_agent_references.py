@@ -54,6 +54,15 @@ def main():
             for m in re.finditer(r"subagent_type\s*=\s*['\"]([\w:-]+)['\"]", line):
                 if m.group(1).split(':')[-1] not in existing:
                     dangling.append(f'{f.relative_to(ROOT).as_posix()}:{i} -> {m.group(1)}')
+    # plugin agents only resolve under their full name <plugin>:<agent>; no text may say the prefix is optional, and the session policy lists every agent's prefix
+    optional = [f.relative_to(ROOT).as_posix() for f in files if re.search(r'prefix is optional|plain name also works', f.read_text(encoding='utf-8', errors='replace'))]
+    check('no text claims that the plugin prefix of an agent name is optional', not optional, ', '.join(optional))
+    policy = (PLUGINS / 'haiku-delegation' / 'policy' / 'haiku-delegation.md').read_text(encoding='utf-8')
+    full = next((l for l in policy.splitlines() if l.startswith('Full names:')), '')
+    check('the session policy tells the main agent to use the full <plugin>:<agent> name', 'FULL name' in policy and bool(full))
+    missing = [f'{p.parent.parent.name}:{p.stem}' for p in PLUGINS.glob('*/agents/*.md')
+               if p.stem not in full or (f'`{p.parent.parent.name}:`' not in full and f'`{p.parent.parent.name}:{p.stem}`' not in full)]
+    check('the "Full names" line of the session policy lists every agent under its plugin prefix', not missing, ', '.join(missing))
     check('no file names a removed (merged) agent', not stale, ', '.join(stale[:8]))
     check("every subagent_type='...' in hooks, scripts and docs names an existing agent", not dangling, ', '.join(dangling[:8]))
 

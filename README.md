@@ -70,7 +70,7 @@ claude plugin update haiku-delegation@agent-kit      # repeat for each plugin yo
 ```
 Restart Claude Code afterwards, then run `/agent-guards:kit-doctor` (it checks that the running version is the installed one). Claude Code updates a plugin only when its `version` changes, so a release is what delivers new agents, hooks and skills; see [`CHANGELOG.md`](CHANGELOG.md) for what each version contains. Projects that use the roster run `/haiku-delegation:subagents-init` once after an update to refresh `SUBAGENTS.md` and the rules block (your "Project facts" are kept and a backup is written). To remove a plugin: `claude plugin uninstall <plugin>@agent-kit`. The data folder is left in place so your audit records are kept; delete it yourself if you do not need them.
 
-Plugin agents are addressed as `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); the plain name also works.
+Plugin agents are addressed by their full name `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`); a bare name such as `code-explorer` fails with "Agent type not found".
 
 ## Where data lives
 All state is in one folder (KIT_DATA), resolved in this order by every hook and CLI: `$AGENT_KIT_DATA`; `<CLAUDE_CONFIG_DIR>/agent-kit`; the config folder the plugin is installed under (derived from the script's own `.../plugins/cache/...` path, so it still works when `CLAUDE_CONFIG_DIR` is not passed to the hook, e.g. `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`); `~/.claude/agent-kit`. The plugins' own `${CLAUDE_PLUGIN_DATA}` is not used: it is per plugin and deleted on uninstall, while the audit and usage data is shared by four plugins and must outlive any one of them.

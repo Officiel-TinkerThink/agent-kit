@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-15
+
 ### Fixed
 - `/haiku-delegation:subagents-init` no longer leaves an older `SUBAGENTS.md` (one without a "Project facts" section) for you to merge by hand. It now replaces the file with the shipped one (one roster, no second copy), saves the old file as `SUBAGENTS.md.bak-<UTC timestamp>` and adds a note under "Project facts" that names the backup; copy your project's own facts from the backup. A second run changes nothing. `-Keep` still leaves the file alone, and `-Update` no longer refuses such a file.
 

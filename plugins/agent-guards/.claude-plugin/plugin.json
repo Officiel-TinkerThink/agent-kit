@@ -1,6 +1,6 @@
 {
   "name": "agent-guards",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Deterministic guard hooks for subagents: secret redaction at hand-back and web-exfiltration block, .env file protection, bulk-read redirect, monitor/poll blocking, read-only git for changelog-summarizer.",
   "author": {
     "name": "Unidentified"

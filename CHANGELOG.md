@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-15
+
 ### Changed
 - **Behaviour change:** `/haiku-delegation:subagents-init` now refreshes by default. A `SUBAGENTS.md` that differs from the shipped one used to be reported (`EXISTS ... kept as it is`) and left alone until you ran `update`; now everything above "Project facts" is replaced with the shipped text, your own facts below it are kept, and `SUBAGENTS.md.bak-<timestamp>` is written first (`UPDATED SUBAGENTS.md (previous version: ...)`). The orchestrator rules block is refreshed the same way (only the text between the two markers, backup of the target file first). A `SUBAGENTS.md` with no "Project facts" section is still never touched: the default run keeps it and prints a note, `-Update` still refuses it. New flag `-Keep` (skill argument `keep`) gives the old behaviour (`EXISTS ... (-Keep)`, `ORCHESTRATION outdated`); `-Update` is still accepted and is now the default. If you had edited the shipped part above "Project facts", those edits are replaced (they are in the backup). Tests: `tests/haiku-delegation/test_subagents_init.py`.
 

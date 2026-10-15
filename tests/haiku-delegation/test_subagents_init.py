@@ -189,7 +189,7 @@ def main():
 
             def step(label, *args):
                 rc, lines, err = run(make, proj, *args)
-                log.append((label, rc, lines))
+                log.append((label, rc, stamp(lines)))
                 return rc, lines, err
 
             # empty project: creates both files
@@ -227,10 +227,10 @@ def main():
             rc, lines, err = step('update-again', '-Update')
             check(f'[{name}] -Update twice: nothing changes and no second backup', rc == 0 and after_first == (read(proj / 'SUBAGENTS.md'), read(proj / 'CLAUDE.md')) and len(list(proj.glob('SUBAGENTS.md.bak-*'))) == 1 and 'UNCHANGED SUBAGENTS.md (shipped part already up to date)' in lines, str(lines))
 
-            # -Update on a file without the marker is refused, nothing changes
+            # -Update on a file without the marker migrates it (old text kept verbatim, backup first), as the default run does
             (proj / 'SUBAGENTS.md').write_bytes(b'# no marker\n')
             rc, lines, err = step('nomarker', '-Update')
-            check(f'[{name}] -Update without a Project facts section is refused', rc == 1 and 'REFUSED' in err and read(proj / 'SUBAGENTS.md') == b'# no marker\n', err)
+            check(f'[{name}] -Update without a Project facts section migrates it (old text in the backup)', rc == 0 and b'# no marker' not in read(proj / 'SUBAGENTS.md') and any(l.startswith('MIGRATED SUBAGENTS.md') for l in lines), str(lines) + err)
 
         # the default refreshes a differing SUBAGENTS.md (no flag needed): shipped text above, the project's facts kept, one backup
         with tempfile.TemporaryDirectory() as td:
@@ -252,7 +252,25 @@ def main():
             proj.mkdir()
             (proj / 'SUBAGENTS.md').write_bytes(b'# no marker\n')
             rc, lines, err = run(make, proj)
-            check(f'[{name}] default run: a SUBAGENTS.md without a Project facts section is kept (not refused), with a note', rc == 0 and read(proj / 'SUBAGENTS.md') == b'# no marker\n' and not list(proj.glob('SUBAGENTS.md.bak-*')) and any(l.startswith('EXISTS SUBAGENTS.md differs') and 'cannot be refreshed safely' in l for l in lines), str(lines) + err)
+            mig = read(proj / 'SUBAGENTS.md').replace(b'\r\n', b'\n')
+            baks = list(proj.glob('SUBAGENTS.md.bak-*'))
+            check(f'[{name}] default run: a SUBAGENTS.md without a Project facts section is migrated in place: only the shipped text plus a pointer to the backup (no second copy of the roster), one backup',
+                  rc == 0 and mig.startswith(tmpl.replace(b'\r\n', b'\n')) and b'# no marker' not in mig and b'> Migrated: the previous SUBAGENTS.md is saved as SUBAGENTS.md.bak-' in mig
+                  and len(baks) == 1 and baks[0].read_bytes() == b'# no marker\n' and any(l.startswith('MIGRATED SUBAGENTS.md (replaced by the shipped version; previous version: SUBAGENTS.md.bak-') for l in lines), str(lines) + err)
+            first = read(proj / 'SUBAGENTS.md')
+            rc, lines, err = run(make, proj)
+            check(f'[{name}] after a migration the next run changes nothing (the file now has a Project facts section)', rc == 0 and read(proj / 'SUBAGENTS.md') == first and len(list(proj.glob('SUBAGENTS.md.bak-*'))) == 1 and not any(l.startswith('MIGRATED') for l in lines), str(lines) + err)
+        with tempfile.TemporaryDirectory() as td:
+            proj = pathlib.Path(td) / 'p'
+            proj.mkdir()
+            (proj / 'SUBAGENTS.md').write_bytes(b'# no marker, no final newline')
+            rc, lines, err = run(make, proj, '-Keep')
+            check(f'[{name}] -Keep: a SUBAGENTS.md without a Project facts section stays as it is, no backup', rc == 0 and read(proj / 'SUBAGENTS.md') == b'# no marker, no final newline' and not list(proj.glob('SUBAGENTS.md.bak-*')), str(lines) + err)
+            rc, lines, err = run(make, proj, '-DryRun')
+            check(f'[{name}] -DryRun: says WOULD MIGRATE and writes nothing', rc == 0 and read(proj / 'SUBAGENTS.md') == b'# no marker, no final newline' and not list(proj.glob('SUBAGENTS.md.bak-*')) and any(l.startswith('WOULD MIGRATE SUBAGENTS.md') for l in lines), str(lines) + err)
+            rc, lines, err = run(make, proj)
+            mig = read(proj / 'SUBAGENTS.md').replace(b'\r\n', b'\n')
+            check(f'[{name}] migration of a file without a final newline: replaced, old file intact in the backup', rc == 0 and b'no final newline' not in mig and [b.read_bytes() for b in proj.glob('SUBAGENTS.md.bak-*')] == [b'# no marker, no final newline'], repr(mig[-80:]))
 
         # AGENTS.md only: import goes there, text above it stays byte for byte, a missing final newline is handled
         with tempfile.TemporaryDirectory() as td:

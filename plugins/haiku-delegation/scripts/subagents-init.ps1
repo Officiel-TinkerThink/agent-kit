@@ -3,8 +3,8 @@
 #   subagents-init.ps1 [-Project <dir>] [-Import auto|claude|agents|none] [-Keep] [-NoOrchestration] [-DryRun]
 # Never loses text: an existing SUBAGENTS.md that differs is refreshed (only the part above "## Project facts"; the project's
 # own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>; the same for the orchestration block (only the text between
-# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now, and refuses a SUBAGENTS.md
-# that has no "## Project facts" section instead of keeping it).
+# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now). A SUBAGENTS.md
+# without a "## Project facts" section is replaced by the shipped one (backup first, a note under "Project facts" names the backup).
 # The import line (@SUBAGENTS.md) is added once, to CLAUDE.md when it exists, else AGENTS.md, else a new CLAUDE.md.
 # Exit codes: 0 ok, 1 refused (bad input), 2 internal error.
 param(
@@ -57,14 +57,25 @@ try {
         Write-Output 'UNCHANGED SUBAGENTS.md (identical to the shipped version)'
     } elseif (-not $doUpdate) {
         Write-Output 'EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (-Keep)'
-    } elseif ((-not $Update) -and (-not [regex]::IsMatch([IO.File]::ReadAllText($dest), '(?m)^' + [regex]::Escape($Marker)))) {
-        Write-Output "EXISTS SUBAGENTS.md differs from the shipped version and has no '$Marker' section, so it cannot be refreshed safely; kept as it is (merge by hand)"
+    } elseif (-not [regex]::IsMatch([IO.File]::ReadAllText($dest), '(?m)^' + [regex]::Escape($Marker))) {
+        # an older SUBAGENTS.md without a "Project facts" section: the project's own text cannot be told apart from the shipped text,
+        # so the file is replaced by the shipped one (no second copy of the roster) and the old file is saved as a backup that a
+        # one-line note under "Project facts" points to
+        if ($DryRun) { Write-Output "WOULD MIGRATE SUBAGENTS.md (backup first; replaced by the shipped version)" }
+        else {
+            $ship = [IO.File]::ReadAllText($Template)
+            $bak = $dest + '.bak-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+            Copy-Item -LiteralPath $dest -Destination $bak
+            $bn = Split-Path -Leaf $bak
+            $new = $ship + "`n> Migrated: the previous SUBAGENTS.md is saved as $bn. Copy the facts about this project from it into the list above.`n"
+            [IO.File]::WriteAllText($dest, $new, $utf8)
+            Write-Output "MIGRATED SUBAGENTS.md (replaced by the shipped version; previous version: $bn; copy this project's facts from it into '$Marker')"
+        }
     } else {
         $own = [IO.File]::ReadAllText($dest)
         $ship = [IO.File]::ReadAllText($Template)
         $mo = [regex]::Match($own, '(?m)^' + [regex]::Escape($Marker))
         $ms = [regex]::Match($ship, '(?m)^' + [regex]::Escape($Marker))
-        if (-not $mo.Success) { Refuse "SUBAGENTS.md has no '$Marker' section, so the project's own text cannot be told apart; merge by hand" }
         if (-not $ms.Success) { FailInternal "the shipped template has no '$Marker' section" }
         $new = $ship.Substring(0, $ms.Index) + $own.Substring($mo.Index)
         if ($new -ceq $own) { Write-Output 'UNCHANGED SUBAGENTS.md (shipped part already up to date)' }

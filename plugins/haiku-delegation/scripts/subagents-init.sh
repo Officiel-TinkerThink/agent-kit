@@ -4,8 +4,8 @@
 #   subagents-init.sh [-Project <dir>] [-Import auto|claude|agents|none] [-Keep] [-NoOrchestration] [-DryRun]
 # Never loses text: an existing SUBAGENTS.md that differs is refreshed (only the part above "## Project facts"; the project's
 # own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>; the same for the orchestration block (only the text between
-# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now, and refuses a SUBAGENTS.md
-# that has no "## Project facts" section instead of keeping it).
+# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now). A SUBAGENTS.md
+# without a "## Project facts" section is replaced by the shipped one (backup first, a note under "Project facts" names the backup).
 # The import line (@SUBAGENTS.md) is added once, to CLAUDE.md when it exists, else AGENTS.md, else a new CLAUDE.md.
 # Exit codes: 0 ok, 1 refused (bad input), 2 internal error.
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -56,10 +56,20 @@ elif cmp -s "$TEMPLATE" "$DEST"; then
   echo "UNCHANGED SUBAGENTS.md (identical to the shipped version)"
 elif [ "$UPDATE" = 0 ]; then
   echo "EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (-Keep)"
-elif ! grep -q "^$MARKER" "$DEST" && [ "$EXPLICIT" = 0 ]; then
-  echo "EXISTS SUBAGENTS.md differs from the shipped version and has no '$MARKER' section, so it cannot be refreshed safely; kept as it is (merge by hand)"
+elif ! grep -q "^$MARKER" "$DEST"; then
+  # an older SUBAGENTS.md without a "Project facts" section: the project's own text cannot be told apart from the shipped text,
+  # so the file is replaced by the shipped one (no second copy of the roster) and the old file is saved as a backup that a
+  # one-line note under "Project facts" points to
+  if [ "$DRY" = 1 ]; then
+    echo "WOULD MIGRATE SUBAGENTS.md (backup first; replaced by the shipped version)"
+  else
+    BAK="$DEST.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+    cp "$DEST" "$BAK" || fail_internal "cannot write the backup"
+    { awk '{ print }' "$TEMPLATE"; printf '\n> Migrated: the previous SUBAGENTS.md is saved as %s. Copy the facts about this project from it into the list above.\n' "$(basename "$BAK")"; } > "$TMP/new" || fail_internal "cannot build the migrated SUBAGENTS.md"
+    cp "$TMP/new" "$DEST" || fail_internal "cannot write $DEST"
+    echo "MIGRATED SUBAGENTS.md (replaced by the shipped version; previous version: $(basename "$BAK"); copy this project's facts from it into '$MARKER')"
+  fi
 else
-  grep -q "^$MARKER" "$DEST" || refuse "SUBAGENTS.md has no '$MARKER' section, so the project's own text cannot be told apart; merge by hand"
   grep -q "^$MARKER" "$TEMPLATE" || fail_internal "the shipped template has no '$MARKER' section"
   awk -v m="^$MARKER" '$0 ~ m { exit } { print }' "$TEMPLATE" > "$TMP/new" || fail_internal "cannot split the template"
   awk -v m="^$MARKER" '$0 ~ m { f = 1 } f { print }' "$DEST" >> "$TMP/new" || fail_internal "cannot split SUBAGENTS.md"

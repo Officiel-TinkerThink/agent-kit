@@ -1,5 +1,5 @@
 """Runs every suite under tests/ and prints one line per suite plus its time. Windows + PowerShell 5.1 + Python 3.10+.
-Usage: python tests/run_all.py [-j N] [--serial]     (default: 4 suites at a time; --serial = one after another)"""
+Usage: python tests/run_all.py [-j N] [--serial]     (default: cores - 2 suites at a time, between 4 and 8; --serial = one after another)"""
 import argparse
 import concurrent.futures
 import os
@@ -24,9 +24,11 @@ def run_suite(f):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('-j', type=int, default=4, help='suites to run at the same time')
+    ap.add_argument('-j', type=int, default=0, help='suites to run at the same time (default: cores - 2, between 4 and 8)')
     ap.add_argument('--serial', action='store_true')
     a = ap.parse_args()
+    if a.j <= 0:
+        a.j = min(8, max(4, (os.cpu_count() or 4) - 2))
     suites = sorted(here.glob('*/test_*.py'))
     t0 = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=1 if a.serial else max(1, a.j)) as ex:

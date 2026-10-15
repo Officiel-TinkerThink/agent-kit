@@ -1,6 +1,7 @@
 """/subagents-init: copies SUBAGENTS.md to a project, imports it from CLAUDE.md or AGENTS.md and adds the shipped AGENTS.md text there as a marked block, without overwriting anything.
 Runs the same scenarios against the POSIX sh tool and the PowerShell tool (whichever exist here) and requires identical stdout.
 Run: python test_subagents_init.py"""
+import concurrent.futures
 import pathlib
 import re
 import shutil
@@ -180,8 +181,7 @@ def main():
 
     tools = runners()
     check('at least one tool can run here', bool(tools))
-    transcripts = {}
-    for name, make in tools.items():
+    def one_tool(name, make):   # one full pass for one runner; the sh and the PowerShell pass are independent, so they run at the same time
         with tempfile.TemporaryDirectory() as td:
             proj = pathlib.Path(td) / 'p'
             proj.mkdir()
@@ -278,7 +278,10 @@ def main():
         p = subprocess.run(make(['-Import', 'bogus']), capture_output=True, text=True, timeout=120)
         check(f'[{name}] a bad -Import value exits 1', p.returncode == 1, p.stderr)
         orchestration(name, make, log)
-        transcripts[name] = log
+        return log
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        transcripts = dict(zip(tools, ex.map(lambda kv: one_tool(*kv), tools.items())))
 
     if len(transcripts) == 2:
         check('sh and ps1 print identical lines for every scenario', transcripts['sh'] == transcripts['ps1'], f"{transcripts['sh']}\n{transcripts['ps1']}")

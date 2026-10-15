@@ -91,19 +91,19 @@ CASES = [  # (label, agent, brief, answer, expected footer_missing details)
 def main():
     ts = tools()
     check('at least one hook can run here', bool(ts))
-    got = {}
+    got = {t: [] for t in ts}
     n = 0
+    # one run of the hook takes about 20 s on Windows (process start-up): run the cases of both tools side by side, each with its own files
+    jobs = []
     for tool, cmd in ts.items():
-        # one run of the hook takes about 20 s on Windows (process start-up): run the cases side by side, each with its own files
-        jobs = []
         for label, agent, brief, answer, want in CASES:
             n += 1
-            jobs.append((n, label, agent, brief, answer, want))
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            haves = list(pool.map(lambda j: flags(cmd, j[2], j[3], j[4], j[0]), jobs))
-        got[tool] = haves
-        for (_, label, _, _, _, want), have in zip(jobs, haves):
-            check(f'[{tool}] {label}', have == sorted(want), f'{have} != {sorted(want)}')
+            jobs.append((n, tool, cmd, label, agent, brief, answer, want))
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        haves = list(pool.map(lambda j: flags(j[2], j[4], j[5], j[6], j[0]), jobs))
+    for (_, tool, _, label, _, _, _, want), have in zip(jobs, haves):
+        got[tool].append(have)
+        check(f'[{tool}] {label}', have == sorted(want), f'{have} != {sorted(want)}')
     if len(ts) == 2:
         check('sh and ps1 record identical footer flags', got['sh'] == got['ps1'], f"{got['sh']} vs {got['ps1']}")
 

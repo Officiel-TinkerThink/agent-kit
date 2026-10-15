@@ -1,6 +1,6 @@
 # Operator tool behind /subagents-init (haiku-delegation). Copies the shipped SUBAGENTS.md roster to a project root and
 # imports it from CLAUDE.md or AGENTS.md. PowerShell twin of subagents-init.sh (same flags, stdout, files and exit codes).
-#   subagents-init.ps1 [-Project <dir>] [-Import auto|claude|agents|none] [-Update] [-DryRun]
+#   subagents-init.ps1 [-Project <dir>] [-Import auto|claude|agents|none] [-Update] [-DryRun] [-NoOrchestration]
 # Never overwrites: an existing SUBAGENTS.md that differs is kept unless -Update is given, and -Update replaces only the
 # part above "## Project facts" (the project's own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>.
 # The import line (@SUBAGENTS.md) is added once, to CLAUDE.md when it exists, else AGENTS.md, else a new CLAUDE.md.
@@ -9,7 +9,8 @@ param(
     [string]$Project = '',
     [string]$Import = 'auto',
     [switch]$Update,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$NoOrchestration
 )
 $Template = Join-Path $PSScriptRoot '..\templates\SUBAGENTS.md'
 $Marker = '## Project facts'
@@ -71,7 +72,7 @@ try {
     }
 
     # --- step 2: the @SUBAGENTS.md import
-    if ($Import -eq 'none') { Write-Output 'IMPORT skipped (-Import none)'; Write-Output 'DONE'; exit 0 }
+    if ($Import -eq 'none') { Write-Output 'IMPORT skipped (-Import none)'; Write-Output 'ORCHESTRATION skipped (-Import none)'; Write-Output 'DONE'; exit 0 }
     $claude = Join-Path $root 'CLAUDE.md'; $agents = Join-Path $root 'AGENTS.md'
     if ($Import -eq 'claude') { $target = 'CLAUDE.md' }
     elseif ($Import -eq 'agents') { $target = 'AGENTS.md' }
@@ -81,6 +82,17 @@ try {
     $tf = Join-Path $root $target
     $exists = Test-Path -LiteralPath $tf -PathType Leaf
     if ($exists -and (IsLink $tf)) { Refuse "$target is a symbolic link; edit its target by hand" }
+    if ($exists -and (Get-Item -LiteralPath $tf).IsReadOnly) { Refuse "$target is read-only; make it writable first" }
+    # refuse damaged orchestration markers up front, so a refused run has written nothing to $target
+    if (-not $NoOrchestration -and $exists) {
+        $ptext = [IO.File]::ReadAllText($tf)
+        $pb = [regex]::Matches($ptext, '(?m)^<!-- agent-kit:orchestration:begin'); $pe = [regex]::Matches($ptext, '(?m)^<!-- agent-kit:orchestration:end -->')
+        if ($pb.Count -ne 0 -or $pe.Count -ne 0) {
+            if ($pb.Count -ne 1 -or $pe.Count -ne 1 -or $pb[0].Index -ge $pe[0].Index) {
+                Refuse "the orchestration markers in $target are damaged ($($pb.Count) begin line(s), $($pe.Count) end line(s), or the end comes first); fix them by hand or remove both marker lines and the text between them"
+            }
+        }
+    }
     $block = "## Subagents`n`n@SUBAGENTS.md`n"
     if ($exists -and ([IO.File]::ReadAllText($tf) -match '@SUBAGENTS\.md')) {
         Write-Output "IMPORT already in $target"
@@ -95,6 +107,71 @@ try {
     } else {
         [IO.File]::WriteAllText($tf, $block, $utf8)
         Write-Output "IMPORT created $target"
+    }
+
+    # --- step 3: the orchestration block = the shipped AGENTS.md text, verbatim, between two marker lines, in the same file as the import.
+    # Everything already in the file stays byte for byte. -Update replaces only what sits between the markers (backup first).
+    if ($NoOrchestration) {
+        Write-Output 'ORCHESTRATION skipped (-NoOrchestration)'
+    } else {
+        $otemplate = Join-Path $PSScriptRoot '..\templates\AGENTS.md'
+        if (-not (Test-Path -LiteralPath $otemplate -PathType Leaf)) { FailInternal "template not found: $otemplate" }
+        $obegin = '<!-- agent-kit:orchestration:begin (managed by /haiku-delegation:subagents-init; the text between the markers is replaced by -Update, everything outside is yours) -->'
+        $oend = '<!-- agent-kit:orchestration:end -->'
+        $tpl = [IO.File]::ReadAllText($otemplate).Replace("`r", '')
+        if (-not $tpl.EndsWith("`n")) { $tpl += "`n" }
+        $block = $obegin + "`n" + $tpl + $oend + "`n"
+        $text = ''; $tfExists = Test-Path -LiteralPath $tf -PathType Leaf
+        if ($tfExists) { $text = [IO.File]::ReadAllText($tf) }
+        $crlf = $text.Contains("`r")
+        if ($crlf) { $block = $block.Replace("`n", "`r`n") }
+        $nb = [regex]::Matches($text, '(?m)^<!-- agent-kit:orchestration:begin').Count
+        $ne = [regex]::Matches($text, '(?m)^<!-- agent-kit:orchestration:end -->').Count
+        $mb = [regex]::Match($text, '(?m)^<!-- agent-kit:orchestration:begin')
+        $me = [regex]::Match($text, '(?m)^<!-- agent-kit:orchestration:end -->')
+        if ($nb -eq 0 -and $ne -eq 0) {
+            $norm = $text.Replace("`r", '')
+            if ($text.Length -gt 0 -and $norm.IndexOf($tpl.TrimEnd("`n"), [StringComparison]::Ordinal) -ge 0) {
+                Write-Output "ORCHESTRATION already present in $target (verbatim; no markers added)"
+            } elseif ($DryRun) {
+                Write-Output "WOULD ADD orchestration to $target"
+            } else {
+                $eol = if ($crlf) { "`r`n" } else { "`n" }
+                $prefix = ''
+                if ($text.Length -gt 0) { if (-not $text.EndsWith("`n")) { $prefix = $eol }; $prefix += $eol }
+                [IO.File]::AppendAllText($tf, $prefix + $block, $utf8)
+                Write-Output "ORCHESTRATION added to $target"
+            }
+        } elseif ($nb -eq 1 -and $ne -eq 1 -and $mb.Index -lt $me.Index) {
+            $lines = $text -split "`n"
+            $bi = -1; $ei = -1
+            for ($i = 0; $i -lt $lines.Length; $i++) {
+                if ($bi -lt 0 -and $lines[$i].StartsWith('<!-- agent-kit:orchestration:begin')) { $bi = $i }
+                elseif ($bi -ge 0 -and $lines[$i].StartsWith('<!-- agent-kit:orchestration:end -->')) { $ei = $i; break }
+            }
+            $inner = (($lines[($bi + 1)..($ei - 1)] | ForEach-Object { $_.Replace("`r", '') }) -join "`n")
+            if ($ei -eq $bi + 1) { $inner = '' } else { $inner += "`n" }
+            if ($inner -ceq $tpl) {
+                Write-Output "ORCHESTRATION up to date in $target"
+            } elseif (-not $Update) {
+                Write-Output "ORCHESTRATION outdated in $target; run again with -Update to refresh the block (text outside the markers is never touched)"
+            } elseif ($DryRun) {
+                Write-Output "WOULD UPDATE orchestration in $target (backup first)"
+            } else {
+                $blockLines = $block.Substring(0, $block.Length - 1) -split "`n"
+                $new = @(); if ($bi -gt 0) { $new += $lines[0..($bi - 1)] }
+                $new += $blockLines
+                if ($ei + 1 -le $lines.Length - 1) { $new += $lines[($ei + 1)..($lines.Length - 1)] }
+                $newText = $new -join "`n"
+                if (-not $newText.EndsWith("`n")) { $newText += "`n" }
+                $bak = $tf + '.bak-' + (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+                Copy-Item -LiteralPath $tf -Destination $bak
+                [IO.File]::WriteAllText($tf, $newText, $utf8)
+                Write-Output "ORCHESTRATION updated in $target (previous version: $(Split-Path -Leaf $bak))"
+            }
+        } else {
+            Refuse "the orchestration markers in $target are damaged ($nb begin line(s), $ne end line(s), or the end comes first); fix them by hand or remove both marker lines and the text between them"
+        }
     }
     Write-Output 'DONE'
     exit 0

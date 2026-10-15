@@ -9,5 +9,5 @@
 - [ ] Changelog line added under `## [Unreleased]` in `CHANGELOG.md` (or: nothing user-visible, because ...)
 - [ ] No version changed in any `plugin.json` or `marketplace.json`; `[Unreleased]` not renamed (that is the release step, see `CONTRIBUTING.md`)
 - [ ] Tests added or updated for the change, and the relevant suites pass
-- [ ] If the root `SUBAGENTS.md` changed: copied to `plugins/haiku-delegation/templates/SUBAGENTS.md`
+- [ ] If the root `SUBAGENTS.md` changed: copied to `plugins/haiku-delegation/templates/SUBAGENTS.md`. If the root `AGENTS.md` changed: copied to `plugins/haiku-delegation/templates/AGENTS.md` (a test fails when either pair differs)
 - [ ] Change-control ID linked, if the team uses one: 

@@ -78,16 +78,19 @@ def main():
         n = rows['verification-runner']
         rt = 'verification-runner:verification-runner'
         seq = []
-        for i in range(1, n + 6):
+        order = [1, 2, 3] + list(range(n - 2, n + 3))   # the first calls from a fresh count, then (count skipped ahead) the calls around the budget: fewer process starts
+        for i in order:
+            if i == n - 2:
+                (bud / 'r1').write_text(f'{n - 3}\n')
             r = run(cmd, call('r1', rt), tmp)
             seq.append((i, r.returncode, r.stderr.strip()))
         quiet = [i for i, rc, _ in seq if rc == 0]
         blocked = [(i, err) for i, rc, err in seq if rc == 2]
-        check(f'[{ver}] calls 1..{n - 1} pass, call {n} is blocked once, later calls pass again', quiet == [i for i in range(1, n + 6) if i != n] and len(blocked) == 1 and blocked[0][0] == n, str(seq))
+        check(f'[{ver}] calls before the budget pass, call {n} is blocked once, later calls pass again', quiet == [i for i in order if i != n] and len(blocked) == 1 and blocked[0][0] == n, str(seq))
         msg = blocked[0][1] if blocked else ''
         check(f'[{ver}] the block says: intentional guard, budget {n}, stop, report, PARTIAL', 'intentional guard' in msg and f'({n} tool calls)' in msg and 'PARTIAL' in msg and 'final report' in msg, msg)
         outputs[ver] = msg
-        check(f'[{ver}] the count is kept per agent id in turn-budget/<id>', (bud / 'r1').read_text().strip() == str(n + 5))
+        check(f'[{ver}] the count is kept per agent id in turn-budget/<id>', (bud / 'r1').read_text().strip() == str(n + 2))
 
         # main agent and unknown agents are never counted
         for label, payload in (('main agent (no agent_id)', call(None, None)), ('unknown agent type', call('g1', 'general-purpose')), ('agent_id without type', call('g2', None))):

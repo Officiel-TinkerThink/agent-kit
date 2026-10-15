@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Added
+- New hook `guard-turn-budget` (`agent-guards`, PowerShell and shell, fails open) so a subagent that runs out of turns can still hand back a report. It counts each kit subagent's tool calls (per `agent_id`, in `turn-budget/` under the kit data folder) and, when the N-th call arrives, blocks that one call with a message: stop calling tools, write the final report now, start it with `PARTIAL` and list what was not done or not checked. N per agent is in `plugins/agent-guards/scripts/turn-budget.txt` (the old `maxTurns`). It never blocks again; the real cap is now 3 x N (`maxTurns` in each agent file, for example 90 for `code-explorer`), so the agent still has turns left to deliver the report, and the hand-back call itself is never counted. Each agent file got one operating-rules bullet that states the budget and the `PARTIAL` rule. Before this, an agent that hit its cap while still calling tools ended with no report (the usage log flags this as `no_final_answer`). Count files older than a day are removed when a new agent starts. Tests: `tests/agent-guards/test_guard_turn_budget.py`.
+
 ## [0.2.1] - 2026-10-15
 
 ### Added

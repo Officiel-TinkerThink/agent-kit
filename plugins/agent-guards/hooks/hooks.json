@@ -75,6 +75,16 @@
           }
         ],
         "matcher": "mcp__claude-in-chrome__.*"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-turn-budget\"",
+            "timeout": 10
+          }
+        ],
+        "matcher": ".*"
       }
     ]
   }

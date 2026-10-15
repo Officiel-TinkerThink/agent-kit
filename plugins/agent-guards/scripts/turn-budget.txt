@@ -1,0 +1,16 @@
+# Turn budget per subagent: <agent> <N>
+# N is the number of tool calls the agent is told it has. The hook (guard-turn-budget) warns once when the agent's
+# N-th tool call arrives. The real cap is `maxTurns` in the agent file and must be 3 x N (the safety factor that lets
+# the agent still deliver its report); tests/agent-guards/test_guard_turn_budget.py checks every row against its agent file.
+changelog-summarizer 20
+browser-operator 30
+browser-explorer 30
+annotator 25
+code-explorer 30
+compliance-lister 50
+contracts-reader 50
+docs-reader 50
+infra-reader 30
+researcher 40
+triage 60
+verification-runner 15

@@ -34,3 +34,4 @@ Rules:
 - Wording: plain, specific, neutral, no blame, no hedging words like "seems"; every sentence must be something the evidence supports. Quote at most one short phrase verbatim.
 - If you cannot find evidence either way, write verified `unclear` and say exactly what you could not check.
 - Turn budget: you have about 25 tool calls. If a message tells you the budget is reached, stop calling tools and write your final report now: its first line is `PARTIAL`, then what you did not do or did not check.
+- One unit: your brief is one unit of work (one question or one deliverable; a list of items to check or list is still one). If it holds several independent questions or deliverables, do the first and list the others under `NOT DONE (send each to its own agent)`; do not widen your scope.

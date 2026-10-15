@@ -63,6 +63,9 @@ def main():
     missing = [f'{p.parent.parent.name}:{p.stem}' for p in PLUGINS.glob('*/agents/*.md')
                if p.stem not in full or (f'`{p.parent.parent.name}:`' not in full and f'`{p.parent.parent.name}:{p.stem}`' not in full)]
     check('the "Full names" line of the session policy lists every agent under its plugin prefix', not missing, ', '.join(missing))
+    # every kit agent knows it is one unit of work and what to do with a brief that holds several
+    no_unit = [p.stem for p in PLUGINS.glob('*/agents/*.md') if '- One unit: your brief is one unit of work' not in p.read_text(encoding='utf-8') or 'NOT DONE (send each to its own agent)' not in p.read_text(encoding='utf-8')]
+    check('every agent file has the "One unit" rule (a brief with several questions: do the first, list the rest as NOT DONE)', not no_unit, ', '.join(no_unit))
     check('no file names a removed (merged) agent', not stale, ', '.join(stale[:8]))
     check("every subagent_type='...' in hooks, scripts and docs names an existing agent", not dangling, ', '.join(dangling[:8]))
 

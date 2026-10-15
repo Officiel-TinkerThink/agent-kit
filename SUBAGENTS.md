@@ -9,7 +9,7 @@ Which subagents exist, what each one is for, and when the main agent should hand
 Your context is the scarce resource. A subagent returns facts with `path:line` in 20-40 lines at about one twentieth of the cost per token; reading inline leaves the raw dump in your context for the rest of the session.
 
 - **Handoff is the default; inline needs a reason.** Hand the reading off first, then keep working on the next independent step while the agent runs. Never sit waiting when there is independent work left.
-- **A unit of work is the smallest piece of work that cannot be split any further**, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. One agent per unit. A brief with numbered steps, "and then", or several deliverables (read + write + test + document) holds several units; split it, and never hand a whole feature to one agent. Haiku input costs about 5x more once a single prompt passes 100k tokens, so a unit must be small enough to finish far below that.
+- **A unit of work is the smallest piece of work that cannot be split any further**, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. One agent per unit. A brief with a numbered list of steps, "and then", or several deliverables (read + write + test + document) holds several units; split it, and never hand a whole feature to one agent. Haiku input costs about 5x more once a single prompt passes 100k tokens, so a unit must be small enough to finish far below that. Wrong: one agent, brief "1. read prompt.py 2. write a loader 3. change the precedence 4. add tests 5. update the docs 6. run the tests". Right: in one message three read agents (where the cost is computed; the pricing fields; how other code opens a DB session), you write the loader, then in one message a docs draft and one test run. When you start a subagent other than a kit agent, always pass `model: "haiku"` and use the full `<plugin>:<agent>` name.
 - **Fan out.** Independent units (per module, per file group, per question, per verification gate) go to one agent each, launched in a single message; dependent units go one after the other as each result arrives.
 - **Agents return evidence, not judgement.** Counts reconciled, quotes verbatim, `NOT FOUND` / `UNCLEAR` marked, and no verdicts on safety, compliance or design. Judgement stays with you.
 - **Treat every result as unverified.** Check totals, and run `compliance-lister` (`Task kind: citation-verifier`) on the `path:line` claims you will edit from.
@@ -159,7 +159,7 @@ Documents your project says to read before a change are decision inputs. Locate 
 An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is self-contained:
 
 0. **For `code-explorer` and `contracts-reader`: the first line is `Task kind: <kind>`.** A hook blocks the call without it.
-1. **One precise question.** Not "look at the auth code".
+1. **One precise question: one unit of work.** Not "look at the auth code", and not a numbered list of steps (each step is its own agent).
 2. **Absolute paths** and the repository layout facts it needs (which folders exist, which are stale).
 3. **The special input** from the tables above: category list, two refs, `package@version` pairs, the one command to run.
 4. **The output you want:** terse bullets or a table, with `path:line`.

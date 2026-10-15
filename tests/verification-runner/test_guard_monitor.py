@@ -1,6 +1,7 @@
 """verification-runner may use the Monitor tool only to wait for a log: `until grep -q [-E] 'PATTERN' <log inside verification-logs>; do sleep N; done [; tail -n K <same log>]`.
 A Monitor call is a shell command or a WebSocket, so the guard must refuse everything else. Runs the PowerShell and the POSIX sh guard (whichever exist here) on the same inputs
 and requires the same exit codes. Run: python test_guard_monitor.py   (uses a temp kit data folder)"""
+import concurrent.futures
 import json
 import os
 import pathlib
@@ -55,6 +56,12 @@ def run(cmd, stdin):
     return subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=120, env=ENV)
 
 
+def run_many(cmd, stdins):
+    """Runs the guard on several inputs at the same time (a shell guard under Git Bash is bound by process forks) and returns the results in order."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        return list(ex.map(lambda s: run(cmd, s), stdins))
+
+
 def main():
     ts = tools()
     check('at least one guard version can run here', bool(ts))
@@ -100,14 +107,14 @@ def main():
             ('main thread is not affected', payload('tail -f /var/log/syslog', agent=None), 0),
         ]
         seen[tool] = []
-        for label, stdin, want in cases:
-            p = run(cmd, stdin)
+        outs = run_many(cmd, [s for _, s, _ in cases] + [payload('tail -f x'), payload('pytest -q', tool='Bash')])   # all at once, the checks below stay in order
+        for (label, stdin, want), p in zip(cases, outs):
             seen[tool].append(p.returncode)
             check(f'[{tool}] {label}', p.returncode == want, f'exit {p.returncode}, want {want}: {p.stderr[:200]}')
-        p = run(cmd, payload('tail -f x'))
+        p = outs[len(cases)]
         check(f'[{tool}] the block message says what is allowed', p.returncode == 2 and 'until grep -q' in p.stderr, p.stderr[:200])
         # Bash behaviour must not change
-        p = run(cmd, payload('pytest -q', tool='Bash'))
+        p = outs[len(cases) + 1]
         check(f'[{tool}] a plain Bash command is still left to permissions', p.returncode == 0, p.stderr[:200])
     if len(seen) == 2:
         check('sh and ps1 return the same exit codes', seen['sh'] == seen['ps1'], f"{seen['sh']} vs {seen['ps1']}")

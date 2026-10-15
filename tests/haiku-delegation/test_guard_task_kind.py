@@ -1,5 +1,6 @@
 """guard-task-kind (PreToolUse on the Agent tool): a brief for code-explorer or contracts-reader must start with `Task kind: <kind>`. Runs the PowerShell and the POSIX sh version
 (whichever exist here) on the same hook inputs and requires the same exit code and a message that names the valid kinds. Run: python test_guard_task_kind.py"""
+import concurrent.futures
 import json
 import os
 import pathlib
@@ -74,30 +75,43 @@ CASES = [  # label, stdin, env, expected exit
 ]
 
 
+def run_all(jobs):
+    """Runs the hook processes concurrently (a shell guard under Git Bash is bound by process forks, so this cuts the wall time) and returns the results in order."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        return list(ex.map(lambda kw: subprocess.run(capture_output=True, text=True, timeout=120, **kw), jobs))
+
+
 def main():
     ts = tools()
     check('at least one guard version can run here', bool(ts))
-    seen = {}
-    for tool, cmd in ts.items():
-        seen[tool] = []
-        for label, stdin, env, want in CASES:
-            p = subprocess.run(cmd, input=stdin, capture_output=True, text=True, timeout=60, env=dict(os.environ, **env))
-            seen[tool].append(p.returncode)
-            check(f'[{tool}] {label}', p.returncode == want, f'exit {p.returncode}, want {want}: {p.stderr[:160]}')
-        p = subprocess.run(cmd, input=hook('contracts-reader', 'no kind'), capture_output=True, text=True, timeout=60)
-        check(f'[{tool}] the block message names the valid kinds and an example', all(k in p.stderr for k in ('schema', 'api-spec', 'migrations', 'api-match', 'Task kind:')), p.stderr)
-    if len(ts) == 2:
-        check('sh and ps1 return the same exit codes', seen['sh'] == seen['ps1'], f"{seen['sh']} vs {seen['ps1']}")
     # the kind words come from the brief (untrusted text): a glob character must not list the working folder, and a bad word is echoed only in a short plain form
     import tempfile
     with tempfile.TemporaryDirectory(prefix='kindguard_') as td:
         (pathlib.Path(td) / 'zzz_sentinel_file.txt').write_text('x', encoding='utf-8')
+        words = (('star', 'Task kind: *'), ('question mark', 'Task kind: ?'), ('bracket', 'Task kind: [a-z]*'))
+        jobs = []
         for tool, cmd in ts.items():
-            for label, kind_line in (('star', 'Task kind: *'), ('question mark', 'Task kind: ?'), ('bracket', 'Task kind: [a-z]*')):
-                p = subprocess.run(cmd, input=hook('code-explorer', kind_line + '\nq'), capture_output=True, text=True, timeout=60, cwd=td)
+            jobs += [dict(args=cmd, input=stdin, env=dict(os.environ, **env)) for label, stdin, env, want in CASES]
+            jobs.append(dict(args=cmd, input=hook('contracts-reader', 'no kind')))
+            jobs += [dict(args=cmd, input=hook('code-explorer', kind_line + chr(10) + 'q'), cwd=td) for label, kind_line in words]
+            jobs.append(dict(args=cmd, input=hook('code-explorer', 'Task kind: <b>' + 'a' * 100 + '</b>' + chr(10) + 'q'), cwd=td))
+        done = iter(run_all(jobs))
+        seen = {}
+        for tool, cmd in ts.items():
+            seen[tool] = []
+            for label, stdin, env, want in CASES:
+                p = next(done)
+                seen[tool].append(p.returncode)
+                check(f'[{tool}] {label}', p.returncode == want, f'exit {p.returncode}, want {want}: {p.stderr[:160]}')
+            p = next(done)
+            check(f'[{tool}] the block message names the valid kinds and an example', all(k in p.stderr for k in ('schema', 'api-spec', 'migrations', 'api-match', 'Task kind:')), p.stderr)
+            for label, kind_line in words:
+                p = next(done)
                 check(f'[{tool}] {label} in the kind line: blocked and the working folder is not listed', p.returncode == 2 and 'zzz_sentinel_file' not in p.stderr, p.stderr[:200])
-            p = subprocess.run(cmd, input=hook('code-explorer', 'Task kind: <b>' + 'a' * 100 + '</b>\nq'), capture_output=True, text=True, timeout=60, cwd=td)
+            p = next(done)
             check(f'[{tool}] a bad kind word is echoed short and without markup', p.returncode == 2 and '<b>' not in p.stderr and 'a' * 21 not in p.stderr, p.stderr[:200])
+        if len(ts) == 2:
+            check('sh and ps1 return the same exit codes', seen['sh'] == seen['ps1'], f"{seen['sh']} vs {seen['ps1']}")
     hooks = json.loads((ROOT / 'plugins' / 'haiku-delegation' / 'hooks' / 'hooks.json').read_text(encoding='utf-8'))
     pre = hooks['hooks'].get('PreToolUse', [])
     check('hooks.json registers guard-task-kind on the Agent tool through run.sh',

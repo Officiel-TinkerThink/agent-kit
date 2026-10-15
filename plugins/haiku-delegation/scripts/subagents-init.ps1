@@ -1,17 +1,21 @@
 # Operator tool behind /subagents-init (haiku-delegation). Copies the shipped SUBAGENTS.md roster to a project root and
 # imports it from CLAUDE.md or AGENTS.md. PowerShell twin of subagents-init.sh (same flags, stdout, files and exit codes).
-#   subagents-init.ps1 [-Project <dir>] [-Import auto|claude|agents|none] [-Update] [-DryRun] [-NoOrchestration]
-# Never overwrites: an existing SUBAGENTS.md that differs is kept unless -Update is given, and -Update replaces only the
-# part above "## Project facts" (the project's own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>.
+#   subagents-init.ps1 [-Project <dir>] [-Import auto|claude|agents|none] [-Keep] [-NoOrchestration] [-DryRun]
+# Never loses text: an existing SUBAGENTS.md that differs is refreshed (only the part above "## Project facts"; the project's
+# own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>; the same for the orchestration block (only the text between
+# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now, and refuses a SUBAGENTS.md
+# that has no "## Project facts" section instead of keeping it).
 # The import line (@SUBAGENTS.md) is added once, to CLAUDE.md when it exists, else AGENTS.md, else a new CLAUDE.md.
 # Exit codes: 0 ok, 1 refused (bad input), 2 internal error.
 param(
     [string]$Project = '',
     [string]$Import = 'auto',
     [switch]$Update,
+    [switch]$Keep,
     [switch]$DryRun,
     [switch]$NoOrchestration
 )
+$doUpdate = -not $Keep   # refreshing is the default; -Keep leaves SUBAGENTS.md and the rules block as they are (-Update is accepted as before)
 $Template = Join-Path $PSScriptRoot '..\templates\SUBAGENTS.md'
 $Marker = '## Project facts'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -51,8 +55,10 @@ try {
         else { Copy-Item -LiteralPath $Template -Destination $dest; Write-Output 'CREATED SUBAGENTS.md' }
     } elseif (SameBytes $Template $dest) {
         Write-Output 'UNCHANGED SUBAGENTS.md (identical to the shipped version)'
-    } elseif (-not $Update) {
-        Write-Output "EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (run again with -Update to refresh everything above '$Marker')"
+    } elseif (-not $doUpdate) {
+        Write-Output 'EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (-Keep)'
+    } elseif ((-not $Update) -and (-not [regex]::IsMatch([IO.File]::ReadAllText($dest), '(?m)^' + [regex]::Escape($Marker)))) {
+        Write-Output "EXISTS SUBAGENTS.md differs from the shipped version and has no '$Marker' section, so it cannot be refreshed safely; kept as it is (merge by hand)"
     } else {
         $own = [IO.File]::ReadAllText($dest)
         $ship = [IO.File]::ReadAllText($Template)
@@ -153,8 +159,8 @@ try {
             if ($ei -eq $bi + 1) { $inner = '' } else { $inner += "`n" }
             if ($inner -ceq $tpl) {
                 Write-Output "ORCHESTRATION up to date in $target"
-            } elseif (-not $Update) {
-                Write-Output "ORCHESTRATION outdated in $target; run again with -Update to refresh the block (text outside the markers is never touched)"
+            } elseif (-not $doUpdate) {
+                Write-Output "ORCHESTRATION outdated in $target; kept as it is (-Keep); run again without -Keep to refresh the block (text outside the markers is never touched)"
             } elseif ($DryRun) {
                 Write-Output "WOULD UPDATE orchestration in $target (backup first)"
             } else {

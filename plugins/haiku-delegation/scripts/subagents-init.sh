@@ -1,9 +1,11 @@
 #!/bin/sh
 # Operator tool behind /subagents-init (haiku-delegation). Copies the shipped SUBAGENTS.md roster to a project root and
 # imports it from CLAUDE.md or AGENTS.md. POSIX sh port of subagents-init.ps1 (same flags, stdout, files and exit codes).
-#   subagents-init.sh [-Project <dir>] [-Import auto|claude|agents|none] [-Update] [-DryRun]
-# Never overwrites: an existing SUBAGENTS.md that differs is kept unless -Update is given, and -Update replaces only the
-# part above "## Project facts" (the project's own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>.
+#   subagents-init.sh [-Project <dir>] [-Import auto|claude|agents|none] [-Keep] [-NoOrchestration] [-DryRun]
+# Never loses text: an existing SUBAGENTS.md that differs is refreshed (only the part above "## Project facts"; the project's
+# own facts are kept) after writing SUBAGENTS.md.bak-<UTC timestamp>; the same for the orchestration block (only the text between
+# the markers). -Keep leaves both as they are. -Update is accepted as before (it is the default now, and refuses a SUBAGENTS.md
+# that has no "## Project facts" section instead of keeping it).
 # The import line (@SUBAGENTS.md) is added once, to CLAUDE.md when it exists, else AGENTS.md, else a new CLAUDE.md.
 # Exit codes: 0 ok, 1 refused (bad input), 2 internal error.
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,12 +16,13 @@ refuse() { printf 'REFUSED: %s\n' "$1" >&2; exit 1; }
 fail_internal() { printf 'subagents-init failed: %s\n' "$1" >&2; exit 2; }
 param_error() { printf 'subagents-init: %s\n' "$1" >&2; exit 1; }
 
-PROJECT=""; IMPORT="auto"; UPDATE=0; DRY=0; NOORCH=0
+PROJECT=""; IMPORT="auto"; UPDATE=1; EXPLICIT=0; DRY=0; NOORCH=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -Project|-project) [ $# -ge 2 ] || param_error "missing value for -Project"; PROJECT="$2"; shift 2 ;;
     -Import|-import)   [ $# -ge 2 ] || param_error "missing value for -Import";  IMPORT="$2"; shift 2 ;;
-    -Update|-update)   UPDATE=1; shift ;;
+    -Update|-update)   UPDATE=1; EXPLICIT=1; shift ;;
+    -Keep|-keep)       UPDATE=0; shift ;;
     -DryRun|-dryrun)   DRY=1; shift ;;
     -NoOrchestration|-noorchestration) NOORCH=1; shift ;;
     *) param_error "unknown argument: $1" ;;
@@ -52,7 +55,9 @@ if [ ! -e "$DEST" ]; then
 elif cmp -s "$TEMPLATE" "$DEST"; then
   echo "UNCHANGED SUBAGENTS.md (identical to the shipped version)"
 elif [ "$UPDATE" = 0 ]; then
-  echo "EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (run again with -Update to refresh everything above '$MARKER')"
+  echo "EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (-Keep)"
+elif ! grep -q "^$MARKER" "$DEST" && [ "$EXPLICIT" = 0 ]; then
+  echo "EXISTS SUBAGENTS.md differs from the shipped version and has no '$MARKER' section, so it cannot be refreshed safely; kept as it is (merge by hand)"
 else
   grep -q "^$MARKER" "$DEST" || refuse "SUBAGENTS.md has no '$MARKER' section, so the project's own text cannot be told apart; merge by hand"
   grep -q "^$MARKER" "$TEMPLATE" || fail_internal "the shipped template has no '$MARKER' section"
@@ -140,7 +145,7 @@ else
     if cmp -s "$TMP/inner" "$TMP/tpl"; then
       echo "ORCHESTRATION up to date in $TARGET"
     elif [ "$UPDATE" = 0 ]; then
-      echo "ORCHESTRATION outdated in $TARGET; run again with -Update to refresh the block (text outside the markers is never touched)"
+      echo "ORCHESTRATION outdated in $TARGET; kept as it is (-Keep); run again without -Keep to refresh the block (text outside the markers is never touched)"
     elif [ "$DRY" = 1 ]; then
       echo "WOULD UPDATE orchestration in $TARGET (backup first)"
     else

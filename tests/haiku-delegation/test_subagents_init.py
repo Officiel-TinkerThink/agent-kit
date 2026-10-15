@@ -81,9 +81,9 @@ def orchestration(name, make, log):
         tail = b'\nMy notes after the block.\n'
         mine = before.replace(b'Decompose before executing.', b'Decompose first.') + tail
         (proj / 'CLAUDE.md').write_bytes(mine)
-        rc, lines, err = run(make, proj)
+        rc, lines, err = run(make, proj, '-Keep')
         log.append(('orch-outdated', rc, lines))
-        check(f'[{name}] orchestration: an outdated block is reported and left alone without -Update', rc == 0 and read(proj / 'CLAUDE.md') == mine and any(l.startswith('ORCHESTRATION outdated in CLAUDE.md; run again with -Update') for l in lines), str(lines))
+        check(f'[{name}] orchestration: with -Keep an outdated block is reported and left alone', rc == 0 and read(proj / 'CLAUDE.md') == mine and any(l.startswith('ORCHESTRATION outdated in CLAUDE.md; kept as it is (-Keep)') for l in lines), str(lines))
         rc, lines, err = run(make, proj, '-Update', '-DryRun')
         log.append(('orch-dry-update', rc, lines))
         check(f'[{name}] orchestration: -Update -DryRun writes nothing', rc == 0 and read(proj / 'CLAUDE.md') == mine and not list(proj.glob('CLAUDE.md.bak-*')) and 'WOULD UPDATE orchestration in CLAUDE.md (backup first)' in lines, str(lines))
@@ -93,6 +93,15 @@ def orchestration(name, make, log):
         baks = list(proj.glob('CLAUDE.md.bak-*'))
         check(f'[{name}] orchestration: -Update restores the shipped text and keeps everything before and after the block', rc == 0 and inner(new) == tpl and new.startswith(mine[:mine.index(BEGIN)]) and new.endswith(tail), str(lines) + repr(new[-120:]))
         check(f'[{name}] orchestration: -Update wrote one backup of the previous file', len(baks) == 1 and baks[0].read_bytes() == mine and any(l.startswith('ORCHESTRATION updated in CLAUDE.md (previous version: CLAUDE.md.bak-') for l in lines), str(baks) + str(lines))
+        # refreshing is the default: the same outdated block, run with no flags
+        (proj / 'CLAUDE.md').write_bytes(mine)
+        for b in baks:
+            b.unlink()
+        rc, lines, err = run(make, proj)
+        log.append(('orch-default-refresh', rc, stamp(lines)))
+        new = read(proj / 'CLAUDE.md')
+        baks = list(proj.glob('CLAUDE.md.bak-*'))
+        check(f'[{name}] orchestration: with no flags an outdated block is refreshed, text around it kept, one backup written', rc == 0 and inner(new) == tpl and new.endswith(tail) and len(baks) == 1 and baks[0].read_bytes() == mine and any(l.startswith('ORCHESTRATION updated in CLAUDE.md (previous version: CLAUDE.md.bak-') for l in lines), str(lines))
     # the shipped text is already in the file, no markers: nothing is duplicated
     with tempfile.TemporaryDirectory() as td:
         proj = pathlib.Path(td) / 'p'
@@ -195,11 +204,11 @@ def main():
             rc, lines, err = step('again')
             check(f'[{name}] second run: no change and no duplicate import', rc == 0 and before == (read(proj / 'SUBAGENTS.md'), read(proj / 'CLAUDE.md')) and 'IMPORT already in CLAUDE.md' in lines, str(lines))
 
-            # a project's own SUBAGENTS.md is kept without -Update
+            # a project's own SUBAGENTS.md is kept with -Keep
             own = b'# My roster\n\nmine\n\n## Project facts\n\n- layout: src/\n'
             (proj / 'SUBAGENTS.md').write_bytes(own)
-            rc, lines, err = step('exists')
-            check(f'[{name}] differing SUBAGENTS.md is kept without -Update', rc == 0 and read(proj / 'SUBAGENTS.md') == own and any(l.startswith('EXISTS') for l in lines), str(lines))
+            rc, lines, err = step('exists', '-Keep')
+            check(f'[{name}] differing SUBAGENTS.md is kept with -Keep', rc == 0 and read(proj / 'SUBAGENTS.md') == own and 'EXISTS SUBAGENTS.md differs from the shipped version; kept as it is (-Keep)' in lines and not list(proj.glob('SUBAGENTS.md.bak-*')), str(lines))
 
             # -DryRun writes nothing
             rc, lines, err = step('dry', '-Update', '-DryRun')
@@ -222,6 +231,28 @@ def main():
             (proj / 'SUBAGENTS.md').write_bytes(b'# no marker\n')
             rc, lines, err = step('nomarker', '-Update')
             check(f'[{name}] -Update without a Project facts section is refused', rc == 1 and 'REFUSED' in err and read(proj / 'SUBAGENTS.md') == b'# no marker\n', err)
+
+        # the default refreshes a differing SUBAGENTS.md (no flag needed): shipped text above, the project's facts kept, one backup
+        with tempfile.TemporaryDirectory() as td:
+            proj = pathlib.Path(td) / 'p'
+            proj.mkdir()
+            own = b'# My roster\n\nold text\n\n## Project facts\n\n- layout: src/\n'
+            (proj / 'SUBAGENTS.md').write_bytes(own)
+            (proj / 'CLAUDE.md').write_bytes(b'# C\n')
+            rc, lines, err = run(make, proj)
+            log.append(('default-refresh', rc, [re.sub(r'bak-\d{8}T\d{6}Z', 'bak-STAMP', l) for l in lines]))
+            new = read(proj / 'SUBAGENTS.md')
+            baks = list(proj.glob('SUBAGENTS.md.bak-*'))
+            check(f'[{name}] default run: a differing SUBAGENTS.md is refreshed, project facts kept', rc == 0 and new.endswith(b'## Project facts\n\n- layout: src/\n') and new.split(b'## Project facts')[0].replace(b'\r\n', b'\n') == tmpl.split(b'## Project facts')[0] and any(l.startswith('UPDATED SUBAGENTS.md (previous version: SUBAGENTS.md.bak-') for l in lines), str(lines))
+            check(f'[{name}] default run: one backup holds the previous file', len(baks) == 1 and baks[0].read_bytes() == own, str(baks))
+            rc, lines, err = run(make, proj)
+            check(f'[{name}] default run twice: nothing changes, no second backup', rc == 0 and read(proj / 'SUBAGENTS.md') == new and len(list(proj.glob('SUBAGENTS.md.bak-*'))) == 1 and 'UNCHANGED SUBAGENTS.md (shipped part already up to date)' in lines, str(lines))
+        with tempfile.TemporaryDirectory() as td:
+            proj = pathlib.Path(td) / 'p'
+            proj.mkdir()
+            (proj / 'SUBAGENTS.md').write_bytes(b'# no marker\n')
+            rc, lines, err = run(make, proj)
+            check(f'[{name}] default run: a SUBAGENTS.md without a Project facts section is kept (not refused), with a note', rc == 0 and read(proj / 'SUBAGENTS.md') == b'# no marker\n' and not list(proj.glob('SUBAGENTS.md.bak-*')) and any(l.startswith('EXISTS SUBAGENTS.md differs') and 'cannot be refreshed safely' in l for l in lines), str(lines) + err)
 
         # AGENTS.md only: import goes there, text above it stays byte for byte, a missing final newline is handled
         with tempfile.TemporaryDirectory() as td:

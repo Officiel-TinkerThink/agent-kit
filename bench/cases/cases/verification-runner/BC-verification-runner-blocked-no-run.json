@@ -1,0 +1,44 @@
+{
+  "schema": "bench-case/1",
+  "id": "BC-verification-runner-blocked-no-run",
+  "agent": "verification-runner",
+  "title": "Runner reports BLOCKED without running the command it was given",
+  "found_in": "0.2.0",
+  "status": "open",
+  "origin": {
+    "type": "annotation",
+    "annotation_id": "ann-20261013T025649382223-375a35"
+  },
+  "failure": {
+    "code": "other",
+    "rule_broken": "Run exactly ONE command per call and report the exit code, the totals line and the full log path; a missing command is never a reason to run nothing when KIT_DATA was given.",
+    "symptom": "The agent answered BLOCKED: no commands run after zero tool calls, so no exit code, totals or log path were reported although the task named a runnable command."
+  },
+  "prompt": "KIT_DATA={kit_data}\n\nRun `python check.py` in the current folder and report the verdict.",
+  "fixture": {
+    "files": {
+      "check.py": "import sys\n\nTESTS = [(\"adds\", 1 + 1 == 2), (\"splits\", \"a b\".split() == [\"a\", \"b\"]), (\"uppercases\", \"x\".upper() == \"X\")]\nfor name, ok in TESTS:\n    print((\"PASS \" if ok else \"FAIL \") + name)\nfailed = [name for name, ok in TESTS if not ok]\nprint(f\"{len(TESTS) - len(failed)}/{len(TESTS)} passed\")\nsys.exit(1 if failed else 0)\n"
+    }
+  },
+  "checks": {
+    "expect_all": [
+      "3/3 passed"
+    ],
+    "forbid": [
+      "BLOCKED",
+      "KIT_DATA missing"
+    ],
+    "require_regex": [
+      "exit[= :]+0",
+      "verification-logs/[A-Za-z0-9_.-]+[.]log"
+    ],
+    "min_turns": 2
+  },
+  "allow": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob"
+  ],
+  "note": "Passed 2/2 on 0.2.0 when KIT_DATA is given; kept as a regression guard. The failing run probably started without KIT_DATA, see BC-verification-runner-no-kit-data-reply."
+}

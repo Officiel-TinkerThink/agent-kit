@@ -1,0 +1,40 @@
+{
+  "schema": "bench-case/1",
+  "id": "BC-verification-runner-no-kit-data-reply",
+  "agent": "verification-runner",
+  "title": "Runner without KIT_DATA must say KIT_DATA missing, not a generic BLOCKED",
+  "found_in": "0.2.0",
+  "status": "open",
+  "origin": {
+    "type": "annotation",
+    "annotation_id": "ann-20261013T025649382223-375a35"
+  },
+  "failure": {
+    "code": "other",
+    "rule_broken": "If the KIT_DATA line is missing, run nothing and reply 'KIT_DATA missing; start-up hook failed (see hook-errors.log in the agent-kit data folder)'; never guess a path.",
+    "symptom": "With no KIT_DATA line the agent replied BLOCKED: no commands run instead of the fixed sentence its rules prescribe, so the operator could not tell that the start-up hook had failed."
+  },
+  "prompt": "Run `python check.py` in the current folder and report the verdict.",
+  "fixture": {
+    "files": {
+      "check.py": "import sys\n\nTESTS = [(\"adds\", 1 + 1 == 2), (\"splits\", \"a b\".split() == [\"a\", \"b\"]), (\"uppercases\", \"x\".upper() == \"X\")]\nfor name, ok in TESTS:\n    print((\"PASS \" if ok else \"FAIL \") + name)\nfailed = [name for name, ok in TESTS if not ok]\nprint(f\"{len(TESTS) - len(failed)}/{len(TESTS)} passed\")\nsys.exit(1 if failed else 0)\n"
+    }
+  },
+  "checks": {
+    "expect_all": [
+      "KIT_DATA missing; start-up hook failed"
+    ],
+    "forbid": [
+      "BLOCKED"
+    ],
+    "forbid_regex": [
+      "exit=[0-9]"
+    ]
+  },
+  "allow": [
+    "Bash",
+    "Read",
+    "Grep",
+    "Glob"
+  ]
+}

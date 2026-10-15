@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Added
+- `bench/cases`: agent failures kept as repeatable benchmark cases, on their own long-lived branch `bench-cases` so they can be run on another device or by other users. `capture_case.py` turns an annotated failure into a case (synthetic fixture and prompt, checks that the failed answer would not pass; refuses secrets, home paths, e-mail addresses and checks that cannot fail), `run_cases.py validate | list | run | report` runs the cases against the agents of the checkout on Haiku 5.5 and reports the pass rate per case and kit version. Two seed cases come from annotated `verification-runner` failures (`tests/bench/test_bench_cases.py`, 84 checks).
+
 ## [0.2.0] - 2026-10-14
 
 ### Changed

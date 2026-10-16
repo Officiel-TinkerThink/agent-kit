@@ -43,7 +43,7 @@ def main():
             check(f'{p.name}: hook command for {name} has no shell-language extension', '.ps1' not in c and '.sh"' not in c.replace('run.sh', ''), c)
     for skill in sorted((ROOT / 'plugins').glob('*/skills/*/SKILL.md')):
         t = skill.read_text(encoding='utf-8')
-        runs_scripts = (skill.parents[2] / 'scripts').is_dir()
+        runs_scripts = 'scripts/' in t
         check(f'{skill.parent.name}: skill commands go through run.sh', 'powershell' not in t.lower() and '.ps1' not in t and ('scripts/run.sh' in t or not runs_scripts))
 
     libs = {p.name: (p / 'scripts' / 'lib.sh').read_bytes() for p in PLUGINS if (p / 'scripts' / 'lib.sh').is_file()}

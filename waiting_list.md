@@ -12,13 +12,13 @@ Open decisions and follow-ups that are parked on purpose. Add new items at the t
 - Options to weigh when this is picked up: (a) always list CONFIRMED simplicity findings under `## Simplicity`, whatever their severity; (b) keep Notes but add a count line ("3 simplifications in Notes"); (c) leave as is.
 - Not started: no code or text was changed for this item.
 
-### Benchmark numbers are single-run; round 2 re-run done, trap-hit regression open
-- Added: 2026-10-16. Source: side-agent caveat, parked by the user for later.
-- Done 2026-10-16: round 2 re-run on the current lens (24 of 24 reports), scored by one independent scorer per case. Results are in `benchmarks/code-review/README.md`: 53 of 60 seeded defects, 4 trap hits (up from 0), 5 false positives (up from 4).
-- Open: tuned run (2026-10-16): 51 of 60 defects, 3 trap hits (simplicity-h4 `average_cents` guard, design-h7 rollback, spec-h5 pre-existing purge path), 2 false positives. Recall dropped by two versus the untuned after-run and simplicity recall is still 6 of 12. Next: decide whether to tighten the simplicity and design lenses again or accept these numbers, then repeat runs for variance.
-- Open: each number is one run with no variance estimate; repeat runs are needed before a number is used as a decision basis.
-- Open: the round-1 score totals (69 of 70, 66 of 70) are one run each; the scorer output for round 1 is not kept under `results/`.
-- Not started: repeat runs and the trap-hit fix.
+### Round-2 variance and persistent trap hits after three tuned runs
+- Added: 2026-10-16. Source: the three tuned round-2 runs.
+- Done: three runs on the current lenses (`skills-r2tune`, `skills-r2tuneB`, `skills-r2tuneC`): mean 54 of 60 seeded defects, 3.3 trap hits, 2.0 false positives. Results are in `benchmarks/code-review/README.md`.
+- Open: the found count varies by about plus or minus 3 with identical lens text, so the tuning gains are not established.
+- Open: persistent trap hits: simplicity-h1 `label_text` rewrite, design-h7 rollback path, plus occasional simplicity-h4 `average_cents` and bug-h5 duplicated rule. Each needs a lens fix and a re-run.
+- Open: false positives in spec-h4 (duplicate-release rejection) and spec-h5 (full client context in the audit entry).
+- Not started: the fixes above and a larger corpus with more cases per axis.
 
 ## Done
 

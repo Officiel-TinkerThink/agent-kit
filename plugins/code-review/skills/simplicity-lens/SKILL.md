@@ -15,7 +15,7 @@ A finding names the simpler form and shows that the behaviour stays the same for
 1. For each hunk, read the added or modified code and ask: what is the shortest form that does exactly this? Write that form down before you decide.
 2. Prove sameness. Run both forms in your head on these inputs: empty, None, 0, False, one item, many items, a value on each side of every comparison, and every exception the original can raise.
 3. Compare side effects too: log calls, writes, counters, the order of calls. A simpler form that drops a log line or a write is not identical.
-4. For a parameter, flag, branch or function you think is unnecessary, Grep every caller in the material you were given. The claim "every caller passes the same value" needs the list of callers behind it. If you cannot see all callers, put it under UNCLEAR.
+4. For a parameter, flag, branch or function you think is unnecessary, Grep every caller in the material you were given. The claim "every caller passes the same value" needs the list of callers behind it. If you cannot see all callers, report it at confidence 55 and name the callers you could not see; the validator decides.
 5. For duplicated code, open every copy. Report duplication only when the copies are the same except for names, and say which lines differ. Copies that differ in a comparison, a limit or a message may differ on purpose; read the intent before you merge them.
 6. Check the Traps section before you write a candidate. Most look-alike simplifications are listed there.
 7. One finding per root cause. Three copies of one function are one finding with three locations.
@@ -121,7 +121,7 @@ Good:
 def line_total(unit_price, quantity):
     return to_money(unit_price * quantity)      # identical only if quantity is never None; else TypeError, not InvalidQuantityError
 ```
-Not a defect when: the function is public and can be called from outside the material you were given (say so under UNCLEAR), or the guard is the only check on that path.
+Not a defect when: the function is public and the change makes its guard the only check on a reachable input, or the guard is the only check on that path. A public function called only from the material you were given is a finding at confidence 55, not UNCLEAR.
 
 ### Abstraction with one implementation
 - Tell: an abstract base class, a factory and a registry that together serve one concrete class that nothing else subclasses or swaps.
@@ -255,7 +255,7 @@ Good:
 ```python
 # removed  # a deletion, not a rewrite: any importer breaks; grep first
 ```
-Not a defect when: it is a public API of a library, an entry point named in a config or a decorator registry, a hook called by name, or a test helper used by tests you were not given. When in doubt put it under UNCLEAR.
+Not a defect when: it is a public API of a library, an entry point named in a config or a decorator registry, a hook called by name, or a test helper used by tests you were not given. When in doubt report it at confidence 55 and name the doubt.
 
 ## Traps
 

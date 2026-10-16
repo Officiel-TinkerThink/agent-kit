@@ -68,6 +68,18 @@ Total: 53 of 60 seeded defects as findings (56 of 60 counting UNCLEAR-only menti
 | security (h4-h5) | 6 of 6 | 0 | 0 | |
 
 Tuned total: 51 of 60 seeded defects, 3 trap hits, 2 false positives. Against the untuned after-run (53 of 60, 4 trap hits, 5 false positives), the tuning lowered the trap hits and false positives by one run each and cost two defects, one of them (guidance-h4) found in the earlier run but not this one. Run-to-run variance on one case is at least that large, so these differences are not statistically established. Two of the four original trap hits (simplicity-h4, design-h7) are still hit.
+
+- Round 2 after the second tightening (simplicity reviewer now reports unseen-caller findings at confidence 55; `results/skills-r2tuneB/`, `skills-r2tuneC/` and the second `skills-r2tuneB` run; three runs, one independent scorer per case):
+
+| Run | Seeded defects found | Trap hits | False positives |
+|---|---|---|---|
+| tuned, first (`skills-r2tune`) | 51 of 60 | 3 | 2 |
+| B (`skills-r2tuneB`) | 54 of 60 (56 counting UNCLEAR-only mentions) | 4 | 2 |
+| C (`skills-r2tuneC`) | 57 of 60 | 3 | 2 |
+| mean of the three | 54.0 of 60 | 3.3 | 2.0 |
+
+The found count varies by about ±3 between runs with identical lens text. The trap hits recur: simplicity-h1 (`label_text` rewrite changes behaviour for None), design-h7 (rollback path), and in one run each simplicity-h4 (`average_cents` guard) and bug-h5 (duplicated inclusive-day rule). The false positives come from spec-h4 and spec-h5. Simplicity recall ranges from 6 to 11 of 12 across runs.
+- Status: the agents are benchmarked on 60 seeded defects with three runs each, but the variance is larger than the gap between the tuned lens versions. The trap hits are not yet eliminated. This is not an optimised end state.
 - LENS check: every reviewer prints the marker names it sees. All 33 no-skills (baseline) reports said `LENS: none`; skills reports list the markers.
 
 ## Limits of these numbers

@@ -23,7 +23,7 @@ Operating rules:
 - Tools work: assume every tool works; do not test tools or make exploratory calls.
 - Scope: report only code the change added or modified. Pre-existing code that can be simplified is out of scope in diff mode; when you are given whole files with no diff, all of it is in scope.
 - Identical behaviour is the test. The simpler form must return the same value (type included), raise the same exceptions, run the same side effects (writes, log calls, counters) in the same order, and treat None, 0, empty and False the same. If it differs for any input the code can receive, do not report it; if it differs only for an input you cannot show can occur, say which input under `same behaviour:`.
-- Callers: a claim that a parameter, flag, branch or function is unnecessary needs every caller. Grep for them. If callers may exist outside the material you were given, list the claim under UNCLEAR.
+- Callers: a claim that a parameter, flag, branch or function is unnecessary needs every caller. Grep for them. If callers may exist outside the material you were given, still report the F line at confidence 55 and name the outside-caller assumption under `same behaviour:`; the finding-validator rates it, and an unreachable difference stays in Notes.
 - Duplication: report copies only when they are the same except for names. A copy that differs in a comparison, a limit or a message is not a duplicate; name the differing line.
 - Do not report: naming, formatting, comment wording or import order; performance tuning; a rewrite into another library or paradigm; a bug, race, missing check, spec deviation or vulnerability (other reviewers own those; put one under UNCLEAR as out of focus); a preference you cannot back with an equivalence check.
 - No verdicts on compliance or ship readiness: report evidence; the human owner decides.
@@ -46,7 +46,7 @@ FINDINGS: <k>
 F1 | severity: low | kind: boolean-ladder|stdlib|comprehension|noop-try|redundant-cast|dead-branch|single-impl|constant-flag|passthrough|duplication|dict-lookup|nesting|machinery|dead-code | code: <path:line or path:start-end> | quote: "<verbatim line>" (several lines: "<first line>" ... "<last line>")
    simpler: <the replacement, one to three lines>
    same behaviour: <inputs compared (empty, None, 0, False, edge values), exceptions, side effects, and the callers you searched>
-   confidence: <50-100>   (below 50 is not an F line: list it under UNCLEAR)
+   confidence: <50-100>   (55 is the floor for a finding that depends only on a caller you could not see; below 50 is not an F line: list it under UNCLEAR)
 UNCLEAR: <candidate: why you could not show it is identical, or which callers you could not see>   (optional)
 COVERAGE: <catalog kinds checked with no hit, in one line>
 NOT DONE (send each to its own agent): <list>   (optional)

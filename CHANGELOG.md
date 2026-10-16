@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Added
+- Two model-invokable skills in `haiku-delegation`, so the main agent can load the orchestrator rules without a typed command: `haiku-delegation:orchestrate` (decompose the task into units, delegate each to a kit agent with a `Task kind` line, launch independent units in one message in waves of at most 8, keep edits and judgement on the main thread, verify and close out with `Handoffs` and `Verified` lines) and `haiku-delegation:review-fix-cycle` (implement, run the gates, commit on a feature branch, run `/code-review:review`, fix valid findings, re-review the fixes, stop after four cycles or when a human decision is needed). Both are triggered by their descriptions; invoke them by name if the model does not pick them up.
+
 ## [0.2.7] - 2026-10-16
 
 ### Added

@@ -1,0 +1,95 @@
+{
+  "axis": "bug",
+  "case": "bug-h6",
+  "difficulty": "hard",
+  "sources": [
+    "Python decimal module: Decimal.quantize with ROUND_HALF_UP on exact decimal strings (display rounding separate from calculation)",
+    "Python datetime and zoneinfo: aware datetimes, datetime.combine with tzinfo at local midnight, DST day length (25 h fall-back, 47 h range over spring-forward)",
+    "Keyset (seek) pagination with a unique tie-breaker key and opaque cursor tokens",
+    "Python late binding of closures and default-argument binding in predicate factories",
+    "Mutating a dict while iterating over a snapshot list(d.items())"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/services/dosing.py",
+      "line": 49,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Decimal.quantize with rounding=ROUND_HALF_UP is the intended half-up rule. Computed: round_dose_mg('2.345') -> 2.35 and round_dose_mg('2.344') -> 2.34; label_text('12.345') -> '12.35 mg'. Parsing from str keeps the input exact, so no binary float rounding enters the result. The unrounded dose is still used for volume_for_dose, as the docstring states."
+    },
+    {
+      "file": "code/services/dosing.py",
+      "line": 33,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The test is 'max_mg is None', so an explicit cap of 0 is honoured rather than replaced by MAX_DOSE_MG. Computed: weight_based_dose('80', '1.5', max_mg='0') -> 0; weight_based_dose('400', '1.5') -> 500 (site cap); weight_based_dose('400', '1.5', max_mg='250') -> 250; weight_based_dose('80', '1.5') -> 120.0 (dose below cap). A truthiness test on max_mg would wrongly give 500 for the first case, so this line is the correct form."
+    },
+    {
+      "file": "code/services/scheduling.py",
+      "line": 65,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Adding one day to last_day and building the end as local midnight in SITE_ZONE is correct. The naive '+24 h' reading is wrong on DST days, but this line does not use it. Computed: dispensing_window(date(2026,10,25), date(2026,10,25)) -> (2026-10-24T22:00Z, 2026-10-25T23:00Z), window_hours -> 25.0 (the site falls back to CET on 2026-10-25). dispensing_window(date(2026,3,28), date(2026,3,29)) -> window_hours 47.0 (spring forward on 2026-03-29). Both match the local calendar days."
+    },
+    {
+      "file": "code/services/scheduling.py",
+      "line": 73,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The comparison is half-open: start included, end excluded, which matches the window built by dispensing_window and R2 (adjacent windows must not overlap). Computed for the 2026-10-25 window: in_window(start 2026-10-24T22:00Z) -> True; in_window(end 2026-10-25T23:00Z) -> False; in_window(2026-10-25T23:59:59Z) -> False (the next local day starts at the end)."
+    },
+    {
+      "file": "code/services/listing.py",
+      "line": 48,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Keyset comparison uses the full (created_at, id) tuple, so records that share created_at are not skipped or repeated. Computed with three records all created_at '2026-10-01T08:00:00Z' and ids b, a, c, page_size 2: page 1 -> ['a', 'b'] with a next token; page 2 with that token -> ['c'] and next token None. The tie-breaker id is the reason the split is stable."
+    },
+    {
+      "file": "code/services/listing.py",
+      "line": 69,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The expected value is bound through the default argument _expected=status when matches is created, so each predicate keeps its own status even when built in a loop. Computed: status_predicate('released')({'status':'released'}) -> True; status_predicate('hold')({'status':'released'}) -> False; apply_predicates(records, [status_predicate('released')]) -> ['b', 'c']."
+    },
+    {
+      "file": "code/services/listing.py",
+      "line": 86,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Iterating over the snapshot list(cache.items()) makes the del inside the loop safe. Computed: cache {'a':0,'b':50,'c':200}, evict_stale(cache, 300, 120) -> ['a', 'b'] and cache left {'c': 200} (ages 300 and 250 exceed 120, age 100 does not). The boundary case cache {'x':180} with now 300 and ttl 120 (age exactly 120, not strictly greater) -> [] and kept."
+    },
+    {
+      "file": "code/tools/registry.py",
+      "line": 49,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line (identical in base and code, absent from change.diff). The comparison 'previous == None' is a PEP 8 style issue (E711) that is harmless here: callables do not override __eq__, so the result equals 'previous is None'. Computed: (lambda: 0) == None -> False; replace('nope', fn) on an unknown name raises RegistryError as intended. A diff-mode reviewer must not report it; it is listed here only."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/services/dosing.py",
+      "line": 37,
+      "description": "NaN/sNaN/Infinity reach Decimal arithmetic: InvalidOperation instead of ValueError; Infinity silently capped (audit-confirmed, low)."
+    },
+    {
+      "file": "code/services/dosing.py",
+      "line": 49,
+      "description": "quantize raises InvalidOperation for very large values (28-digit context) (audit-confirmed, low)."
+    },
+    {
+      "file": "code/services/dosing.py",
+      "line": 45,
+      "description": "negative zero formats as -0.00 mg (cosmetic)."
+    },
+    {
+      "file": "code/services/scheduling.py",
+      "line": 73,
+      "description": "in_window accepts any aware datetime, R3 asks for UTC; results still correct (audit-confirmed, low)."
+    },
+    {
+      "file": "code/services/listing.py",
+      "line": 77,
+      "description": "apply_predicates: a generator passed as predicates is consumed on the first record so later records skip the checks (reviewer-found, scorer-confirmed by running)."
+    },
+    {
+      "file": "code/services/listing.py",
+      "line": 70,
+      "description": "status_predicate(\"unknown\") compares None == \"unknown\" while count_by_status maps missing status to \"unknown\" (low, scorer-confirmed)."
+    }
+  ]
+}

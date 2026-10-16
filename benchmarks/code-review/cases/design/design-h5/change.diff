@@ -1,0 +1,149 @@
+--- a/applier.py
++++ b/applier.py
+@@ -6,7 +6,9 @@
+ from __future__ import annotations
+ 
+ import logging
+-from typing import Any, Dict, Mapping
++import time
++from contextlib import contextmanager
++from typing import Any, Dict, Iterator, Mapping
+ 
+ from locks import LockSet
+ from models import APPLY_APPLIED, APPLY_NOTHING_PENDING, APPLY_STALE, ApplyResult
+@@ -14,6 +16,17 @@
+ 
+ LOG = logging.getLogger("plan_applier")
+ MAX_PATCH_KEYS = 500
++
++
++@contextmanager
++def timed_section(label: str) -> Iterator[None]:
++    """Log how long a section of apply work took."""
++    started = time.monotonic()
++    try:
++        yield
++    finally:
++        elapsed_ms = (time.monotonic() - started) * 1000.0
++        LOG.info("%s took %.1f ms", label, elapsed_ms)
+ 
+ 
+ class PlanApplier:
+@@ -33,15 +46,17 @@
+         return self.apply(plan_id, row.version, row.payload)
+ 
+     def apply(self, plan_id: str, version: int, payload: Mapping[str, Any]) -> ApplyResult:
+-        """Check the version and write the patch, all under the plan lock."""
+-        with self._locks.plan:
+-            current = self._store.applied_version(plan_id)
++        """Check the version, build the patch, then write it under both locks."""
++        with timed_section(f"apply {plan_id} v{version}"):
++            with self._locks.plan:
++                current = self._store.applied_version(plan_id)
+             if version <= current:
+                 LOG.info("stale %s v%d (applied v%d)", plan_id, version, current)
+                 return ApplyResult(APPLY_STALE, plan_id, version)
+             patch = self._build_patch(payload)
+-            with self._locks.store:
+-                self._store.write_applied(plan_id, version, patch)
++            with self._locks.plan:
++                with self._locks.store:
++                    self._store.write_applied(plan_id, version, patch)
+         LOG.info("applied %s v%d", plan_id, version)
+         return ApplyResult(APPLY_APPLIED, plan_id, version)
+ 
+--- a/cleaner.py
++++ b/cleaner.py
+@@ -1,22 +1,27 @@
+ """Removes history rows that no longer need to be kept.
+ 
+ All cleanup work goes through sweep_once. Each sweep keeps the rows at or
+-above the latest applied seq.
++above the latest applied seq. The cleaner runs on its own thread; requests
++are queued and consumed by that single thread.
+ """
+ 
+ from __future__ import annotations
+ 
+ import logging
+-from typing import Dict
++import queue
++import threading
++from typing import Dict, Optional
+ 
+ from locks import LockSet
+ from plan_store import PlanStore
+ 
+ LOG = logging.getLogger("plan_cleaner")
++SWEEP_REQUEST = "sweep"
++STOP_REQUEST = "stop"
+ 
+ 
+ class PlanCleaner:
+-    """Periodic removal of old history rows."""
++    """Periodic and on-demand removal of old history rows."""
+ 
+     def __init__(self, store: PlanStore, locks: LockSet, interval_s: float = 60.0) -> None:
+         if interval_s <= 0:
+@@ -24,6 +29,8 @@
+         self._store = store
+         self._locks = locks
+         self.interval_s = interval_s
++        self._requests: "queue.Queue[str]" = queue.Queue()
++        self._thread: Optional[threading.Thread] = None
+         self._sweeps = 0
+ 
+     @property
+@@ -40,12 +47,32 @@
+ 
+     def sweep_once(self) -> int:
+         """Delete history below the latest applied seq and return the count."""
+-        with self._locks.plan:
++        with self._locks.store:
+             horizon = self._store.latest_applied_seq()
+-            removed = self._store.delete_older_than(horizon)
++            with self._locks.plan:
++                removed = self._store.delete_older_than(horizon)
+         self._sweeps += 1
+         LOG.info("sweep %d removed %d rows (horizon %d)", self._sweeps, removed, horizon)
+         return removed
++
++    def start(self) -> None:
++        """Start the background thread; refuses to start twice."""
++        if self._thread is not None and self._thread.is_alive():
++            raise RuntimeError("cleaner already running")
++        self._thread = threading.Thread(target=self._run, name="plan-cleaner", daemon=True)
++        self._thread.start()
++
++    def request_sweep(self) -> None:
++        """Ask the background thread for a sweep without waiting for the interval."""
++        self._requests.put(SWEEP_REQUEST)
++
++    def stop(self, timeout_s: float = 5.0) -> None:
++        """Ask the background thread to exit and wait up to timeout_s."""
++        self._requests.put(STOP_REQUEST)
++        if self._thread is not None:
++            self._thread.join(timeout_s)
++            if self._thread.is_alive():
++                LOG.info("cleaner did not stop within %.1f s", timeout_s)
+ 
+     def describe(self) -> Dict[str, object]:
+         """Diagnostic snapshot of the cleaner and the row count."""
+@@ -60,3 +87,17 @@
+     def due(self, elapsed_s: float) -> bool:
+         """True when at least one interval has passed since the last sweep."""
+         return elapsed_s >= self.interval_s
++
++    def _run(self) -> None:
++        while True:
++            try:
++                request = self._requests.get(timeout=self.interval_s)
++            except queue.Empty:
++                request = SWEEP_REQUEST
++            if request == STOP_REQUEST:
++                break
++            try:
++                self.sweep_once()
++            except Exception:
++                LOG.exception("sweep failed; will retry on next request")
++        LOG.info("cleaner stopped")

@@ -1,0 +1,17 @@
+{
+  "axis": "guidance",
+  "case": "guidance-03",
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/calibration.py",
+      "line": 44,
+      "why_not_a_defect": "datetime.now() is used, but the rule that restricts it applies only to services/ (`Rules for services/ only`). This module is under code/, so the rule does not apply."
+    },
+    {
+      "file": "code/calibration.py",
+      "line": 21,
+      "why_not_a_defect": "ValueError is caught, not raised. Rule 1 forbids raising ValueError; the handler converts it to DomainError, which complies."
+    }
+  ]
+}

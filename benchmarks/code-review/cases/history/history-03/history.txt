@@ -1,0 +1,132 @@
+History digest: code/report_export.py
+Commits touching this file, oldest first (4).
+
+commit 2b7e6f0
+Subject: feat: add CSV and JSON report export (#589)
+--- /dev/null
++++ b/code/report_export.py
+@@ -0,0 +1,46 @@
++"""Report export: builds CSV or JSON files from report records."""
++
++import csv
++import io
++import json
++import logging
++
++logger = logging.getLogger("reports.export")
++
++SUPPORTED_FORMATS = ("csv", "json")
++COLUMNS = ("site_id", "study_code", "visit", "status")
++
++
++class ReportExporter:
++    def __init__(self, sink):
++        self._sink = sink
++
++    def export(self, records: list, fmt: str):
++        if fmt not in SUPPORTED_FORMATS:
++            raise ValueError(f"unsupported format: {fmt}")
++        if not records:
++            logger.info("no records to export")
++            return None
++        rows = [
++            {
++                "site_id": r.get("site_id", ""),
++                "study_code": r.get("study_code", ""),
++                "visit": r.get("visit", ""),
++                "status": r.get("status", "UNKNOWN"),
++            }
++            for r in records
++        ]
++        if fmt == "csv":
++            return self._write_csv(rows)
++        return self._write_json(rows)
++
++    def _write_csv(self, rows):
++        buffer = io.StringIO()
++        writer = csv.DictWriter(buffer, fieldnames=COLUMNS)
++        writer.writeheader()
++        writer.writerows(rows)
++        return self._sink.write("report.csv", buffer.getvalue())
++
++    def _write_json(self, rows):
++        payload = json.dumps(rows, indent=2, sort_keys=True)
++        return self._sink.write("report.json", payload)
+
+commit 3f9a2c1
+Subject: refactor: extract build_rows from export (#602)
+--- a/code/report_export.py
++++ b/code/report_export.py
+@@ -11,6 +11,18 @@
+ COLUMNS = ("site_id", "study_code", "visit", "status")
+ 
+ 
++def build_rows(records):
++    return [
++        {
++            "site_id": r.get("site_id", ""),
++            "study_code": r.get("study_code", ""),
++            "visit": r.get("visit", ""),
++            "status": r.get("status", "UNKNOWN"),
++        }
++        for r in records
++    ]
++
++
+ class ReportExporter:
+     def __init__(self, sink):
+         self._sink = sink
+@@ -21,15 +33,7 @@
+         if not records:
+             logger.info("no records to export")
+             return None
+-        rows = [
+-            {
+-                "site_id": r.get("site_id", ""),
+-                "study_code": r.get("study_code", ""),
+-                "visit": r.get("visit", ""),
+-                "status": r.get("status", "UNKNOWN"),
+-            }
+-            for r in records
+-        ]
++        rows = build_rows(records)
+         if fmt == "csv":
+             return self._write_csv(rows)
+         return self._write_json(rows)
+
+commit a8d41e7
+Subject: refactor: rename _write_csv to write_csv_rows (#618)
+--- a/code/report_export.py
++++ b/code/report_export.py
+@@ -35,10 +35,10 @@
+             return None
+         rows = build_rows(records)
+         if fmt == "csv":
+-            return self._write_csv(rows)
++            return self.write_csv_rows(rows)
+         return self._write_json(rows)
+ 
+-    def _write_csv(self, rows):
++    def write_csv_rows(self, rows):
+         buffer = io.StringIO()
+         writer = csv.DictWriter(buffer, fieldnames=COLUMNS)
+         writer.writeheader()
+
+commit c4d9e10
+Subject: refactor: extract format selection into _dispatch() (#625)
+--- a/code/report_export.py
++++ b/code/report_export.py
+@@ -34,6 +34,9 @@
+             logger.info("no records to export")
+             return None
+         rows = build_rows(records)
++        return self._dispatch(rows, fmt)
++
++    def _dispatch(self, rows, fmt):
+         if fmt == "csv":
+             return self.write_csv_rows(rows)
+         return self._write_json(rows)
+
+Review comments from earlier pull requests:
+- PR #618 (reviewer-a): "Rename is fine, no behaviour change. When you touch the JSON writer, keep the csv and json writer names symmetric."
+- PR #625 (reviewer-b): "Empty-records guard stays in export() for now. If it moves, keep the format check ahead of it so unsupported formats still raise."

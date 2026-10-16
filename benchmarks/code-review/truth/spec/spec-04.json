@@ -1,0 +1,17 @@
+{
+  "axis": "spec",
+  "case": "spec-04",
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/retry.py",
+      "line": 12,
+      "why_not_a_defect": "attempt starts at 0 and is incremented before each call, so attempt numbers are 1-based as R4 requires. The increment placed before the try looks like an off-by-one but is correct."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 19,
+      "why_not_a_defect": "The sleep uses 2 ** (attempt - 1), giving base_delay_s for the first failure and doubling thereafter, which is R3. It runs only before a retry, since the final-attempt raise on line 18 precedes it, so there is no sleep after the last attempt."
+    }
+  ]
+}

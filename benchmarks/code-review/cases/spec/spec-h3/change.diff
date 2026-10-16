@@ -1,0 +1,65 @@
+--- a/states.py
++++ b/states.py
+@@ -13,10 +13,13 @@
+     REJECTED = 7
+ 
+ 
++SIGNED_CODE_ALIAS = 4
++
+ _CODE_TO_STATUS = {
+     1: BatchStatus.DRAFT,
+     2: BatchStatus.SUBMITTED,
+     3: BatchStatus.SIGNED,
++    SIGNED_CODE_ALIAS: BatchStatus.SIGNED,
+     5: BatchStatus.RELEASED,
+     7: BatchStatus.REJECTED,
+ }
+--- a/release.py
++++ b/release.py
+@@ -24,8 +24,8 @@
+         raise TypeError("quantity is required")
+     if isinstance(quantity, bool) or not isinstance(quantity, (int, float)):
+         raise TypeError("quantity must be numeric")
+-    if quantity == 0:
+-        raise ValueError("quantity must be greater than zero")
++    if not quantity:
++        raise TypeError("quantity must be greater than zero")
+     return to_micrograms(quantity, unit)
+ 
+ 
+--- a/units.py
++++ b/units.py
+@@ -1,6 +1,11 @@
+ """Unit conversion for batch quantities, recorded in micrograms."""
+ 
+ MG_TO_UG = 1000
++
++_FACTORS = {
++    "mg": MG_TO_UG,
++    "ug": MG_TO_UG,
++}
+ 
+ 
+ def to_micrograms(quantity, unit):
+@@ -8,16 +13,15 @@
+ 
+     Raises ValueError for units other than mg or ug.
+     """
+-    if unit == "mg":
+-        return int(round(quantity * MG_TO_UG))
+-    if unit == "ug":
+-        return int(round(quantity))
+-    raise ValueError(f"unsupported unit: {unit!r}")
++    factor = _FACTORS.get(str(unit).lower())
++    if factor is None:
++        raise ValueError(f"unsupported unit: {unit!r}")
++    return int(round(quantity * factor))
+ 
+ 
+ def is_supported_unit(unit):
+     """Return True when the unit can be converted."""
+-    return unit in ("mg", "ug")
++    return str(unit).lower() in _FACTORS
+ 
+ 
+ def from_micrograms(micrograms, unit):

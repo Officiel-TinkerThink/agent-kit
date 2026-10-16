@@ -1,0 +1,47 @@
+--- a/export.py
++++ b/export.py
+@@ -45,8 +45,7 @@
+     """Write the header and data rows as CSV to an open text handle."""
+     writer = csv.writer(handle)
+     writer.writerow(EXPORT_COLUMNS)
+-    for row in rows:
+-        writer.writerow([neutralise_cell(cell) for cell in row])
++    writer.writerows(rows)
+     return handle
+ 
+ 
+--- a/query.py
++++ b/query.py
+@@ -21,15 +21,14 @@
+ 
+ def fetch_batches(conn, raw_ids):
+     """Return batch records whose identifiers appear in raw_ids."""
+-    ids = parse_ids(raw_ids)
+-    placeholders = ", ".join("?" for _ in ids)
++    id_list = ",".join(raw_ids)
+     sql = (
+         "SELECT %s FROM batch_records "
+         "WHERE batch_id IN (%s) "
+         "ORDER BY recorded_at"
+-    ) % (BATCH_COLUMNS, placeholders)
+-    logger.info("fetch_batches count=%d", len(ids))
+-    return conn.execute(sql, ids).fetchall()
++    ) % (BATCH_COLUMNS, id_list)
++    logger.info("fetch_batches count=%d", len(raw_ids))
++    return conn.execute(sql).fetchall()
+ 
+ 
+ def fetch_batches_by_status(conn, status, lot):
+--- a/render.py
++++ b/render.py
+@@ -23,8 +23,8 @@
+ 
+ def render_title(title):
+     """Render the report heading for a user-supplied title."""
+-    template = Template("<h1>{{ title }}</h1>", autoescape=True)
+-    return template.render(title=title)
++    template = Template("<h1>" + title + "</h1>", autoescape=True)
++    return template.render()
+ 
+ 
+ def embed_json_for_script(data):

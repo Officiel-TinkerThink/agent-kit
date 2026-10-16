@@ -1,0 +1,174 @@
+--- a/record_store.py
++++ b/record_store.py
+@@ -2,22 +2,30 @@
+ 
+ import itertools
+ import logging
+-from typing import Any, Dict
++from typing import Any, Dict, Optional
+ 
++from audit import AuditLog
+ from models import RegulatedRecord, RecordNotFound, ValidationError
+ 
+ log = logging.getLogger("record_store")
+ 
+ 
+ class RecordStore:
+-    """In-memory store for regulated records."""
++    """In-memory store. Each create, update and delete writes one audit entry."""
+ 
+-    def __init__(self) -> None:
++    def __init__(self, audit: AuditLog) -> None:
++        self._audit = audit
+         self._records: Dict[str, RegulatedRecord] = {}
+         self._ids = itertools.count(1)
+ 
+-    def create(self, kind: str, payload: Dict[str, Any], actor: str) -> RegulatedRecord:
+-        """Store a new record created by actor."""
++    def create(
++        self,
++        kind: str,
++        payload: Dict[str, Any],
++        actor: str,
++        client_context: Optional[Dict[str, Any]] = None,
++    ) -> RegulatedRecord:
++        """Store a new record created by actor and audit the creation."""
+         if not kind:
+             raise ValidationError("kind is required")
+         record_id = f"REC-{next(self._ids):05d}"
+@@ -28,6 +36,14 @@
+             created_by=actor,
+         )
+         self._records[record_id] = record
++        self._audit.record(
++            actor,
++            "create",
++            record_id,
++            old_value=None,
++            new_value=record.snapshot(),
++            client_context=client_context,
++        )
+         log.info("created %s kind=%s", record_id, kind)
+         return record
+ 
+@@ -35,15 +51,50 @@
+         """Return the stored record or raise RecordNotFound."""
+         return self._require(record_id)
+ 
+-    def update(self, record_id: str, changes: Dict[str, Any], actor: str) -> RegulatedRecord:
+-        """Merge changes into the record and bump its version."""
++    def update(
++        self,
++        record_id: str,
++        changes: Dict[str, Any],
++        actor: str,
++        client_context: Optional[Dict[str, Any]] = None,
++    ) -> RegulatedRecord:
++        """Merge changes into the record, bump its version and audit both values."""
+         if not changes:
+             raise ValidationError("no changes supplied")
+         record = self._require(record_id)
++        previous = record.payload
+         record.payload.update(changes)
+         record.version += 1
++        self._audit.record(
++            actor,
++            "update",
++            record_id,
++            old_value=previous,
++            new_value=record.snapshot(),
++            client_context=client_context,
++        )
+         log.info("updated %s to version %d by %s", record_id, record.version, actor)
+         return record
++
++    def delete(
++        self,
++        record_id: str,
++        actor: str,
++        client_context: Optional[Dict[str, Any]] = None,
++    ) -> None:
++        """Remove the record and audit the removed value."""
++        record = self._require(record_id)
++        before = record.snapshot()
++        del self._records[record_id]
++        self._audit.record(
++            actor,
++            "delete",
++            record_id,
++            old_value=before,
++            new_value=None,
++            client_context=client_context,
++        )
++        log.info("deleted %s by %s", record_id, actor)
+ 
+     def purge(self, record_id: str) -> None:
+         """Drop a record during retention maintenance."""
+--- a/audit.py
++++ b/audit.py
+@@ -33,21 +33,28 @@
+         old_value: Optional[Dict[str, Any]],
+         new_value: Optional[Dict[str, Any]],
+         meaning: Optional[str] = None,
++        client_context: Optional[Dict[str, Any]] = None,
+     ) -> AuditEntry:
+-        """Append one entry for a change to a regulated record."""
++        """Append one entry for a change to a regulated record.
++
++        The client context may carry the time the operator saw on screen; it is
++        kept for the operator trail and does not replace the server time.
++        """
+         if action not in ALLOWED_ACTIONS:
+             raise ValueError(f"unknown audit action: {action!r}")
+         if not actor:
+             raise ValueError("audit entry requires an actor")
++        when = (client_context or {}).get("timestamp") or self._clock()
+         entry = AuditEntry(
+             entry_id=f"AE-{next(self._ids):06d}",
+             record_id=record_id,
+             action=action,
+             actor=actor,
+-            server_time=self._clock(),
++            server_time=when,
+             old_value=old_value,
+             new_value=new_value,
+             meaning=meaning,
++            client_context=client_context,
+         )
+         self._entries.append(entry)
+         log.info("audit %s", entry.describe())
+--- a/api.py
++++ b/api.py
+@@ -34,7 +34,12 @@
+         payload = body.get("payload")
+         if not isinstance(payload, dict):
+             raise ValidationError("payload must be an object")
+-        record = self._store.create(body.get("kind"), payload, actor)
++        record = self._store.create(
++            body.get("kind"),
++            payload,
++            actor,
++            client_context=body.get("client"),
++        )
+         log.info("create request by %s", actor)
+         return 201, {"record_id": record.record_id, "version": record.version}
+ 
+@@ -57,6 +62,17 @@
+         changes = body.get("changes")
+         if not isinstance(changes, dict):
+             raise ValidationError("changes must be an object")
+-        record = self._store.update(record_id, changes, actor)
++        record = self._store.update(
++            record_id,
++            changes,
++            actor,
++            client_context=body.get("client"),
++        )
+         log.info("update request by %s", actor)
+         return 200, {"record_id": record.record_id, "version": record.version}
++
++    def delete_record(self, record_id: str, actor: str) -> Tuple[int, Dict[str, Any]]:
++        """DELETE: remove the record and return no content."""
++        self._store.purge(record_id)
++        log.info("delete request by %s", actor)
++        return 204, {}

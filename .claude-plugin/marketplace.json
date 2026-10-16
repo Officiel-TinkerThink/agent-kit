@@ -31,6 +31,12 @@
       "source": "./plugins/verification-runner",
       "description": "Test/lint/build runner (Claude Code permissions decide the commands) with safe-rm quarantine.",
       "version": "0.2.6"
+    },
+    {
+      "name": "code-review",
+      "source": "./plugins/code-review",
+      "description": "Focused Haiku 5.5 reviewers (spec, design, security, project rules, history) with an independent finding validator and a /code-review:review skill.",
+      "version": "0.2.6"
     }
   ]
 }

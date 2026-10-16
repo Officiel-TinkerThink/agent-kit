@@ -1,0 +1,64 @@
+{
+  "axis": "spec",
+  "case": "spec-h4",
+  "difficulty": "hard",
+  "sources": [
+    "SemVer 2.0.0 precedence rules, https://semver.org/#spec-item-11 (numeric components, pre-release lower than release, build metadata ignored)",
+    "RFC 3339 section 5.6 date-time, https://www.rfc-editor.org/rfc/rfc3339#section-5.6 (lower-case t and z allowed, offset required)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/versions.py",
+      "line": 37,
+      "class": "string comparison of numeric version components",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Quoted line: core_parts = tuple(self.core.split(\".\")). Components stay strings, so the tuple compares lexically. Input compare_versions(\"1.10.0\", \"1.9.0\") returns -1 (wrong; expected 1 under R1). Base code returns 1. Downstream: code/release_check.py require_newer(ledger 1.10.0, published 1.9.0) raises ReleaseCheckError \"1.10.0 must be higher than 1.9.0\"; the release gate blocks a valid release."
+    },
+    {
+      "id": "D2",
+      "file": "code/versions.py",
+      "line": 39,
+      "class": "inverted pre-release precedence",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Quoted line: return core_parts + (0, ()). A release gets sort slot 0 and a pre-release gets slot 1, so the release sorts below its pre-release. Input compare_versions(\"1.0.0\", \"1.0.0-rc1\") returns -1 (wrong; expected 1 under R2). compare_versions(\"1.0.0-rc1\", \"1.0.0\") returns 1 (wrong; expected -1). Evidence: printed values from build_h4.py run against code/."
+    },
+    {
+      "id": "D3",
+      "file": "code/timestamps.py",
+      "line": 10,
+      "class": "case-sensitive RFC 3339 delimiter and offset designator",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Quoted line: the _TIMESTAMP_PATTERN regex literal with literal T and Z. Input '2026-10-15t08:00:00z' raises TimestampError (not an RFC 3339 timestamp). Under R4 it is valid and equals 2026-10-15 08:00:00+00:00. Cross-file trace: code/manifest.py _entry_from_dict calls parse_timestamp on released_at; a manifest written in lower case by another tool, e.g. {\"component\":\"ledger\",\"version\":\"1.0.0\",\"released_at\":\"2026-10-15t08:00:00z\"}, makes load_manifest raise ManifestError \"entry 0 is invalid: not an RFC 3339 timestamp\". Evidence: printed values from build_h4.py run against code/."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/versions.py",
+      "line": 62,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Quoted line: return Version(raw=stripped, pre=match.group(4), build=match.group(5)). Build metadata is stored but precedence_key uses only core and pre, so R3 holds. compare_versions(\"1.0.0+build.7\", \"1.0.0\") returns 0, which is correct."
+    },
+    {
+      "file": "code/release_check.py",
+      "line": 41,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Quoted line: return candidate_major > previous_major. MAJOR is converted with int() before comparison, so it is numeric, the same pattern as D1 done correctly. is_major_bump(\"9.9.9\", \"10.0.0\") returns True, which is correct."
+    },
+    {
+      "file": "code/timestamps.py",
+      "line": 31,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Quoted line: if offset is None:. The regex makes the offset optional, and this check rejects it, so R5 holds. parse_timestamp(\"2026-10-15T08:00:00\") raises TimestampError (timestamp must carry an offset or Z), which is correct."
+    },
+    {
+      "file": "code/cli.py",
+      "line": 29,
+      "kind": "preexisting",
+      "why_not_a_defect": "Quoted line: with open(path, \"w\") as handle:. Real flaw on an unchanged line: no encoding is given, so the platform default is used. On a cp1252 Windows host, a component name such as \"数据\" raises UnicodeEncodeError from _write_report, which main does not catch. The change does not touch cli.py and the spec does not cover report encoding, so a diff-mode review must not report it."
+    }
+  ]
+}

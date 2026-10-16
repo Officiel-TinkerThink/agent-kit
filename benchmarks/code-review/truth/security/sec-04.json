@@ -1,0 +1,17 @@
+{
+  "axis": "security",
+  "case": "sec-04",
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/reports.py",
+      "line": 8,
+      "why_not_a_defect": "The string concatenation builds only the ORDER BY column, and that column is taken from ALLOWED_SORT_COLUMNS through dict.get with a fixed default of id. Caller input never reaches the SQL text, and the status value is bound with a ? placeholder, so this is not SQL injection."
+    },
+    {
+      "file": "code/config.py",
+      "line": 8,
+      "why_not_a_defect": "yaml.safe_load builds only plain Python types (dict, list, str, int, float, bool, None) and cannot construct arbitrary objects, so it does not carry the CWE-502 risk of yaml.load with an unsafe loader. The `or {}` handles an empty file."
+    }
+  ]
+}

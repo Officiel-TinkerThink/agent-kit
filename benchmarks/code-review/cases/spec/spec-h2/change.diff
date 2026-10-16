@@ -1,0 +1,73 @@
+--- a/api.py
++++ b/api.py
+@@ -44,8 +44,7 @@
+     end_utc = _utc(end)
+     paging.validate_page(page)
+     size = paging.clamp_page_size(size)
+-    offset = (page - 1) * size
+-    rows = repo.fetch_page(conn, start_utc, end_utc, offset, size)
++    rows = repo.fetch_page(conn, start_utc, end_utc, page, size)
+     total = repo.count_matching(conn, start_utc, end_utc)
+     _audit_listing(conn, user, "list_records", start_utc, end_utc, len(rows))
+     return {
+@@ -54,6 +53,17 @@
+         "total": total,
+         "items": rows,
+     }
++
++
++def export_all(conn, user_id, page, size, start, end):
++    """Return one export page of records in the window, same ordering as list_records."""
++    user = _check_user_id(user_id)
++    start_utc = _utc(start)
++    end_utc = _utc(end)
++    paging.validate_page(page)
++    rows = repo.fetch_page(conn, start_utc, end_utc, page, size)
++    _audit_listing(conn, user, "export_records", start_utc, end_utc, len(rows))
++    return rows
+ 
+ 
+ def get_record(conn, user_id, batch_code):
+--- a/repo.py
++++ b/repo.py
+@@ -3,6 +3,8 @@
+ All queries use bound parameters. Window bounds are half-open:
+ created_at >= start and created_at < end, both in UTC.
+ """
++
++import paging
+ 
+ SELECT_COLUMNS = "id, batch_code, product, created_at, status"
+ WINDOW_FILTER = "created_at >= ? AND created_at < ?"
+@@ -20,15 +22,16 @@
+     }
+ 
+ 
+-def fetch_page(conn, start, end, offset, limit):
++def fetch_page(conn, start, end, page, size):
+     """Return one page of matching records, newest first."""
++    offset = paging.page_offset(page, size)
+     sql = (
+         "SELECT " + SELECT_COLUMNS + " FROM " + BASE_TABLE + " "
+         "WHERE " + WINDOW_FILTER + " "
+-        "ORDER BY created_at DESC, id DESC "
++        "ORDER BY created_at DESC "
+         "LIMIT ? OFFSET ?"
+     )
+-    cursor = conn.execute(sql, (start, end, limit, offset))
++    cursor = conn.execute(sql, (start, end, size, offset))
+     return [row_to_dict(row) for row in cursor.fetchall()]
+ 
+ 
+--- a/paging.py
++++ b/paging.py
+@@ -46,3 +46,9 @@
+         "pages": page_count(total, size),
+         "has_next": has_next(page, size, total),
+     }
++
++
++def page_offset(page, size):
++    """Return the zero-based row offset of a 1-based page."""
++    validate_page(page)
++    return page * size

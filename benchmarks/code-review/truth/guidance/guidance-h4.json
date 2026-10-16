@@ -1,0 +1,97 @@
+{
+  "axis": "guidance",
+  "case": "guidance-h4",
+  "difficulty": "hard",
+  "sources": [
+    "Nearest-rule scoping: a rule file in a subfolder governs only its subtree and overrides the root rule there (internal rules layout, rules/billing/RULES.md)",
+    "Money represented as decimal.Decimal, never float (internal root rule, rules/RULES.md)",
+    "Lint suppression must name a ticket; bare noqa is not allowed (internal root rule, rules/RULES.md)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/billing/tax.py",
+      "line": 60,
+      "class": "nested-rule-violation: Decimal used in billing code",
+      "in_diff": true,
+      "cross_file": true,
+      "rule_file": "rules/billing/RULES.md",
+      "rule_quote": "Billing code stores money as integer cents and never uses Decimal.",
+      "line_text": "rate = Decimal(rate_for_customer(customer_id)) / Decimal(10000)",
+      "description": "invoice_tax_due(1000, 'CUST-0001') returns Decimal('2.00') computed with Decimal inside billing/tax.py. The nested billing rule forbids Decimal in billing code; the root rule (Decimal for money) does not override it because the nearest rule wins. Evidence: executed the function, result Decimal('2.00'). Same violation on line 61 (amount = Decimal(subtotal_cents) / Decimal(100)) and line 62 (quantize call). Only the line 60 is reported as the defect location. Reviewer must read rules/billing/RULES.md to see the nested rule; the root file alone would make Decimal look correct."
+    },
+    {
+      "id": "D2",
+      "file": "code/reports/stock_value.py",
+      "line": 51,
+      "class": "root-rule-violation: integer cents used for money outside billing",
+      "in_diff": true,
+      "cross_file": true,
+      "rule_file": "rules/RULES.md",
+      "rule_quote": "Money amounts are decimal.Decimal. Never use float for money.",
+      "line_text": "return on_hand_units(item) * item[\"unit_cost_cents\"]",
+      "description": "line_value_cents({'sku': 'A1', 'on_hand': 3, 'unit_cost_cents': 1250}) returns the int 3750 (cents) as the stock value. reports/stock_value.py is outside billing/, so the nested billing rule (integer cents) does not apply and the root rule requires decimal.Decimal for money amounts. Evidence: executed, result 3750 of type int. Reviewer must check that no nested rule file exists under reports/ (rules/ has only RULES.md and billing/RULES.md) to conclude the root rule governs this file."
+    },
+    {
+      "id": "D3",
+      "file": "code/services/lots.py",
+      "line": 70,
+      "class": "suppression-form: bare noqa hides line-length violation",
+      "in_diff": true,
+      "cross_file": false,
+      "rule_file": "rules/RULES.md",
+      "rule_quote": "A bare `# noqa` is not allowed.",
+      "line_text": "raise DomainError(f\"lot {lot_code} request of {requested_units} units exceeds approved limit {approved_limit}\")  # noqa",
+      "description": "Line 70 is 127 characters, above the 88-character limit (rules/RULES.md, Line length, lint code E501). The line ends with a bare `# noqa`, which is not allowed; it suppresses E501 without a code or ticket. Both the invalid suppression form and the hidden E501 violation are one root cause on the same line and are reportable together. The valid form per rules/RULES.md would be `# noqa: E501  TICKET-<n>`."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/services/lots.py",
+      "line": 6,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Suppression names the code and a ticket in the form required by rules/RULES.md (`# noqa: <code>  TICKET-<n>`, two spaces before the ticket). F401 is a real unused import, so the suppression is also accurate. Rule satisfied."
+    },
+    {
+      "file": "code/billing/invoice.py",
+      "line": 52,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Billing code storing money as integer cents follows the nested billing rule (rules/billing/RULES.md). Line computes quantity * unit_price_cents with int operands; no Decimal and no float. Correct under the nearest rule, which is the same money pattern as D2 but inside billing/ where it is required."
+    },
+    {
+      "file": "code/tests/test_tax.py",
+      "line": 8,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Float literal in a test fixture under tests/. rules/RULES.md states the money rule does not apply under tests/. Not money in production code; rule not violated."
+    },
+    {
+      "file": "code/tests/test_tax.py",
+      "line": 53,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Decimal with ROUND_HALF_UP quantize used in a test under tests/, outside billing/. Root rule permits Decimal for money and the nested billing rule does not reach tests/. Executed: Decimal('2.675') quantized half-up to 0.01 gives Decimal('2.68'), matching the assertion. Same API as D1, correct scope."
+    },
+    {
+      "file": "code/billing/invoice.py",
+      "line": 7,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real violation of rules/RULES.md (bare `# noqa` on import clock is not allowed), but the line is unchanged by change.diff and lives in an unchanged file. A diff-mode reviewer must not report it; it is listed here only."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/reports/stock_value.py",
+      "line": 58,
+      "description": "same root-rule money violation as D2 (integer cents outside billing), audit-confirmed"
+    },
+    {
+      "file": "code/reports/stock_value.py",
+      "line": 63,
+      "description": "same root-rule money violation as D2, audit-confirmed"
+    },
+    {
+      "file": "code/billing/tax.py",
+      "line": 62,
+      "description": "same nested-rule Decimal use as D1, audit-confirmed"
+    }
+  ]
+}

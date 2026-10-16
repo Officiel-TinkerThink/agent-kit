@@ -1,0 +1,42 @@
+{
+  "axis": "guidance",
+  "case": "guidance-h3",
+  "difficulty": "hard",
+  "sources": [
+    "Scoped CLAUDE.md rule files with nearest-directory applicability",
+    "Electronic records audit trail principle (21 CFR Part 11 section 11.10(e), change recording without obscuring prior entries)"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/tools/lot_import.py",
+      "line": 20,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Nested rules\\services\\CLAUDE.md applies only to code under services\\. tools\\ is outside it, and the root rules do not forbid ValueError. Raising ValueError from the CLI-side loader is consistent with the rules."
+    },
+    {
+      "file": "code/tools/lot_import.py",
+      "line": 47,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Explicit opt-out: the line ends with '# rule-exempt: LAB-210', and LAB-210 is named in spec.md R2 as the change request. The timestamp is a console run-start value, not a record timestamp."
+    },
+    {
+      "file": "code/services/lot_release.py",
+      "line": 78,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_persist_release is private (leading underscore). The root rule requires audit.record_change only in public writers; the public caller release_lot calls audit.record_change after _persist_release and before returning."
+    },
+    {
+      "file": "code/services/lot_release.py",
+      "line": 63,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The root logging rule requires batch-record failures in services\\ to go through ops_feed.push(event, **fields), and this call does. No logging module call is needed; the wrapper name does not contain 'log' but satisfies the rule."
+    },
+    {
+      "file": "code/services/audit.py",
+      "line": 40,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real violation of the root rule 'do not call datetime.now()', but the line is unchanged by this change (not in change.diff). A diff-mode reviewer must not report it; it is listed here only."
+    }
+  ]
+}

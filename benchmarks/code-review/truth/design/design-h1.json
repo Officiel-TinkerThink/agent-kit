@@ -1,0 +1,72 @@
+{
+  "axis": "design",
+  "case": "design-h1",
+  "difficulty": "hard",
+  "sources": [
+    "Transactional outbox pattern (microservices.io): https://microservices.io/patterns/data/transactional-outbox.html",
+    "Idempotent consumer pattern under at-least-once delivery (microservices.io): https://microservices.io/patterns/communication-style/idempotent-consumer.html",
+    "Timeouts, retries and backoff with jitter (AWS Builders' Library): https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/intake.py",
+      "line": 63,
+      "class": "dual write without outbox",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "accept_order commits the order row (with conn: block, lines 52-61) and only afterwards calls _publish_order_paid(broker, order) as a separate broker call. Input: a valid Order; the commit succeeds; broker.publish raises ConnectionError on all 3 attempts. Outcome: the order stays persisted with status NEW, accept_order raises ConnectionError, no outbox row exists in the same transaction, and no order_paid event ever reaches the loyalty consumer, violating R1 and R2. The publish is not part of the transaction and no outbox row is written, so a later outbox sweep cannot recover it."
+    },
+    {
+      "id": "D2",
+      "file": "code/consumer.py",
+      "line": 42,
+      "class": "non-idempotent consumer (no processed-message check)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "_on_paid reads the balance with get_customer_balance and writes balance + points without any processed message_id check. Input: the same order_paid message with amount '100.00' for customer C is delivered twice (at-least-once redelivery). First call: balance 0 is read, 10 is written. Second call: balance 10 is read, 20 is written. Expected final balance 10 (R3); actual 20."
+    },
+    {
+      "id": "D3",
+      "file": "code/intake.py",
+      "line": 71,
+      "class": "retry amplification without jitter or deadline",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "The caller loop in _publish_order_paid makes PUBLISH_ATTEMPTS=3 outer attempts, each calling publish_with_retry, which itself makes 3 inner attempts (code/outbox_publisher.py:44). Both layers use fixed sleeps (PUBLISH_RETRY_SLEEP=1.0 at outbox_publisher.py:50 and 2.0 at intake.py:78), with no jitter and no overall deadline. Input: a broker outage where every publish raises ConnectionError. Outcome: 9 publish attempts for one message, about 12 s of synchronised fixed sleeps (3 x 2 s outer plus 3 x 2 x 1 s inner), and every worker retries in lockstep. This violates R4."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/outbox_publisher.py",
+      "line": 65,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The sleep uses exponential backoff with random jitter, and the deadline check at line 62 uses 2 * delay, which is the maximum sleep length. The sleep therefore cannot run past the deadline, so the overall deadline is respected."
+    },
+    {
+      "file": "code/outbox_publisher.py",
+      "line": 10,
+      "kind": "safe-looking",
+      "why_not_a_defect": "A module-level tuple of exception classes used only in except clauses is correct and needs no change. The names ConnectionError and TimeoutError are the intended retryable errors."
+    },
+    {
+      "file": "code/consumer.py",
+      "line": 63,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The broad except logs the failure with exc_info=True and re-raises with a bare raise at line 65, so the failure is not swallowed or acknowledged silently. The consumer's caller still sees the exception."
+    },
+    {
+      "file": "code/intake.py",
+      "line": 89,
+      "kind": "preexisting",
+      "why_not_a_defect": "fetch_order_status is unchanged by the diff. Its broad except Exception at line 88 returns UNKNOWN for every database error, so an outage is indistinguishable from an unknown order. This is a real flaw on an unchanged line; a diff-mode reviewer must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/consumer.py",
+      "line": 37,
+      "note": "balance is read outside the transaction, so concurrent consumers lose an update"
+    }
+  ]
+}

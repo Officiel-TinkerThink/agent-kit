@@ -1,0 +1,149 @@
+--- a/codes.py
++++ b/codes.py
+@@ -67,3 +67,26 @@
+ def is_open(code):
+     """Return True while the batch still accepts dispensing events."""
+     return not is_terminal(code) and code is not None
++
++
++def status_label(code):
++    """Return the operator-facing label for a status code."""
++    if code == STATUS_NEW:
++        return "New"
++    elif code == STATUS_QUEUED:
++        return "Queued"
++    elif code == STATUS_RUNNING:
++        return "Running"
++    elif code == STATUS_HOLD:
++        return "On hold"
++    elif code == STATUS_RELEASED:
++        return "Released"
++    elif code == STATUS_REJECTED:
++        return "Rejected"
++    elif code == STATUS_EXPIRED:
++        return "Expired"
++    elif code == STATUS_RECALLED:
++        return "Recalled"
++    elif code == STATUS_CLOSED:
++        return "Closed"
++    return UNKNOWN_LABEL
+--- a/validate_c.py
++++ b/validate_c.py
+@@ -2,6 +2,9 @@
+ 
+ import logging
+ import re
++from decimal import Decimal, InvalidOperation
++
++from codes import VIAL_MAX_FILL_G, VIAL_MIN_FILL_G, WEIGHT_MAX_G, WEIGHT_MIN_G
+ 
+ log = logging.getLogger("validate.station_c")
+ 
+@@ -42,6 +45,55 @@
+     return errors
+ 
+ 
++def validate_weight_c(record):
++    """Validate the dispensed weight in grams for station C.
++
++    Returns a list of error messages; an empty list means the weight is valid.
++    """
++    errors = []
++    raw = record.get("weight_g")
++    if raw is None:
++        errors.append(f"{MODULE_LABEL}: weight_g missing")
++        return errors
++    try:
++        weight = Decimal(str(raw))
++    except (InvalidOperation, ValueError):
++        weight = None
++    if weight is None or not weight.is_finite():
++        errors.append(f"{MODULE_LABEL}: weight_g not numeric: {raw!r}")
++        return errors
++    if weight < WEIGHT_MIN_G or weight > WEIGHT_MAX_G:
++        errors.append(
++            f"{MODULE_LABEL}: weight_g {weight} outside [{WEIGHT_MIN_G}, {WEIGHT_MAX_G}]"
++        )
++    return errors
++
++
++def validate_vial_fill_c(record):
++    """Validate the vial fill weight in grams for station C.
++
++    The pharmacopoeial minimum fill is exclusive, so a fill equal to
++    VIAL_MIN_FILL_G is rejected. The maximum fill is inclusive.
++    """
++    errors = []
++    raw = record.get("fill_g")
++    if raw is None:
++        errors.append(f"{MODULE_LABEL}: fill_g missing")
++        return errors
++    try:
++        fill = Decimal(str(raw))
++    except (InvalidOperation, ValueError):
++        fill = None
++    if fill is None or not fill.is_finite():
++        errors.append(f"{MODULE_LABEL}: fill_g not numeric: {raw!r}")
++        return errors
++    if fill <= VIAL_MIN_FILL_G or fill > VIAL_MAX_FILL_G:
++        errors.append(
++            f"{MODULE_LABEL}: fill_g {fill} outside ({VIAL_MIN_FILL_G}, {VIAL_MAX_FILL_G}]"
++        )
++    return errors
++
++
+ def check_operator_on_shift(record, roster):
+     """Return an error when the operator is not on the station roster for this shift."""
+     errors = []
+--- a/report.py
++++ b/report.py
+@@ -59,3 +59,49 @@
+     for status, count in sorted(summarise(rows).items(), key=lambda item: str(item[0])):
+         lines.append(f"TOTAL {status}: {count}")
+     return "\n".join(lines)
++
++
++def handle_event(event, state):
++    """Apply one dispensing event to the running report state and return it."""
++    kind = event.get("kind")
++    if kind == "ALERT":
++        state["alerts"].append(event["message"])
++    elif kind == "RETRY":
++        state["retries"] += 1
++        state["queue"].append(event["batch_id"])
++    elif kind == "DROP":
++        log.warning("dropped event for batch %s", event.get("batch_id"))
++    else:
++        raise ValueError(f"unknown event kind: {kind!r}")
++    return state
++
++
++def sample_disposition(sample, qc_result, retest_due):
++    """Return the disposition of a sample from its QC result and retest flag."""
++    if sample is not None:
++        if qc_result is not None:
++            if qc_result == "FAIL":
++                return "REJECT"
++            else:
++                if retest_due:
++                    return "RETEST"
++                else:
++                    return "ACCEPT"
++        else:
++            return "PENDING"
++    else:
++        return "REJECT"
++
++
++def dispense_mode(line_state, weight_g, limit_g):
++    """Choose how a batch is dispensed for the current line state and weight."""
++    if line_state is not None:
++        if weight_g is not None:
++            if weight_g > limit_g:
++                return "SPLIT"
++            else:
++                return "SINGLE"
++        else:
++            return "MANUAL"
++    else:
++        return "LOCKED"

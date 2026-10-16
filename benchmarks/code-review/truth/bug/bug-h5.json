@@ -1,0 +1,98 @@
+{
+  "axis": "bug",
+  "case": "bug-h5",
+  "difficulty": "hard",
+  "sources": [
+    "Locale-dependent number parsing: thousands grouping versus decimal comma (Python str.replace normalisation pitfall)",
+    "Inclusive calendar range off-by-one: (end - start).days omits the end day (datetime.date subtraction)",
+    "Fixed-width identifier truncation: masking a counter with & 0xFF makes identifiers collide after 256 (sequence id reuse)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/parsing.py",
+      "line": 34,
+      "class": "separator normalisation of thousands grouping",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "parse_weight('1,234') -> 1.234 (R2 expects 1234.0; base returns 1234.0). parse_weight('1,234.5') -> ParseError (R2 expects 1234.5; base returns 1234.5). The comma is replaced by '.' before any grouping check, so '1,234.5' becomes '1.234.5'.",
+      "evidence": {
+        "code_parse_weight('1,234')": 1.234,
+        "base_parse_weight('1,234')": 1234.0,
+        "code_parse_weight('1,234.5')": "ParseError: weight: not a number: '1,234.5'",
+        "base_parse_weight('1,234.5')": 1234.5
+      }
+    },
+    {
+      "id": "D2",
+      "file": "code/report.py",
+      "line": 69,
+      "class": "inclusive range off-by-one",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "reporting_window_days([{produced_on: 2026-03-01}, {produced_on: 2026-03-03}]) -> 2 (R4 expects 3: both end days are in the window). Trace: reporting_window_days takes min and max produced_on, then days_in_range returns (end - start).days without adding the start day. days_in_range(d, d) returns 0 where R4 expects 1.",
+      "evidence": {
+        "reporting_window_days(2026-03-01..2026-03-03)": 2,
+        "expected": 3,
+        "days_in_range(d, d)": 0,
+        "expected_same_day": 1
+      }
+    },
+    {
+      "id": "D3",
+      "file": "code/sequences.py",
+      "line": 43,
+      "class": "fixed-width identifier collision",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "The suffix is masked to 8 bits, so sequence number 256 yields suffix 00 again. importer.py import_batches calls sequences.next_batch_id(produced_on) once per valid row (importer.py line 57); a file with 257 valid rows dated 2026-03-04 issues BT-20260304-00 twice (calls 1 and 257). R5 expects BT-20260304-100 for number 256 and R6 requires uniqueness up to 4096 per day.",
+      "evidence": {
+        "calls_issued": 257,
+        "distinct_ids": 256,
+        "call_1": "BT-20260304-00",
+        "call_257": "BT-20260304-00",
+        "call_256": "BT-20260304-FF",
+        "expected_call_257": "BT-20260304-100"
+      }
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/parsing.py",
+      "line": 52,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Decimal(text) on stripped text with InvalidOperation caught and mapped to ParseError; '1.25' gives Decimal('1.25'), 'abc' raises ParseError, and the quantize call is exact for two places."
+    },
+    {
+      "file": "code/ranges.py",
+      "line": 34,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Same (end - start).days API as D2, with +1 for the start day. 2026-03-01..2026-03-03 gives 3 and 2026-03-01..2026-03-01 gives 1, as R7 requires."
+    },
+    {
+      "file": "code/parsing.py",
+      "line": 45,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Reached only after _DIGITS.fullmatch(raw) succeeds, so int() receives digits only; '007' gives 7 and '' is rejected earlier by _require_text."
+    },
+    {
+      "file": "code/ranges.py",
+      "line": 41,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Python modulo is non-negative for a positive divisor: index 6 with offset 1 gives 0, index 0 with offset -1 gives 6, both as Monday=0 requires."
+    },
+    {
+      "file": "code/importer.py",
+      "line": 23,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line. open() has no encoding argument, so the platform default codec is used (cp1252 on Windows). A UTF-8 export with non-ASCII sample_id values is decoded wrongly, and a UTF-8 BOM makes the first header '\ufeffsample_id', which raises ImportRejected. Real flaw, outside the change, so diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/parsing.py",
+      "line": 35,
+      "description": "parse_weight('1,2345') returns 1.2345 where R2 requires ParseError (base raised). Confirmed by independent audit."
+    }
+  ]
+}

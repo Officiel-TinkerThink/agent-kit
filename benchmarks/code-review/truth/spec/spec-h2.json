@@ -1,0 +1,78 @@
+{
+  "axis": "spec",
+  "case": "spec-h2",
+  "difficulty": "hard",
+  "sources": [
+    "Offset pagination: 1-based page to offset mapping (off-by-one on page index)",
+    "Keyset/stable ordering: ORDER BY with unique tie-breaker column for deterministic paging",
+    "Server-side page size clamp applied at every public entry point"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/paging.py",
+      "line": 54,
+      "class": "off-by-one paging offset",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "page_offset(1, 25) returns 25, so page 1 skips the first 25 rows; page 2 returns rows 51-75 and rows 26-50 are never returned. Expected offset is (page - 1) * size (R2)."
+    },
+    {
+      "id": "D2",
+      "file": "code/api.py",
+      "line": 64,
+      "class": "page size clamp bypass",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "export_all(conn, 'u1', 1, 500, start, end) passes size=500 unclamped to repo.fetch_page (repo does no clamp), so up to 500 rows are returned in one call, violating R1 (never above 100). list_records clamps, export_all does not."
+    },
+    {
+      "id": "D3",
+      "file": "code/repo.py",
+      "line": 31,
+      "class": "unstable ordering, missing tie-breaker",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Three records share created_at T. With size=2: page 1 may return A,B and page 2 may return B,C (or A,C), so rows repeat or are skipped across pages. ORDER BY must include id DESC (R3)."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/paging.py",
+      "line": 26,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Caps every size above 100 at 100; sizes below 1 and None are handled before this line, so this is the correct clamp (R1)."
+    },
+    {
+      "file": "code/repo.py",
+      "line": 10,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Half-open window with bound parameters, matching R4. Parameters are the UTC-normalised datetimes from api._utc."
+    },
+    {
+      "file": "code/repo.py",
+      "line": 40,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The count query has no LIMIT on purpose. R5 requires the total of matching rows, not of the page, so ignoring paging is correct here."
+    },
+    {
+      "file": "code/api.py",
+      "line": 25,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Rejects naive datetimes before conversion, which is the rule in R4; aware datetimes are converted to UTC by astimezone."
+    },
+    {
+      "file": "code/api.py",
+      "line": 20,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line in this change (exists in base/api.py). Whitespace-only user_id passes the presence check and is stored as an empty string in the audit entry, a real weakness on an untouched line; it is outside the seeded change and a diff-mode reviewer must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/api.py",
+      "line": 58,
+      "note": "export_all never applies the default page size, size None reaches page * size"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "axis": "spec",
+  "case": "spec-h5",
+  "difficulty": "hard",
+  "sources": [
+    "21 CFR Part 11 section 11.10(e): secure, computer-generated, time-stamped audit trail recording creation, modification and deletion with operator, date/time and old and new values (concept)",
+    "ALCOA+ attributable, contemporaneous and enduring principles for GxP records (concept)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/record_store.py",
+      "line": 65,
+      "class": "aliased old value (audit captures post-change state)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 65 `previous = record.payload` binds a reference, not a copy; line 66 `record.payload.update(changes)` then mutates the same dict, so the audit old_value equals the new value and the prior value is lost (R1, R3). Input: create('batch_step', {'dose_mg': 5}, 'alice') then update('REC-00001', {'dose_mg': 7}, 'alice') -> audit update entry old_value={'dose_mg': 7}, new_value={'dose_mg': 7}; expected old_value={'dose_mg': 5}. Evidence: run output `D1 old_value = {'dose_mg': 7} new_value = {'dose_mg': 7}`."
+    },
+    {
+      "id": "D2",
+      "file": "code/audit.py",
+      "line": 47,
+      "class": "client-supplied timestamp used as audit server time",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 47 `when = (client_context or {}).get(\"timestamp\") or self._clock()` takes the client's timestamp string as server_time whenever it is present (R6). Input: update('REC-00001', {'dose_mg': 7}, 'alice', client_context={'timestamp': '1999-12-31T23:59:59Z'}) -> entry.server_time == '1999-12-31T23:59:59Z' (type str); expected the server clock value. Evidence: run output `D2 server_time = '1999-12-31T23:59:59Z' type = str`."
+    },
+    {
+      "id": "D3",
+      "file": "code/api.py",
+      "line": 74,
+      "class": "delete path bypasses audit",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "delete_record (def line 74) calls self._store.purge(record_id) (record_store.py:99), which removes the record without any audit call; the audited store.delete() is never reached, and the handler returns 204 (R1). Input: create REC-00001 via create_record, then delete_record('REC-00001', 'bob') -> (204, {}), record removed, audit entries for REC-00001 remain only ['create']; audit length 1 before and after. Evidence: run output `D3 status = 204 record present = False audit before/after = 1 1 delete entries = ['create']`."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/record_store.py",
+      "line": 43,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Line 43 `old_value=None,` in create() uses the same audit call pattern as update(). A creation has no prior value, so old_value=None is correct; new_value=record.snapshot() holds the created payload. Run output `S1 create old_value = None new_value = {'ph': 7}`."
+    },
+    {
+      "file": "code/record_store.py",
+      "line": 50,
+      "kind": "safe-looking",
+      "why_not_a_defect": "get() returns the record with no audit write, as R5 allows for reads. Run output `S2 get audit delta = 0`."
+    },
+    {
+      "file": "code/signatures.py",
+      "line": 35,
+      "kind": "safe-looking",
+      "why_not_a_defect": "sign_approval() records the stated meaning both in new_value and in the meaning field (R4). Run output `S3 meaning = approved new_value = {'meaning': 'approved', 'comment': 'ok'}`."
+    },
+    {
+      "file": "code/models.py",
+      "line": 37,
+      "kind": "safe-looking",
+      "why_not_a_defect": "snapshot() returns dict(self.payload), a detached copy. It is the correct form of the pattern that D1 gets wrong. Run output `S4 snapshot detached: payload ph = 7 snapshot ph = 9`."
+    },
+    {
+      "file": "code/audit.py",
+      "line": 17,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_server_clock() returns datetime.now(timezone.utc), the host UTC clock, which is the server time R6 requires when no clock is injected. Run output `S5 server_time from clock = True` with an injected clock."
+    },
+    {
+      "file": "code/record_store.py",
+      "line": 99,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (purge() is identical in base and code). purge() deletes a regulated record without an audit entry, which violates R1. Diff-mode reviewers must not report it; it is not part of D3. Evidence: run output `P1 purge audit delta = 0`."
+    },
+    {
+      "file": "code/signatures.py",
+      "line": 39,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (sign_review() is identical in base and code). The signature entry has no meaning (meaning None; new_value has reviewed_by and comment only), violating R4. Evidence: run output `P2 meaning = None new_value = {'reviewed_by': 'carol', 'comment': None}`."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/record_store.py",
+      "line": 38,
+      "description": "create stores the record before audit.record(); empty actor raises ValueError but the record stays stored with no audit entry (R1). Audit-confirmed."
+    },
+    {
+      "file": "code/record_store.py",
+      "line": 66,
+      "description": "update mutates payload and bumps version before audit.record(); empty actor leaves the change unaudited (R1, R3). Audit-confirmed."
+    }
+  ]
+}

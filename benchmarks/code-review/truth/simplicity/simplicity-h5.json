@@ -1,0 +1,90 @@
+{
+  "axis": "simplicity",
+  "case": "simplicity-h5",
+  "difficulty": "hard",
+  "sources": [
+    "Exponential backoff and jitter, AWS Architecture Blog: https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/",
+    "Python dataclasses: https://docs.python.org/3/library/dataclasses.html",
+    "Python enum: https://docs.python.org/3/library/enum.html"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/retry.py",
+      "line": 76,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Removing the check (with max_attempts=2 and Random(1)) adds a sleep after the final failed attempt: sleeps change from [0.4866] to [0.4866, 0.8305], so the caller waits a full backoff before RetriesExhausted surfaces. R1 forbids any sleep after the last attempt."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 56,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Replacing the jittered return with the bare capped value makes attempt-3 delay exactly 2.0 s for every client (computed: seeds 11/12/13 give 1.8190/1.8102/1.8964 with jitter, 2.0000 without), so concurrent clients retry in lockstep. R1 requires jitter."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 79,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Re-raising last_error directly changes the outcome: 4 failing attempts give TransientError('503') instead of RetriesExhausted('gave up after 4 attempts: 503') with attempts=4, so callers lose the attempt count and the type they catch. R2 requires RetriesExhausted."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 42,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Removing the guard lets RetryPolicy(max_attempts=0) construct; retry_call then raises RetriesExhausted('gave up after 0 attempts: None') with zero operation calls, instead of ValueError at construction. R3 requires the ValueError."
+    },
+    {
+      "file": "code/state.py",
+      "line": 28,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The explicit empty entry makes RELEASED terminal. Removing it makes can_transition and transition raise KeyError for a released lot (computed), instead of returning False and raising InvalidTransition. R4 requires both results."
+    },
+    {
+      "file": "code/state.py",
+      "line": 72,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Replacing the copy with self.items aliases the list: after a transition and items.append('S2'), history[0].items_snapshot changes from ['S1'] to ['S1', 'S2'] (computed). R5 requires the stored entry to stay unchanged."
+    },
+    {
+      "file": "code/validate.py",
+      "line": 23,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The identity test keeps an explicit 0. Replacing it with submitted-or-default maps an explicit 0 to 50 (computed: effective_quantity(0, 50) returns 0 here, 'submitted or 50' returns 50), which breaks R6 for an empty container. None and 7 give the same result in both forms."
+    },
+    {
+      "file": "code/validate.py",
+      "line": 25,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Removing the bool test lets True through as one unit: effective_quantity(True, 5) returns True instead of raising ValidationError('quantity must be an integer'). R6 rejects boolean values."
+    },
+    {
+      "file": "code/validate.py",
+      "line": 49,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Sample codes follow R8 (lower case, no hyphens) and lot codes follow R7 (upper-cased first). A merged normaliser that lower-cases input and applies this pattern accepts 'ABCDEFGH' as 'abcdefgh' (computed: True), which R8 rejects. The dedicated check rejects it (computed)."
+    },
+    {
+      "file": "code/copy_utils.py",
+      "line": 19,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line: copy_utils.py is not in change.diff, so a diff-mode reviewer must not report it. Real flaw outside spec.md: chunk([1, 2, 3], -2) returns [] and silently drops all items (computed). A list-comprehension rewrite keeps the same range call, so the flaw is not something simplification would change."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/retry.py",
+      "line": 76,
+      "description": "last-attempt break can be an if attempt < max: sleep (identical over 221 probes)."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 68,
+      "description": "rng or random.Random() minor (identical)."
+    },
+    {
+      "file": "code/state.py",
+      "line": 36,
+      "description": "allowed_next one-line wrapper with one caller (identical; public API caveat)."
+    }
+  ]
+}

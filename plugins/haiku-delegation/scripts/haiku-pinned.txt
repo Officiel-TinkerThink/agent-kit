@@ -12,3 +12,10 @@ browser-operator
 verification-runner
 changelog-summarizer
 annotator
+spec-reviewer
+design-reviewer
+security-reviewer
+guidance-reviewer
+history-reviewer
+simplicity-reviewer
+finding-validator

@@ -1,0 +1,168 @@
+--- a/export.py
++++ b/export.py
+@@ -2,24 +2,54 @@
+ 
+ import csv
+ import logging
+-from typing import TextIO
++from typing import Optional, TextIO
+ 
+ from models import CSV_HEADER, count_by_status
++from paginator import DEFAULT_PAGE_SIZE, page_count, validate_page_size
+ from repo import SampleRepository
++from sorting import SORT_KEYS, sort_samples
+ 
+ 
+ logger = logging.getLogger("lab.export")
+ 
+ 
+-def export_csv(repo: SampleRepository, out: TextIO) -> int:
+-    """Write the header and every sample as CSV; return the number of rows written."""
++def export_csv(
++    repo: SampleRepository,
++    out: TextIO,
++    page_size: int = DEFAULT_PAGE_SIZE,
++    sort_by: Optional[str] = None,
++) -> int:
++    """Write the header and every sample as CSV; return the number of sample rows written.
++
++    Without sort_by the repository listing order is kept and rows are read in
++    windows of page_size. With sort_by the full set is read and sorted first.
++    Invalid arguments raise ValueError before anything is written.
++    """
++    validate_page_size(page_size)
++    if sort_by is not None and sort_by not in SORT_KEYS:
++        raise ValueError(f"unknown sort_by {sort_by!r}")
++    total = repo.count()
++    logger.info("export started: %d samples, %d pages", total, page_count(total, page_size))
+     writer = csv.writer(out)
+     writer.writerow(CSV_HEADER)
+-    samples = repo.list_all()
+-    for sample in samples:
+-        writer.writerow(sample.as_row())
+-    logger.info("exported %d samples", len(samples))
+-    return len(samples)
++    if sort_by is not None:
++        samples = sort_samples(repo.list_all(), by=sort_by)
++        for sample in samples:
++            writer.writerow(sample.as_row())
++        logger.info("exported %d samples sorted by %s", len(samples), sort_by)
++        return len(samples)
++    written = 0
++    offset = 0
++    while True:
++        page = repo.list_page(offset, page_size)
++        if len(page) < page_size:
++            break
++        for sample in page:
++            writer.writerow(sample.as_row())
++            written += 1
++        offset += page_size
++    logger.info("exported %d samples in windows", written)
++    return written
+ 
+ 
+ def export_to_path(repo: SampleRepository, path: str) -> int:
+--- a/paginator.py
++++ b/paginator.py
+@@ -1,12 +1,18 @@
+ """Pagination helpers for listing samples in fixed-size windows."""
+ 
+ import logging
++from typing import Callable, Iterator, List, Optional, Tuple
++
++from models import Sample
+ 
+ 
+ logger = logging.getLogger("lab.paginator")
+ 
+ DEFAULT_PAGE_SIZE = 100
+ MAX_PAGE_SIZE = 1000
++
++Cursor = Optional[Tuple]
++FetchAfter = Callable[[Cursor, int], List[Sample]]
+ 
+ 
+ def validate_page_size(page_size: int) -> int:
+@@ -22,3 +28,36 @@
+     """Return a short label for the window that starts at offset."""
+     validate_page_size(page_size)
+     return f"rows {offset + 1}-{offset + page_size}"
++
++
++def page_count(total: int, page_size: int) -> int:
++    """Return how many pages hold total rows; zero rows need zero pages."""
++    validate_page_size(page_size)
++    if total < 0:
++        raise ValueError("total must not be negative")
++    return -(-total // page_size)
++
++
++class KeysetPaginator:
++    """Walks samples in (created_at, sample_id) order from the last key seen.
++
++    fetch_after(cursor, limit) returns up to limit samples whose key is greater
++    than cursor, or the first samples in order when cursor is None.
++    """
++
++    def __init__(self, fetch_after: FetchAfter, page_size: int) -> None:
++        self._fetch_after = fetch_after
++        self._page_size = validate_page_size(page_size)
++
++    def pages(self) -> Iterator[List[Sample]]:
++        """Yield pages until fetch_after returns an empty page."""
++        cursor: Cursor = None
++        while True:
++            page = self._fetch_after(cursor, self._page_size)
++            if not page:
++                logger.info("keyset walk finished")
++                return
++            yield page
++            last = page[-1]
++            cursor = (last.created_at, last.sample_id)
++            logger.info("keyset cursor advanced to %s", last.sample_id)
+--- a/sorting.py
++++ b/sorting.py
+@@ -1,9 +1,12 @@
+ """Ordering helpers for sample listings and exports."""
+ 
+ from functools import cmp_to_key
+-from typing import Iterable, List
++from typing import Iterable, List, Optional
+ 
+ from models import VALID_STATUSES, Sample
++
++
++SORT_KEYS = ("collected", "score")
+ 
+ 
+ def sort_by_collected(samples: Iterable[Sample]) -> List[Sample]:
+@@ -31,3 +34,28 @@
+     """Return True when samples are already in collected order."""
+     keys = [(s.created_at, s.sample_id) for s in samples]
+     return all(a <= b for a, b in zip(keys, keys[1:]))
++
++
++def _compare_score(a: Sample, b: Sample) -> int:
++    """Return a negative, zero or positive value for ascending score order."""
++    return int(a.score - b.score)
++
++
++def sort_by_score(samples: Iterable[Sample]) -> List[Sample]:
++    """Return samples ordered by ascending assay score."""
++    return sorted(samples, key=cmp_to_key(_compare_score))
++
++
++def lowest_score(samples: Iterable[Sample]) -> Optional[Sample]:
++    """Return the sample with the lowest assay score, or None when there are no samples."""
++    ordered = sort_by_score(samples)
++    return ordered[0] if ordered else None
++
++
++def sort_samples(samples: Iterable[Sample], by: str) -> List[Sample]:
++    """Dispatch to the ordering named by `by`; unknown names raise ValueError."""
++    if by == "collected":
++        return sort_by_collected(samples)
++    if by == "score":
++        return sort_by_score(samples)
++    raise ValueError(f"unknown sort key {by!r}; expected one of {SORT_KEYS}")

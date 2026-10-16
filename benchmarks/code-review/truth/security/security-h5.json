@@ -1,0 +1,79 @@
+{
+  "axis": "security",
+  "case": "security-h5",
+  "difficulty": "hard",
+  "sources": [
+    "CWE-180 Incorrect Validation Before Canonicalization (validation applied before Unicode NFKC normalisation)",
+    "CWE-20 Improper Input Validation (parser differential between two URL parsers on one input)",
+    "CWE-306 Missing Authentication for Critical Function (route registered without the protection marker)",
+    "Unicode UAX #15 Normalization Forms (NFKC compatibility mapping)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/names.py",
+      "line": 43,
+      "class": "validation before canonicalisation",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "validate_profile_name checks BANNED_NAME_CHARS on the raw input (line 43) and applies NFKC only afterwards (canonical assignment at line 45). A compatibility character that NFKC maps to a banned character passes the check. Computed: validate_profile_name('lab\\uFF0Fadmin') returns 'lab/admin' (U+FF0F FULLWIDTH SOLIDUS maps to '/'); the banned '/' ends up in the stored name, and create_profile returns 201 with name 'lab/admin'. The same input is rejected by normalise_for_lookup (line 25), which canonicalises first: 'name contains a reserved character'."
+    },
+    {
+      "id": "D2",
+      "file": "code/fetcher.py",
+      "line": 59,
+      "class": "URL parser differential (allow-list check and request target use different parsers)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "import_profile_from_url validates the scheme and hostname with urllib.parse.urlparse (_check_scheme_and_host, line 29), but sends the request to the host produced by _split_target (line 59), which ends the authority at '/', '?', '#' and also at a backslash. For a URL shaped as https://<outside-host><backslash>@<allow-listed-host>/path, urlparse reports hostname <allow-listed-host> (check passes) while _split_target returns <outside-host>. Computed with reserved example.test names: check passes; _split_target returns ('other.example.test', '\\\\@profiles.lab.example.test/export.csv'); transport called with host 'other.example.test'. Ordinary allow-listed URLs give the same host from both parsers (decoy fetch_snapshot)."
+    },
+    {
+      "id": "D3",
+      "file": "code/routes.py",
+      "line": 53,
+      "class": "missing authentication on route",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "export_profiles is added to ROUTES without the @require_auth marker (the def line 53 is where the marker is missing). auth.dispatch enforces check_session only when is_protected(handler) is True (auth.py dispatch), so the handler runs without a session token. Computed: dispatch(ROUTES, 'export_profiles', request with no session header) returns status 200 with body {'names': [...]} listing every stored profile name, while dispatch(ROUTES, 'get_profile', same request) returns 401. Spec R5 requires every route in ROUTES to require a valid session token. Reading auth.py is needed to see that enforcement depends only on the marker."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/names.py",
+      "line": 25,
+      "kind": "safe-looking",
+      "why_not_a_defect": "normalise_for_lookup applies NFKC (in _canonical) before the BANNED_NAME_CHARS check, so the check runs on the canonical form. Computed: normalise_for_lookup('lab\\uFF0Fadmin') raises ProfileNameError 'name contains a reserved character'. Same banned-character test, correct order."
+    },
+    {
+      "file": "code/fetcher.py",
+      "line": 29,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_check_scheme_and_host and fetch_snapshot both use urlparse for the check and for the request target (parts.hostname), so both see the same host. Computed: fetch_snapshot('https://profiles.lab.example.test/export.csv') sends the transport host 'profiles.lab.example.test'. Uses the same urlparse hostname check as D2, done consistently."
+    },
+    {
+      "file": "code/routes.py",
+      "line": 15,
+      "kind": "safe-looking",
+      "why_not_a_defect": "get_profile carries @require_auth, so dispatch applies check_session. Computed: dispatch(ROUTES, 'get_profile') without a token returns 401; with the configured token it reaches the handler (404 for an unknown key)."
+    },
+    {
+      "file": "code/auth.py",
+      "line": 32,
+      "kind": "safe-looking",
+      "why_not_a_defect": "check_session fails closed when the service token is unset (if not expected raises AuthError), so an empty configured token cannot accept an empty presented header. Matches spec R6."
+    },
+    {
+      "file": "code/auth.py",
+      "line": 36,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line in base and code: the presented session token is compared with != instead of a constant-time comparison. Real weakness under the general secure-comparison practice, but the line is not added or changed by the change, so a diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/routes.py",
+      "line": 49,
+      "description": "CWE-117 log injection: profile name with control characters is accepted and logged (low, audit-confirmed)."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+--- a/code/patient_intake.py
++++ b/code/patient_intake.py
+@@ -34,9 +34,6 @@
+         validate_headers(headers)
+         payload = parse_payload(raw_payload)
+         patient_id = payload["patient"].get("id")
+-        if patient_id is None:
+-            logger.warning("intake lookup without patient id, request=%s", headers["x-request-id"])
+-            raise IntakeError("patient id is required")
+         started = time.monotonic()
+         record = self._repo.find_by_id(patient_id)
+         elapsed_ms = (time.monotonic() - started) * 1000

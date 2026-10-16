@@ -1,0 +1,138 @@
+--- a/ledger.py
++++ b/ledger.py
+@@ -46,15 +46,40 @@
+     return StockLevel(*row)
+ 
+ 
+-def adjust_on_hand(conn, sku, warehouse, delta):
++def lock_level(conn, sku, warehouse):
+     cur = conn.cursor()
+     cur.execute(
+-        "UPDATE stock_levels SET on_hand = on_hand + ? "
+-        "WHERE sku = ? AND warehouse = ? AND on_hand + ? >= 0",
+-        (delta, sku, warehouse, delta),
++        "SELECT sku, warehouse, on_hand, reserved FROM stock_levels "
++        "WHERE sku = ? AND warehouse = ? FOR UPDATE",
++        (sku, warehouse),
++    )
++    row = cur.fetchone()
++    if row is None:
++        raise LedgerError(f"no stock row for {sku}@{warehouse}")
++    return StockLevel(*row)
++
++
++def adjust_on_hand(conn, sku, warehouse, delta):
++    level = load_level(conn, sku, warehouse)
++    new_on_hand = level.on_hand + delta
++    if new_on_hand < 0:
++        raise LedgerError(f"on_hand would go negative for {sku}@{warehouse}")
++    cur = conn.cursor()
++    cur.execute(
++        "UPDATE stock_levels SET on_hand = ? WHERE sku = ? AND warehouse = ?",
++        (new_on_hand, sku, warehouse),
++    )
++    conn.commit()
++    return new_on_hand
++
++
++def release_reserved(conn, sku, warehouse, qty):
++    cur = conn.cursor()
++    cur.execute(
++        "UPDATE stock_levels SET reserved = reserved - ? WHERE sku = ? AND warehouse = ?",
++        (qty, sku, warehouse),
+     )
+     if cur.rowcount != 1:
+         conn.rollback()
+-        raise LedgerError(f"on_hand adjustment rejected for {sku}@{warehouse}")
++        raise LedgerError(f"no stock row for {sku}@{warehouse}")
+     conn.commit()
+-    return load_level(conn, sku, warehouse).on_hand
+--- a/lockmgr.py
++++ b/lockmgr.py
+@@ -11,10 +11,14 @@
+ 
+ 
+ class Lease:
+-    def __init__(self, sku, owner, expires_at):
++    def __init__(self, sku, owner, expires_at, token):
+         self.sku = sku
+         self.owner = owner
+         self.expires_at = expires_at
++        self.token = token
++
++    def is_valid(self, now):
++        return now < self.expires_at
+ 
+ 
+ class LeaseManager:
+@@ -41,8 +45,13 @@
+             if cur.rowcount == 0:
+                 self._conn.rollback()
+                 raise LeaseUnavailable(f"lease held for {sku}")
++        cur.execute(
++            "INSERT INTO sku_lease_log (sku, owner, granted_at) VALUES (?, ?, ?)",
++            (sku, owner, now),
++        )
++        token = cur.lastrowid
+         self._conn.commit()
+-        return Lease(sku, owner, expires_at)
++        return Lease(sku, owner, expires_at, token)
+ 
+     def release(self, lease):
+         cur = self._conn.cursor()
+--- a/reserve.py
++++ b/reserve.py
+@@ -1,4 +1,6 @@
+-"""Order reservations against available stock."""
++"""Order reservations against available stock, with carrier holds."""
++
++from ledger import load_level
+ 
+ 
+ class ReservationError(Exception):
+@@ -8,19 +10,36 @@
+ def reserve_stock(conn, order_id, sku, warehouse, qty):
+     if qty <= 0:
+         raise ReservationError("quantity must be positive")
++    level = load_level(conn, sku, warehouse)
++    if level.available < qty:
++        raise ReservationError(f"insufficient stock for {sku}@{warehouse}")
+     cur = conn.cursor()
+-    cur.execute(
+-        "UPDATE stock_levels SET reserved = reserved + ? "
+-        "WHERE sku = ? AND warehouse = ? AND on_hand - reserved >= ?",
+-        (qty, sku, warehouse, qty),
+-    )
+-    if cur.rowcount != 1:
+-        conn.rollback()
+-        raise ReservationError(f"insufficient stock for {sku}@{warehouse}")
+     cur.execute(
+         "INSERT INTO reservations (order_id, sku, warehouse, qty, hold_ref) "
+         "VALUES (?, ?, ?, ?, NULL)",
+         (order_id, sku, warehouse, qty),
+     )
++    reservation_id = cur.lastrowid
++    cur.execute(
++        "UPDATE stock_levels SET reserved = reserved + ? WHERE sku = ? AND warehouse = ?",
++        (qty, sku, warehouse),
++    )
+     conn.commit()
+-    return cur.lastrowid
++    return reservation_id
++
++
++def attach_carrier_hold(conn, leases, order_id, sku, qty, confirm_hold):
++    if qty <= 0:
++        raise ReservationError("quantity must be positive")
++    lease = leases.acquire(sku)
++    try:
++        hold_ref = confirm_hold(sku, qty)
++        cur = conn.cursor()
++        cur.execute(
++            "UPDATE reservations SET hold_ref = ? WHERE order_id = ? AND sku = ?",
++            (hold_ref, order_id, sku),
++        )
++        conn.commit()
++        return hold_ref
++    finally:
++        leases.release(lease)

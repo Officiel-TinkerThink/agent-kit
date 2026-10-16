@@ -1,0 +1,101 @@
+--- a/names.py
++++ b/names.py
+@@ -36,6 +36,19 @@
+     return " ".join(name.split())
+ 
+ 
++def validate_profile_name(name: str) -> str:
++    """Validate a new profile name and return its canonical form."""
++    if not isinstance(name, str):
++        raise ProfileNameError("name must be a string")
++    if any(ch in BANNED_NAME_CHARS for ch in name):
++        raise ProfileNameError("name contains a reserved character")
++    canonical = unicodedata.normalize("NFKC", name).strip()
++    if not canonical or len(canonical) > MAX_NAME_LENGTH:
++        raise ProfileNameError("name length out of range")
++    log.info("validated profile name of length %d", len(canonical))
++    return canonical
++
++
+ def is_reserved(name: str) -> bool:
+     """Return True when the name cannot be used as a profile key."""
+     try:
+--- a/fetcher.py
++++ b/fetcher.py
+@@ -50,3 +50,27 @@
+     if len(body) > MAX_IMPORT_BYTES:
+         raise FetchError("snapshot exceeds size limit")
+     return body
++
++
++def _split_target(url: str):
++    """Split an https URL into the (host, path) pair sent to the transport."""
++    rest = url[len("https://"):]
++    cut = len(rest)
++    for sep in "/?#\\":
++        idx = rest.find(sep)
++        if 0 <= idx < cut:
++            cut = idx
++    authority, path = rest[:cut], rest[cut:] or "/"
++    host = authority.rsplit("@", 1)[-1].split(":", 1)[0].lower()
++    return host, path
++
++
++def import_profile_from_url(url: str) -> bytes:
++    """Fetch a profile export from an allow-listed https URL."""
++    _check_scheme_and_host(url)
++    host, path = _split_target(url)
++    log.info("importing profile export from %s", host)
++    body = _transport_get(host, path, IMPORT_TIMEOUT_SECONDS, MAX_IMPORT_BYTES)
++    if len(body) > MAX_IMPORT_BYTES:
++        raise FetchError("export exceeds size limit")
++    return body
+--- a/routes.py
++++ b/routes.py
+@@ -4,7 +4,7 @@
+ 
+ from auth import require_auth
+ from config import PAGE_SIZE_DEFAULT, page_size
+-from names import ProfileNameError, normalise_for_lookup
++from names import ProfileNameError, display_name, normalise_for_lookup, validate_profile_name
+ 
+ log = logging.getLogger("profiles.routes")
+ 
+@@ -31,6 +31,30 @@
+     limit = page_size(int(request.params.get("limit", PAGE_SIZE_DEFAULT)))
+     keys = sorted(PROFILE_INDEX)[:limit]
+     return {"status": 200, "body": [PROFILE_INDEX[k] for k in keys]}
++
++
++@require_auth
++def create_profile(request):
++    """Create a profile from the submitted name and return the stored record."""
++    try:
++        canonical = validate_profile_name(request.params.get("name", ""))
++    except ProfileNameError as exc:
++        log.info("create rejected: %s", exc)
++        return {"status": 400, "body": {"error": str(exc)}}
++    key = canonical.casefold()
++    if key in PROFILE_INDEX:
++        return {"status": 409, "body": {"error": "already exists"}}
++    record = {"name": display_name(canonical), "key": key}
++    PROFILE_INDEX[key] = record
++    log.info("profile created: %s", key)
++    return {"status": 201, "body": record}
++
++
++def export_profiles(request):
++    """Return every stored profile name for the audit export job."""
++    names = [record["name"] for record in PROFILE_INDEX.values()]
++    log.info("export of %d profile names", len(names))
++    return {"status": 200, "body": {"names": names}}
+ 
+ 
+ @require_auth
+@@ -62,4 +86,6 @@
+     "list_profiles": list_profiles,
+     "count_profiles": count_profiles,
+     "delete_profile": delete_profile,
++    "create_profile": create_profile,
++    "export_profiles": export_profiles,
+ }

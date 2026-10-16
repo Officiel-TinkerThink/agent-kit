@@ -1,0 +1,56 @@
+--- a/intake.py
++++ b/intake.py
+@@ -24,6 +24,13 @@
+     flags: list = field(default_factory=list)
+ 
+ 
++def _check_batch_id(batch_id):
++    if batch_id is None:
++        raise IntakeError("batch_id required")
++    if len(batch_id) > MAX_BATCH_ID_LEN:
++        raise IntakeError("batch_id too long")
++
++
+ def _check_quantity(quantity):
+     if not isinstance(quantity, int) or quantity <= 0:
+         raise IntakeError("quantity must be a positive integer")
+@@ -32,12 +39,9 @@
+ def receive_sample(batch_id, source, quantity, operator):
+     if source not in VALID_SOURCES:
+         raise IntakeError(f"unknown source: {source}")
+-    if batch_id is None:
+-        raise IntakeError("batch_id required")
+-    if len(batch_id) > MAX_BATCH_ID_LEN:
+-        raise IntakeError("batch_id too long")
+     _check_quantity(quantity)
+     if source == "manual":
++        _check_batch_id(batch_id)
+         flags = []
+     else:
+         flags = ["IMPORTED"]
+@@ -55,10 +59,7 @@
+ 
+ def register_manifest_row(row):
+     batch_id = row.get("batch_id")
+-    if batch_id is None:
+-        raise IntakeError("batch_id required")
+-    if len(batch_id) > MAX_BATCH_ID_LEN:
+-        raise IntakeError("batch_id too long")
++    _check_batch_id(batch_id)
+     quantity = row.get("quantity")
+     _check_quantity(quantity)
+     record = SampleRecord(
+--- a/release.py
++++ b/release.py
+@@ -34,9 +34,8 @@
+         raise ReleaseError(f"lot {lot_id} status {lot['status']} is not releasable")
+     if not operator:
+         raise ReleaseError("operator is required")
+-    if not comment:
+-        log.warning("LOT_RELEASE_NO_COMMENT lot=%s operator=%s", lot_id, operator)
+-    entry = _append_release_entry(store, lot_id, operator, comment)
++    entry_comment = (comment or "").strip() or "(none)"
++    entry = _append_release_entry(store, lot_id, operator, entry_comment)
+     store.set_status(lot_id, "RELEASED")
+     log.info("lot released lot=%s operator=%s", lot_id, operator)
+     return entry

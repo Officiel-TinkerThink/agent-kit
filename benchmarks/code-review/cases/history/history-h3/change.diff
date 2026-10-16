@@ -1,0 +1,28 @@
+--- a/intake/sample_intake.py
++++ b/intake/sample_intake.py
+@@ -36,7 +36,13 @@
+ 
+ 
+ def accept_sample(batch, record):
+-    """Append one sample to the batch after the lot and capacity checks."""
++    """Append one sample to the batch through the staging check."""
++    stage_sample(batch, record)
++    return batch
++
++
++def stage_sample(batch, record):
++    """Lot and capacity checks, then append; the only path into batch samples."""
+     require_lot(record)
+     if len(batch["samples"]) >= MAX_SAMPLES_PER_BATCH:
+         raise IntakeError("batch sample cap reached")
+--- a/intake/limits.py
++++ b/intake/limits.py
+@@ -5,7 +5,7 @@
+ commit message.
+ """
+ 
+-MAX_SAMPLES_PER_BATCH = 200
++MAX_SAMPLES_PER_BATCH = 500
+ MAX_ROWS_PER_IMPORT = 5000
+ IMPORT_CHUNK_SIZE = 250
+ MAX_LOT_ID_LENGTH = 32

@@ -1,0 +1,169 @@
+--- a/schedule.py
++++ b/schedule.py
+@@ -2,13 +2,14 @@
+ 
+ import logging
+ from dataclasses import dataclass, field
+-from datetime import datetime, timedelta
++from datetime import datetime, timedelta, timezone
+ from zoneinfo import ZoneInfo
+ 
+ logger = logging.getLogger("lab.schedule")
+ 
+ DEFAULT_ZONE = ZoneInfo("America/New_York")
+ RUN_HOUR = 2
++RUN_INTERVAL_HOURS = 24
+ 
+ 
+ @dataclass
+@@ -19,6 +20,36 @@
+     handler: object
+     last_run_utc: datetime | None = None
+     next_run_utc: datetime | None = None
++
++
++def first_run_after(now_utc, zone=DEFAULT_ZONE):
++    """Return the first RUN_HOUR local run strictly after now_utc, as aware UTC."""
++    if now_utc.tzinfo is None:
++        raise ValueError("now_utc must be timezone-aware")
++    local_now = now_utc.astimezone(zone)
++    candidate = local_now.replace(hour=RUN_HOUR, minute=0, second=0, microsecond=0)
++    if candidate <= local_now:
++        candidate = candidate + timedelta(days=1)
++    logger.info("first run after %s is %s", now_utc.isoformat(), candidate.isoformat())
++    return candidate.astimezone(timezone.utc)
++
++
++def next_daily_run(last_run_utc, zone=DEFAULT_ZONE):
++    """Return the aware UTC instant of the run that follows last_run_utc."""
++    if last_run_utc.tzinfo is None:
++        raise ValueError("last_run_utc must be timezone-aware")
++    candidate = last_run_utc + timedelta(hours=RUN_INTERVAL_HOURS)
++    logger.info(
++        "next run after %s is %s local",
++        last_run_utc.isoformat(),
++        candidate.astimezone(zone).isoformat(),
++    )
++    return candidate
++
++
++def seconds_until(run_utc, now_utc):
++    """Return the seconds from now_utc until run_utc; negative when overdue."""
++    return (run_utc - now_utc).total_seconds()
+ 
+ 
+ @dataclass
+@@ -52,6 +83,6 @@
+         """Record a completed run and schedule the following one."""
+         job = self.jobs[job_name]
+         job.last_run_utc = run_utc
+-        job.next_run_utc = run_utc + timedelta(days=1)
++        job.next_run_utc = next_daily_run(run_utc, self.zone)
+         logger.info("job %s ran at %s", job_name, run_utc.isoformat())
+         return job.next_run_utc
+--- a/expiry.py
++++ b/expiry.py
+@@ -2,7 +2,9 @@
+ 
+ import logging
+ from dataclasses import dataclass
+-from datetime import date
++from datetime import date, datetime, timedelta
++
++from windows import is_expired
+ 
+ logger = logging.getLogger("lab.expiry")
+ 
+@@ -14,7 +16,7 @@
+     lot_id: str
+     expiry_date: date
+     open_life_days: int | None = None
+-    opened_at_utc: object = None
++    opened_at_utc: datetime | None = None
+ 
+ 
+ def validate_lot(lot):
+@@ -32,3 +34,32 @@
+     days = (lot.expiry_date - today).days
+     logger.info("lot %s has %d day(s) to expiry", lot.lot_id, days)
+     return days
++
++
++def is_calendar_usable(lot, today):
++    """Return True while today is on or before the lot expiry date."""
++    usable = today < lot.expiry_date
++    logger.info("calendar check %s today=%s usable=%s", lot.lot_id, today, usable)
++    return usable
++
++
++def opened_life_over(lot, clock):
++    """Return True when an opened lot has passed its open-life limit."""
++    if lot.opened_at_utc is None or lot.open_life_days is None:
++        return False
++    lifetime = timedelta(days=lot.open_life_days)
++    return is_expired(lot.opened_at_utc, clock.now(), lifetime)
++
++
++def usable(lot, clock):
++    """Return True when the lot may be issued to a batch record today."""
++    validate_lot(lot)
++    if not is_calendar_usable(lot, clock.today()):
++        return False
++    return not opened_life_over(lot, clock)
++
++
++def lot_summary(lot):
++    """Return a short human-readable summary of the lot for audit entries."""
++    opened = lot.opened_at_utc.isoformat() if lot.opened_at_utc else "not opened"
++    return f"{lot.lot_id} expiry={lot.expiry_date.isoformat()} opened={opened}"
+--- a/notify.py
++++ b/notify.py
+@@ -1,8 +1,13 @@
+ """Notifications for reagent lot expiry and the daily stock digest."""
+ 
+ import logging
++from datetime import timedelta
++
++from expiry import days_to_expiry, usable
+ 
+ logger = logging.getLogger("lab.notify")
++
++GRACE_DAYS = 30
+ 
+ 
+ def format_notice(lot, days_left):
+@@ -10,6 +15,23 @@
+     if days_left < 0:
+         return f"Lot {lot.lot_id} expired {-days_left} day(s) ago"
+     return f"Lot {lot.lot_id} expires in {days_left} day(s)"
++
++
++def expiring_within(lots, today, grace_days=GRACE_DAYS):
++    """Return lots whose expiry date falls from today through today plus grace_days."""
++    horizon = today + timedelta(days=grace_days)
++    return [lot for lot in lots if today <= lot.expiry_date <= horizon]
++
++
++def build_digest(lots, clock):
++    """Return notice texts for lots still usable and expiring within the grace period."""
++    today = clock.today()
++    notices = []
++    for lot in expiring_within(lots, today):
++        if usable(lot, clock):
++            notices.append(format_notice(lot, days_to_expiry(lot, today)))
++    logger.info("digest built with %d notice(s)", len(notices))
++    return notices
+ 
+ 
+ class NoticeSender:
+@@ -33,3 +55,10 @@
+     def send_all(self, texts):
+         """Send each notice and return the number delivered."""
+         return sum(1 for text in texts if self.send(text))
++
++
++def summarize_digest(notices):
++    """Return a single-line summary of the digest for the operator console."""
++    if not notices:
++        return "no lots require attention"
++    return f"{len(notices)} lot(s) require attention"

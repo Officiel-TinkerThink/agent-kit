@@ -1,0 +1,80 @@
+{
+  "axis": "security",
+  "case": "sec-h1",
+  "difficulty": "hard",
+  "sources": [
+    "CWE-22 Path Traversal: https://cwe.mitre.org/data/definitions/22.html",
+    "CWE-918 Server-Side Request Forgery: https://cwe.mitre.org/data/definitions/918.html",
+    "OWASP Server Side Request Forgery Prevention Cheat Sheet: https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html",
+    "Zip Slip (archive extraction path traversal), concept",
+    "Path-prefix check without separator (CWE-22 family), concept"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/files.py",
+      "line": 19,
+      "class": "path prefix check without separator (CWE-22)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "requested name whose realpath is /srv/lab/uploads-private/coa.pdf -> resolved.startswith('/srv/lab/uploads') is True -> check passes -> read_document returns the sibling directory's file; spec R1 requires the separator-bounded root."
+    },
+    {
+      "id": "D2",
+      "file": "code/archive.py",
+      "line": 42,
+      "class": "zip slip: archive member path not confined to dest (CWE-22)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "dest=/srv/lab/staging/batch-42 and a member whose filename resolves to /srv/lab/config/app.ini -> os.path.join returns a path outside dest -> file is written outside the staging directory and the archive is accepted; spec R2 requires rejection. extractall (base) rejected such members."
+    },
+    {
+      "id": "D3",
+      "file": "code/fetch.py",
+      "line": 24,
+      "class": "SSRF via redirect following after host allowlist check (CWE-918)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "url on allowlisted results.partner-labs.org answers with a redirect to http://10.20.0.5/... -> host check ran only on the original URL -> requests.get follows the redirect by default -> internal response body is returned by fetch_document; spec R3 is violated. Base passed allow_redirects=False."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/files.py",
+      "line": 39,
+      "kind": "safe-looking",
+      "why_not_a_defect": "commonpath of two realpaths equals base_real only when the resolved path is under base_real, so the sibling-prefix case is refused; correct confinement."
+    },
+    {
+      "file": "code/archive.py",
+      "line": 19,
+      "kind": "safe-looking",
+      "why_not_a_defect": "yaml.safe_load builds only plain types; no object construction from the manifest."
+    },
+    {
+      "file": "code/fetch.py",
+      "line": 40,
+      "kind": "safe-looking",
+      "why_not_a_defect": "argv list with shell=False; the path is always joined under /srv/lab/staging so it cannot begin with an option marker; no shell parses the name."
+    },
+    {
+      "file": "code/fetch.py",
+      "line": 51,
+      "kind": "safe-looking",
+      "why_not_a_defect": "md5 is used only as a cache key with usedforsecurity=False; no security property depends on it."
+    },
+    {
+      "file": "code/fetch.py",
+      "line": 34,
+      "kind": "preexisting",
+      "why_not_a_defect": "real non-constant-time comparison of a secret, but the line is unchanged by this change (present in base); diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/archive.py",
+      "line": 46,
+      "note": "no decompressed size limit (CWE-770)"
+    }
+  ]
+}

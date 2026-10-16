@@ -1,0 +1,96 @@
+{
+  "axis": "bug",
+  "case": "bug-h2",
+  "difficulty": "hard",
+  "sources": [
+    "https://docs.python.org/3/library/datetime.html (aware and naive datetimes cannot be compared or subtracted; TypeError)",
+    "https://docs.python.org/3/library/zoneinfo.html (IANA zones; DST offsets)",
+    "https://peps.python.org/pep-0495/ (local time disambiguation: nonexistent and repeated wall times)",
+    "Pattern: fixed 24h UTC step used for a daily local-time schedule drifts across DST transitions",
+    "Pattern: fail-open exception handling in an expiry check (exception treated as not expired)",
+    "Pattern: inclusive expiry boundary (usable through the expiry date) written as a strict comparison"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/schedule.py",
+      "line": 41,
+      "class": "dst-fixed-interval-drift",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "next_daily_run adds a fixed 24 h to the aware UTC instant, so the local run time drifts after a DST change and is never reset to RUN_HOUR. Input last_run_utc=2026-03-08T07:00Z (02:00 EST that day) gives next run 2026-03-09T07:00Z = 2026-03-09 03:00 EDT; spec R1 requires 02:00 EDT (06:00Z). Because mark_ran stores this value, the job keeps running at 03:00 local until 2026-10-31. Fall-back input last_run_utc=2026-10-31T06:00Z (02:00 EDT) gives 2026-11-01T06:00Z = 2026-11-01 01:00 EST; spec requires 02:00 EST (07:00Z). Correction from audit: last_run 2026-03-08T07:00Z gives 2026-03-09T07:00Z = 03:00 EDT (spec 02:00 EDT = 06:00Z); last_run 2026-10-31T06:00Z gives 2026-11-01T06:00Z = 01:00 EST (spec 02:00 EST = 07:00Z).",
+      "evidence": {
+        "computed": [
+          "next_daily_run(2026-03-08T07:00Z) -> 2026-03-09T07:00:00+00:00 = 2026-03-09T03:00:00-04:00",
+          "expected 2026-03-09T02:00:00-04:00 (06:00Z)",
+          "next_daily_run(2026-10-31T06:00Z) -> 2026-11-01T06:00:00+00:00 = 2026-11-01T01:00:00-05:00",
+          "expected 2026-11-01T02:00:00-05:00 (07:00Z)"
+        ]
+      }
+    },
+    {
+      "id": "D2",
+      "file": "code/windows.py",
+      "line": 45,
+      "class": "exception-swallowed-fail-open",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Trace: lot = ReagentLot(R-7741, expiry 2026-12-31, open_life_days=7, opened_at_utc=2026-10-01T12:00Z); clock = SystemClock contract, now() naive 2026-10-15 09:00 (code/clock.py line 18 returns datetime.now() without tzinfo). usable(lot, clock) (code/expiry.py) -> is_calendar_usable True -> opened_life_over -> windows.is_expired(aware stamp, naive now) evaluates now > stamp + lifetime, which raises TypeError; the except branch at line 45 returns False, so the lot is treated as not over its open life and usable returns True. Expected False (open life ended 2026-10-08). Spec R6 requires a check that cannot be evaluated to fail closed. The same lot with an aware now 2026-10-15T09:00Z returns False, so the outcome depends only on the clock type.",
+      "evidence": {
+        "computed": [
+          "usable(lot, naive clock) -> True",
+          "usable(lot, aware clock 2026-10-15T09:00Z) -> False",
+          "raw comparison now > stamp + 7 days with naive now raises TypeError (can't compare offset-naive and offset-aware datetimes)"
+        ]
+      }
+    },
+    {
+      "id": "D3",
+      "file": "code/expiry.py",
+      "line": 41,
+      "class": "inclusive-boundary-off-by-one",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "is_calendar_usable uses today < lot.expiry_date, so the lot is rejected on its expiry day. Input lot expiry_date=2026-10-15, today=2026-10-15 returns False; spec R3 requires True (usable through the expiry date inclusive). Consequence through build_digest: a lot expiring today is dropped from the digest and gets no notice. The day before (2026-10-14) returns True.",
+      "evidence": {
+        "computed": [
+          "is_calendar_usable(expiry 2026-10-15, today 2026-10-15) -> False (expected True)",
+          "is_calendar_usable(expiry 2026-10-15, today 2026-10-14) -> True",
+          "build_digest([lot expiring 2026-10-15], clock 2026-10-15) -> [] (expected one notice)"
+        ]
+      }
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/windows.py",
+      "line": 32,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Half-open interval test with aware UTC bounds: contains(end) is False and contains(start) is True, as the docstring [start_utc, end_utc) requires. Correct for aware-aware comparison."
+    },
+    {
+      "file": "code/schedule.py",
+      "line": 52,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Aware-to-aware subtraction, the same API as the naive/aware trap. Both arguments are aware UTC here. seconds_until(2026-10-16T06:00Z, 2026-10-15T06:00Z) = 86400.0, which is correct."
+    },
+    {
+      "file": "code/notify.py",
+      "line": 23,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Inclusive range on both ends with dates, which is the intended window. For today 2026-10-15 and grace 30 days, lots expiring 2026-10-15 and 2026-11-14 are kept and 2026-11-15 is excluded. Correct."
+    },
+    {
+      "file": "code/schedule.py",
+      "line": 31,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Same-zone aware comparison and replace() with a wall-clock day step in first_run_after. Computed: now 2026-10-15T10:00Z gives 2026-10-16 02:00 EDT; now 2026-03-08T06:30Z gives 2026-03-08 03:00 EDT, the first instant after the nonexistent 02:00, which spec R1 allows. Correct."
+    },
+    {
+      "file": "code/windows.py",
+      "line": 54,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (merge_windows is not in the change). It writes the merged end into the caller's MaintenanceWindow object: with w1 = 09:00-10:00 and w2 = 09:30-11:00, merge_windows([w1, w2]) leaves w1.end_utc = 11:00 (computed). Not part of the change; a diff-mode review must not report it. Not covered by the spec."
+    }
+  ]
+}

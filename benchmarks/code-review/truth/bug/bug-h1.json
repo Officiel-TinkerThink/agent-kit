@@ -1,0 +1,83 @@
+{
+  "axis": "bug",
+  "case": "bug-h1",
+  "difficulty": "hard",
+  "sources": [
+    "https://docs.python.org/3/library/functions.html#round",
+    "https://docs.python.org/3/library/decimal.html",
+    "https://docs.python.org/3/tutorial/floatingpoint.html"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/dosing.py",
+      "line": 43,
+      "class": "built-in round() on binary float instead of half-up rounding",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 43 `dose = round(raw, 2)` with raw = 2.5 * 0.05 = 0.125 (exact in binary). Python round() uses round-half-to-even, so unit_dose_mg(2.5, 0.05) returns 0.12. Intent requires half-up to 0.01 mg, which gives 0.13 (rounding.to_half_up(0.125, 2) = 0.13). Computed: unit_dose_mg(2.5, 0.05) = 0.12, half-up = 0.13."
+    },
+    {
+      "id": "D2",
+      "file": "code/units.py",
+      "line": 52,
+      "class": "int() truncation of a binary float product",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 52 `mcg = int(mg * MCG_PER_MG)`. For mg = 1.001, the float product is 1000.9999999999999, and int() truncates it to 1000. Intent requires exact conversion (1.001 mg = 1001 mcg). Computed: mg_to_mcg(1.001) = 1000, expected 1001. Reached from labels.label_lines via mg_to_mcg(strength_mg_per_unit) with strength 1.001 mg, so the printed strength is 1000 mcg."
+    },
+    {
+      "id": "D3",
+      "file": "code/labels.py",
+      "line": 30,
+      "class": "label total derived from rounded unit dose, not from the unrounded doses reported by the API",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Line 30 `total = round(unit_dose_mg_value * count, 2)` multiplies the already rounded unit dose. Input weight_kg = 0.84, mg_per_kg = 0.15, count = 7: raw unit dose = 0.126, dosing.unit_dose_mg returns 0.13, label_total_mg(0.13, 7) = 0.91. api.batch_summary reports api_total_mg = to_half_up(0.126 * 7, 2) = 0.88 (unrounded sum 0.882). Difference 0.03 mg exceeds the 0.01 mg tolerance in the intent. api.reconcile(0.91, 0.88) returns False. Detection requires reading api.py."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/rounding.py",
+      "line": 34,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Decimal(str(value)).quantize(quantum, rounding=ROUND_HALF_UP) rounds half away from zero on the decimal string. to_half_up(0.125, 2) = 0.13 and to_half_up(2.675, 2) = 2.68, both as intended. It uses the same round-to-places operation as the defect but correctly."
+    },
+    {
+      "file": "code/rounding.py",
+      "line": 42,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Compares abs(first - second) rounded to 9 places against the tolerance, avoiding exact float equality. within_tolerance(0.91, 0.90) = True (difference 0.01 is within 0.01); within_tolerance(0.91, 0.88) = False. Correct under the 0.01 mg intent."
+    },
+    {
+      "file": "code/units.py",
+      "line": 27,
+      "kind": "safe-looking",
+      "why_not_a_defect": "mcg_to_mg divides Decimal(str(mcg)) by Decimal(1000), which is exact for any finite decimal input. mcg_to_mg(1500) = 1.5 exactly. It is an exact unit conversion using the same int-based constant as the defect but with decimal arithmetic."
+    },
+    {
+      "file": "code/api.py",
+      "line": 49,
+      "kind": "safe-looking",
+      "why_not_a_defect": "round() is applied to an int count produced by parse_request (int(payload['count'])). For integers round() returns the same value, so tablet_count_label(7) = '7 tablets' with no rounding error."
+    },
+    {
+      "file": "code/rounding.py",
+      "line": 47,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line. '%.1f mg' keeps one decimal, so display_mg(0.88) = '0.9 mg' and loses the 0.01 mg precision the intent requires for on-screen totals (api.summary_line uses it). This is a real flaw but lies in code the change did not touch, so it must not be reported in diff mode."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/dosing.py",
+      "line": 41,
+      "description": "NaN passes validation (nan < 0 is False): unit_dose_mg(70.0, nan) returns nan; label prints nan. Confirmed by independent audit."
+    },
+    {
+      "file": "code/rounding.py",
+      "line": 54,
+      "description": "Same missing finiteness check on the rounding path (NaN accepted). Confirmed by independent audit."
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "axis": "simplicity",
+  "case": "simplicity-h2",
+  "difficulty": "hard",
+  "sources": [
+    "Fowler, Refactoring: Replace Subclass with Function / Inline Class (concept)",
+    "Fowler, Refactoring: Remove Parameter (concept)",
+    "Fowler, Refactoring: Remove Middle Man (concept)",
+    "YAGNI principle (concept)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/exporter.py",
+      "line": 68,
+      "class": "over-abstraction: abstract base, factory and registry for one implementation",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "BatchExporter (ABC) has exactly one subclass, CsvBatchExporter (line 81), registered once at line 130 and built only through factory.build in cli.py. No second exporter exists in code/. The added indirection (ABC + Registry + build) has no behaviour beyond calling write_csv_rows.",
+      "simpler_form": "Delete BatchExporter, CsvBatchExporter and the EXPORTERS registration (lines 68-90 and 130). cli.py calls write_csv_rows(batches, out, include_header=True) directly and drops the factory and EXPORTERS imports. Module-level function is the single implementation.",
+      "evidence": "Check script: for 305 batch sets (empty, 1, 2, 5, 50 records, and 300 random sets with commas, quotes, newlines, mixed status case, yields 97.125 / 97.135 / string '98.456') CsvBatchExporter().export(b, s, include_header=True) and write_csv_rows(b, s, True) produced identical text and identical return counts. EXPORTERS.get('csv') is CsvBatchExporter, so the registry resolves to the same single class."
+    },
+    {
+      "id": "D2",
+      "file": "code/exporter.py",
+      "line": 88,
+      "class": "unused parameter: flag that every caller fixes to True",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "include_header on CsvBatchExporter.export is the only call-site-visible variation point for the header, and its only caller in the tree, cli.py:85, passes include_header=True. No caller passes False, and no other module calls export. The parameter never takes another value.",
+      "simpler_form": "Remove the include_header parameter from BatchExporter.export (abstract, line 72) and CsvBatchExporter.export (line 88); always write the header, i.e. call write_csv_rows(batches, stream) with the header on. Remove include_header=True at cli.py:85. (Combine with D1 if the registry is also removed.)",
+      "evidence": "Check script: export_no_flag(b, s) = write_csv_rows(b, s, True) and CsvBatchExporter().export(b, s, include_header=True) produced identical text and counts for all 305 batch sets. cli.py csv run (4 records) wrote header 'batch_id,product_code,yield_pct,status,released_on' and 5 physical lines, the same as the stream path. grep of include_header in code/ shows exactly one caller argument, True."
+    },
+    {
+      "id": "D3",
+      "file": "code/exporter.py",
+      "line": 108,
+      "class": "pass-through wrapper used in two places",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "_emit_csv receives batches, stream and include_header and returns write_csv_rows(batches, stream, include_header) with no validation, conversion, logging or error handling. It is called from CsvBatchExporter.export (line 90) and export_csv_file (line 115).",
+      "simpler_form": "Delete _emit_csv (lines 108-109). Replace line 90 with return write_csv_rows(batches, stream, include_header) and line 115 with return write_csv_rows(batches, handle, True).",
+      "evidence": "Check script: _emit_csv(b, s, True) and write_csv_rows(b, s, True) produced identical text and counts for all 305 batch sets. export_csv_file(b, path) file content equal to write_csv_rows output for 20 batch sets."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/factory.py",
+      "line": 14,
+      "kind": "safe-looking",
+      "why_not_a_defect": "RecordSink is an abstract base with two real implementations in the same file: FileSink (line 26, holds a file handle, close() closes it) and MemorySink (keeps a list, close() is a no-op). The behaviour differs, so the abstraction is used correctly and removing it would require duplicating the write path."
+    },
+    {
+      "file": "code/config.py",
+      "line": 22,
+      "kind": "safe-looking",
+      "why_not_a_defect": "ExportSettings carries five distinct values, each used in cli.py: output_dir (output_path), max_rows (row_limit), timezone (ZoneInfo), encoding (open of the output file), file_prefix (output_path). A frozen dataclass with validation is the right carrier; none of the fields is constant or unused."
+    },
+    {
+      "file": "code/cli.py",
+      "line": 54,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The explicit 'requested is None' test is needed because --limit 0 is a legal request (spec R8) that must export zero rows. Rewriting as 'requested or settings.max_rows' would return max_rows for 0. Check: row_limit(settings with max_rows=10, 0) == 0 and row_limit(..., None) == 10."
+    },
+    {
+      "file": "code/exporter.py",
+      "line": 118,
+      "kind": "safe-looking",
+      "why_not_a_defect": "export_csv_checked is not a pure forward: it materializes the iterable, rejects any record missing a COLUMNS key with a ValueError naming the fields, and logs the validated count before writing. Removing it changes behaviour for incomplete records. Check: a record with only batch_id raises ValueError listing product_code, yield_pct, status, released_on; a complete list output equals write_csv_rows output."
+    },
+    {
+      "file": "code/registry.py",
+      "line": 54,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line outside the change diff (find() exists in base/registry.py identically). The membership test followed by a return of None is equivalent to self._items.get(key), so the branch is needless, but it is pre-existing code outside this change. A diff-mode review must not report it. Check: find('xml') returns None before and after."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/exporter.py",
+      "line": 112,
+      "description": "export_csv_file has no caller in code/ (unused; audit-confirmed)."
+    },
+    {
+      "file": "code/exporter.py",
+      "line": 118,
+      "description": "export_csv_checked has no caller in code/ (unused; audit-confirmed)."
+    },
+    {
+      "file": "code/exporter.py",
+      "line": 96,
+      "description": "write_csv_rows include_header flag always True for every caller (same redundancy as D2 one level down)."
+    }
+  ]
+}

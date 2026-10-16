@@ -1,0 +1,127 @@
+--- a/exporter.py
++++ b/exporter.py
+@@ -2,12 +2,17 @@
+ 
+ from __future__ import annotations
+ 
++import csv
+ import json
+ import logging
++from abc import ABC, abstractmethod
+ from typing import Any, Dict, Iterable, Mapping, TextIO
++
++from registry import Registry
+ 
+ LOGGER = logging.getLogger("labops.exporter")
+ 
++COLUMNS = ("batch_id", "product_code", "yield_pct", "status", "released_on")
+ JSON_INDENT = 2
+ YIELD_PRECISION = 2
+ RELEASABLE_STATUSES = frozenset({"RELEASED", "CONDITIONAL"})
+@@ -58,3 +63,68 @@
+     stream.write("\n")
+     LOGGER.info("wrote %d JSON records", len(rows))
+     return len(rows)
++
++
++class BatchExporter(ABC):
++    """Writes batch records to a text stream in one output format."""
++
++    @abstractmethod
++    def export(
++        self,
++        batches: Iterable[Mapping[str, Any]],
++        stream: TextIO,
++        include_header: bool = True,
++    ) -> int:
++        """Write the batches and return the number of data rows written."""
++
++
++class CsvBatchExporter(BatchExporter):
++    """Writes batch records as comma separated rows."""
++
++    def export(
++        self,
++        batches: Iterable[Mapping[str, Any]],
++        stream: TextIO,
++        include_header: bool = True,
++    ) -> int:
++        return _emit_csv(batches, stream, include_header)
++
++
++def write_csv_rows(
++    batches: Iterable[Mapping[str, Any]],
++    stream: TextIO,
++    include_header: bool = True,
++) -> int:
++    """Serialize the batches with the csv module and return the row count."""
++    rows = [flatten_batch(batch) for batch in batches]
++    writer = csv.DictWriter(stream, fieldnames=COLUMNS, lineterminator="\n")
++    if include_header:
++        writer.writeheader()
++    writer.writerows(rows)
++    LOGGER.info("wrote %d CSV records", len(rows))
++    return len(rows)
++
++
++def _emit_csv(batches: Iterable[Mapping[str, Any]], stream: TextIO, include_header: bool) -> int:
++    return write_csv_rows(batches, stream, include_header)
++
++
++def export_csv_file(batches: Iterable[Mapping[str, Any]], path: str, encoding: str = "utf-8") -> int:
++    """Write the batches to path as CSV with a header row."""
++    with open(path, "w", encoding=encoding, newline="") as handle:
++        return _emit_csv(batches, handle, True)
++
++
++def export_csv_checked(batches: Iterable[Mapping[str, Any]], stream: TextIO) -> int:
++    """Validate required fields for every record, then write CSV with a header row."""
++    materialized = list(batches)
++    for index, batch in enumerate(materialized):
++        missing = [key for key in COLUMNS if key not in batch]
++        if missing:
++            raise ValueError(f"record {index} is missing fields: {', '.join(missing)}")
++    LOGGER.info("validated %d records for CSV export", len(materialized))
++    return write_csv_rows(materialized, stream, True)
++
++
++EXPORTERS = Registry("exporter")
++EXPORTERS.register("csv", CsvBatchExporter)
+--- a/cli.py
++++ b/cli.py
+@@ -13,11 +13,13 @@
+ 
+ from config import ExportSettings, SettingsError, load_settings
+ from exporter import (
++    EXPORTERS,
+     average_yield,
+     export_batches_json,
+     is_releasable,
+     summarize_statuses,
+ )
++from factory import build
+ 
+ LOGGER = logging.getLogger("labops.cli")
+ 
+@@ -33,7 +35,7 @@
+         description="Export released batch records.",
+     )
+     parser.add_argument("--input", required=True, help="JSON file with an array of batch records")
+-    parser.add_argument("--format", choices=["json"], default="json")
++    parser.add_argument("--format", choices=["json", "csv"], default="json")
+     parser.add_argument("--limit", type=int, default=None, help="maximum rows to export")
+     return parser.parse_args(argv)
+ 
+@@ -78,7 +80,11 @@
+     now = datetime.now(ZoneInfo(settings.timezone))
+     path = output_path(settings, args.format, now)
+     with open(path, "w", encoding=settings.encoding, newline="") as out:
+-        count = export_batches_json(batches, out)
++        if args.format == "csv":
++            exporter = build("csv", EXPORTERS)
++            count = exporter.export(batches, out, include_header=True)
++        else:
++            count = export_batches_json(batches, out)
+ 
+     releasable = sum(1 for batch in batches if is_releasable(batch))
+     LOGGER.info("status counts %s", summarize_statuses(batches))

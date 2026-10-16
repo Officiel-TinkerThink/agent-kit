@@ -1,0 +1,39 @@
+{
+  "axis": "design",
+  "case": "design-02",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/exporter.py",
+      "line": 37,
+      "kind": "temporal-coupling",
+      "description": "export_csv depends on load() having been called first. If it is called before load() (or on a fresh instance), self._rows is None, the expression falls back to an empty list, and an empty CSV is returned without error. A zero-row report is then filed as a valid zero-balance batch."
+    },
+    {
+      "id": "D2",
+      "file": "code/exporter.py",
+      "line": 18,
+      "kind": "leaky-abstraction",
+      "description": "connection() exposes the raw sqlite3 connection. Callers can run arbitrary SQL against the ledger table, bypass load() and its batch filter, and couple themselves to the schema; a schema or database change breaks every such caller."
+    },
+    {
+      "id": "D3",
+      "file": "code/exporter.py",
+      "line": 42,
+      "kind": "tight-coupling",
+      "description": "The SMTP host and port are hard-coded inside notify(). The method cannot be pointed at another relay per environment or replaced by a test double, so tests send real mail and a relay change requires a code edit and redeploy."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/exporter.py",
+      "line": 11,
+      "why_not_a_defect": "Explicit default locale 'en' in the constructor gives every instance a defined formatting state; set_locale() is optional by design and the default is documented behaviour."
+    },
+    {
+      "file": "code/exporter.py",
+      "line": 29,
+      "why_not_a_defect": "Decimal conversion before formatting is the correct way to render monetary amounts with fixed two decimals; it is a single formatting step, not duplicated logic."
+    }
+  ]
+}

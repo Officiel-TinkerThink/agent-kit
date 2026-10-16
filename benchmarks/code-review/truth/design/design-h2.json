@@ -1,0 +1,83 @@
+{
+  "axis": "design",
+  "case": "design-h2",
+  "difficulty": "hard",
+  "sources": [
+    "check-then-act race on a shared counter (CWE-367, time-of-check to time-of-use)",
+    "lost update from read-modify-write on a row (Kleppmann, Designing Data-Intensive Applications, ch. 7)",
+    "fencing tokens for leases (Kleppmann, How to do distributed locking, https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/reserve.py",
+      "line": 14,
+      "class": "check-then-act race (no lock, no conditional update)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "reserve_stock reads available via load_level and compares level.available < qty at line 14, then INSERTs the reservation and runs UPDATE reserved = reserved + qty as separate statements with no row lock, no conditional UPDATE and no unique constraint. Failing input: stock row SKU-1001/WH-JKT has on_hand=10, reserved=6 (available 4). Two concurrent orders O-1 and O-2 each request qty=4; both read available=4, both pass the check at line 14, both commit. Final reserved=14 against on_hand=10 (available -4), violating R1. The base version guarded this with a single UPDATE ... WHERE on_hand - reserved >= ? and a rowcount check."
+    },
+    {
+      "id": "D2",
+      "file": "code/ledger.py",
+      "line": 69,
+      "class": "lost update (read-modify-write with absolute value)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "adjust_on_hand reads the row through load_level, computes new_on_hand = level.on_hand + delta, and writes the absolute value back with UPDATE stock_levels SET on_hand = ? at line 69. Failing input: on_hand=10. Transaction T1 adjust_on_hand(sku, wh, +5) and transaction T2 adjust_on_hand(sku, wh, -3) both read 10 before either writes. T1 writes 15, T2 writes 7. Final on_hand=7, expected 12, violating R2. The base version used UPDATE ... SET on_hand = on_hand + ? with a guard in the WHERE clause."
+    },
+    {
+      "id": "D3",
+      "file": "code/reserve.py",
+      "line": 39,
+      "class": "lease holder writes without fencing or validity check",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "attach_carrier_hold acquires a SKU lease (LeaseManager.acquire, TTL 30 s from lockmgr.py) and then calls the slow confirm_hold. The write UPDATE reservations SET hold_ref = ? at line 39 runs without checking lease.is_valid(now) and without comparing lease.token, although lockmgr.py now issues the token and Lease.is_valid exists. Failing input: A acquires the lease at t=0 (token 41), confirm_hold takes 45 s. At t=31 the lease has expired, B acquires it (token 42), confirms hold H-B and writes at t=33. At t=45 A returns and writes H-A at line 39, overwriting B's hold_ref. The reservation references H-A while carrier hold H-B is orphaned, violating R3."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/ledger.py",
+      "line": 53,
+      "kind": "safe-looking",
+      "why_not_a_defect": "lock_level reads the row with SELECT ... FOR UPDATE inside the caller's transaction, which blocks concurrent writers until commit. It is a correct row-lock read."
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 13,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_WAREHOUSE_INDEX is a module-level dict filled once at import time by the loop and never mutated afterwards, so there is no shared mutable state written at runtime."
+    },
+    {
+      "file": "code/lockmgr.py",
+      "line": 37,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The conditional UPDATE takes over a lease only when expires_at <= now, in one statement, and the INSERT OR IGNORE path covers a missing row. Two acquirers cannot both obtain an unexpired lease for the same SKU."
+    },
+    {
+      "file": "code/reserve.py",
+      "line": 15,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The insufficient-stock rejection is correct by itself. The race is in the check and write sequence below it (line 14 and the INSERT), not in this raise."
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 33,
+      "kind": "preexisting",
+      "why_not_a_defect": "warehouses_for returns the internal list stored in _WAREHOUSE_INDEX, so a caller can mutate the index. This is a real flaw, but the line is unchanged from base, so a diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/reserve.py",
+      "line": 39,
+      "note": "UPDATE reservations keyed by order and sku matches every reservation of that sku, not only the new one"
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 79,
+      "note": "reserved decrement has no >= guard, reserved can go negative"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "axis": "spec",
+  "case": "spec-h3",
+  "difficulty": "hard",
+  "sources": [
+    "State-machine status guard with retired status codes (concept: transition guard must reject, never alias, retired codes)",
+    "Unit normalization through a factor table keyed by case-folded unit (concept)",
+    "Audit-trail completeness for GxP release records (concept: 21 CFR Part 11 audit trail, one entry per release)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/states.py",
+      "line": 22,
+      "class": "retired status code accepted",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "status_from_code(4) returns BatchStatus.SIGNED because _CODE_TO_STATUS maps retired code 4 (SIGNED_CODE_ALIAS). R1 requires ValueError. With batch status 4, signer != operator, quantity 1 unit mg, release_batch sets RELEASED and returns a record instead of raising ValueError."
+    },
+    {
+      "id": "D2",
+      "file": "code/units.py",
+      "line": 7,
+      "class": "wrong unit conversion factor",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "_FACTORS['ug'] is MG_TO_UG (1000), so to_micrograms(2, 'ug') returns 2000 instead of 2; to_micrograms(2, 'UG') also returns 2000. R3 requires micrograms to equal the given microgram quantity, so release of 2 ug stores 2000."
+    },
+    {
+      "id": "D3",
+      "file": "code/release.py",
+      "line": 27,
+      "class": "zero quantity raises wrong exception type",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "release_batch(batch, signer, 0, 'mg', audit) raises TypeError('quantity must be greater than zero') because 'not quantity' is true for 0. R4 requires ValueError for 0. None still raises TypeError, which is correct."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/release.py",
+      "line": 38,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Idempotent early return: a RELEASED batch released again by the same signer returns the stored record before any status check or audit write, so no second audit entry is written (R5)."
+    },
+    {
+      "file": "code/release.py",
+      "line": 41,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Status guard: only SIGNED passes, so RELEASED batches by another signer and REJECTED batches (R7) raise ReleaseError. The comparison is correct for R2 and R7."
+    },
+    {
+      "file": "code/states.py",
+      "line": 35,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Rejecting bool before the int check is correct: bool is a subclass of int and True would otherwise map to key 1 (DRAFT) silently."
+    },
+    {
+      "file": "code/release.py",
+      "line": 18,
+      "kind": "preexisting",
+      "why_not_a_defect": "Pre-existing, unchanged line in _write_audit: an OSError from the audit trail is logged and swallowed, so a release can complete without its audit entry. This is a real flaw on an unchanged line, outside the change; diff-mode review must not report it."
+    }
+  ]
+}

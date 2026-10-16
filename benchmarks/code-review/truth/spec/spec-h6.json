@@ -1,0 +1,88 @@
+{
+  "axis": "spec",
+  "case": "spec-h6",
+  "difficulty": "hard",
+  "sources": [
+    "https://docs.python.org/3/library/decimal.html",
+    "consistent units at interface boundaries (interface contract practice)",
+    "stable identifiers instead of list positions (data integrity practice)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/dose_calc.py",
+      "line": 71,
+      "class": "inconsistent normalisation between preview and export (R1, R6)",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "display_dose calls normalise_open, which has no order maximum check, while plan_export.export_monitor_units calls normalise_blocked. Input: dose_mg=120, concentration=10, order max 100 mg. Computed: display_dose(120, 10) returns '12.00 mL'; export_monitor_units on the same dose raises DoseLimitError('dose 120 mg above maximum 100 mg'). The operator sees a volume for a dose R6 requires to be rejected, and the preview and export disagree (R1)."
+    },
+    {
+      "id": "D2",
+      "file": "code/api.py",
+      "line": 88,
+      "class": "unit mismatch at interface: mL/h passed to a mL/min parameter (R2)",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "start_infusion_handler passes to_decimal(body['rate_ml_h']) straight into start_infusion(drug_id, rate, volume_ml), which documents and computes flow in mL/min. The sibling restart_infusion_handler converts with / Decimal(60). Input: rate_ml_h=30, volume_ml=15. Computed: start_infusion_handler returns program rate_ml_min '30.000', duration_min '0.50' and summary 'HEP-5K: 15.00 mL over 0.50 min'. Correct: 0.5 mL/min and 30.00 min (restart_infusion_handler with the same input returns rate_ml_min '0.500', duration_min '30.00'). Flow is 60 times too high and runtime 60 times too short, and the limit check passes because 30 is within 0.05-50 mL/min."
+    },
+    {
+      "id": "D3",
+      "file": "code/plan_export.py",
+      "line": 39,
+      "class": "drug identified by list position, library version of plan not checked (R3, R5)",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "_resolve_drug returns library.drugs[plan['drug_index']]. The list order differs between library versions. Input: plan {drug_index: 1, dose_mg: 5, library_version: '1.0'} built against v1 where index 1 is MOR-10 (max 2 mg), exported with library v2 where index 1 is HEP-5K (max 10 mg), concentration 1. Computed: export_monitor_units with v1 library raises DoseLimitError('dose 5 mg above maximum 2 mg'); with v2 library returns 5.00 and export_document returns monitor_units_ml '5.00', library_version '2.0'. The plan is exported silently against a different drug and a higher limit, and no library version check is made on the plan record."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/api.py",
+      "line": 74,
+      "kind": "safe-looking",
+      "why_not_a_defect": "restart_infusion_handler converts the mL/h input to mL/min before calling start_infusion: input rate_ml_h=30, volume_ml=15 gives rate 0.500 mL/min and duration 30.00 min (computed). Same API and parameter as D2, done correctly."
+    },
+    {
+      "file": "code/dose_calc.py",
+      "line": 77,
+      "kind": "safe-looking",
+      "why_not_a_defect": "within_tolerance uses an inclusive comparison with 0.01 as R1 states: within_tolerance(12.00, 12.01) is True and within_tolerance(12.00, 12.02) is False (computed)."
+    },
+    {
+      "file": "code/library.py",
+      "line": 67,
+      "kind": "safe-looking",
+      "why_not_a_defect": "load calls require_version, which raises LibraryVersionError on a mismatch: DrugLibrary('1.0', []).require_version('2.0') raises 'library 1.0 loaded, 2.0 required' (computed). The version check exists and works for the library file; it is not applied to the plan record, which is the D3 issue."
+    },
+    {
+      "file": "code/library.py",
+      "line": 43,
+      "kind": "safe-looking",
+      "why_not_a_defect": "by_id resolves the stable drug_id through a dict, not by list position (R3). by_id('HEP-5K') returns {'drug_id': 'HEP-5K', 'max_dose_mg': 10} for library v2 (computed)."
+    },
+    {
+      "file": "code/library.py",
+      "line": 37,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line in _build_index: a repeated drug_id silently overwrites the earlier record. Computed: DrugLibrary('2.0', [{'drug_id': 'A', 'max_dose_mg': 1}, {'drug_id': 'A', 'max_dose_mg': 9}]).by_id('A') returns max_dose_mg 9 and len(drugs) is 2. Real flaw in code the change did not touch; diff-mode reviewers must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/infusion.py",
+      "line": 29,
+      "description": "program record and pump export carry rate_ml_min; R2 requires mL/h at every interface (audit-confirmed, in diff)."
+    },
+    {
+      "file": "code/api.py",
+      "line": 80,
+      "description": "both handlers store rate_ml_min in the program record (R2)."
+    },
+    {
+      "file": "code/plan_export.py",
+      "line": 70,
+      "description": "export_batch lets IndexError escape for drug_index out of range and accepts negative index (R3, list position); audit-confirmed."
+    }
+  ]
+}

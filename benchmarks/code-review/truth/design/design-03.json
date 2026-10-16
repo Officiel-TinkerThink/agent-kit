@@ -1,0 +1,39 @@
+{
+  "axis": "design",
+  "case": "design-03",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/inventory.py",
+      "line": 17,
+      "kind": "missing-transaction-boundary",
+      "description": "The debit is committed at line 17 before the credit runs. A crash, timeout or exception between line 17 and the credit at line 18/19 leaves the units removed from the source and never added to the destination, with no rollback."
+    },
+    {
+      "id": "D2",
+      "file": "code/inventory.py",
+      "line": 11,
+      "kind": "speculative-generality",
+      "description": "The dry_run and priority parameters are accepted but never read. A caller that passes dry_run=True expects no stock change, but debit, credit and commit still run and the stock moves."
+    },
+    {
+      "id": "D3",
+      "file": "code/inventory.py",
+      "line": 24,
+      "kind": "duplicated-logic",
+      "description": "adjust() repeats the quantity check inline instead of using _validate_qty(), and does not truncate consistently. qty=0.5 passes this check, int(0.5) becomes 0 at apply_delta, no stock changes, yet the audit record at line 30 logs an adjustment of 0.5."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/inventory.py",
+      "line": 6,
+      "why_not_a_defect": "_validate_qty is a small single-purpose helper called from transfer; extracting it is a deliberate single place for the positive-quantity rule."
+    },
+    {
+      "file": "code/inventory.py",
+      "line": 34,
+      "why_not_a_defect": "on_hand is a thin delegation method that exposes the public read API without adding logic; there is no duplicated behaviour."
+    }
+  ]
+}

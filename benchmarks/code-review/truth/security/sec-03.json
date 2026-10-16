@@ -1,0 +1,31 @@
+{
+  "axis": "security",
+  "case": "sec-03",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/results_api.py",
+      "line": 15,
+      "cwe": "CWE-918",
+      "owasp": "A10",
+      "description": "preview_instrument_feed fetches whatever feed_url the caller supplies, with no scheme, host or address allowlist. A caller can point it at internal services such as cloud metadata endpoints or the LIMS database admin port and read the response body back in the JSON result."
+    },
+    {
+      "id": "D2",
+      "file": "code/results_api.py",
+      "line": 22,
+      "cwe": "CWE-532",
+      "owasp": "A09",
+      "description": "amend_result writes the entire request body to the application log, including patient_name and other patient identifiers. Anyone with log access, or a log shipper that forwards to a wider audience, can read patient-identifiable data outside the access controls of the LIMS."
+    },
+    {
+      "id": "D3",
+      "file": "code/results_api.py",
+      "line": 24,
+      "cwe": "CWE-778",
+      "owasp": "A09",
+      "description": "The UPDATE to lab_results changes value, unit and status of a GxP-regulated record but writes no audit entry with old value, new value, user, timestamp and reason. The change is not attributable or traceable, which breaks the 21 CFR Part 11 audit trail requirement."
+    }
+  ],
+  "decoys": []
+}

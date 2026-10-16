@@ -1,0 +1,59 @@
+diff --git a/files.py b/files.py
+--- a/files.py
++++ b/files.py
+@@ -16,7 +16,7 @@
+     """Return the real path of a stored document under BASE, or raise."""
+     candidate = os.path.join(BASE, relative_name)
+     resolved = os.path.realpath(candidate)
+-    if not resolved.startswith(BASE + os.sep):
++    if not resolved.startswith(BASE):
+         logger.warning("document path outside uploads root: %r", relative_name)
+         raise Forbidden("document is outside the uploads root")
+     if not os.path.isfile(resolved):
+diff --git a/archive.py b/archive.py
+--- a/archive.py
++++ b/archive.py
+@@ -31,13 +31,26 @@
+ 
+ 
+ def unpack_batch_archive(archive_path, dest):
+-    """Extract every member of the archive into dest."""
++    """Extract every member of the archive into dest, reporting progress."""
+     os.makedirs(dest, exist_ok=True)
+     with zipfile.ZipFile(archive_path) as archive:
+-        count = validate_member_count(archive)
+-        archive.extractall(dest)
+-    logger.info("unpacked %d members into %s", count, dest)
+-    return count
++        members = archive.infolist()
++        validate_member_count(archive)
++        for index, member in enumerate(members, start=1):
++            if member.is_dir():
++                continue
++            target = os.path.join(dest, member.filename)
++            os.makedirs(os.path.dirname(target), exist_ok=True)
++            with archive.open(member) as source, open(target, "wb") as sink:
++                while True:
++                    chunk = source.read(CHUNK_SIZE)
++                    if not chunk:
++                        break
++                    sink.write(chunk)
++            if index % 50 == 0:
++                logger.info("unpacked %d of %d members", index, len(members))
++    logger.info("unpacked %d members into %s", len(members), dest)
++    return len(members)
+ 
+ 
+ def list_staged_files(dest):
+diff --git a/fetch.py b/fetch.py
+--- a/fetch.py
++++ b/fetch.py
+@@ -21,7 +21,7 @@
+     if host not in ALLOWED_HOSTS:
+         logger.warning("fetch refused for host %r", host)
+         raise PermissionError("host is not on the partner allowlist")
+-    response = requests.get(url, timeout=timeout, allow_redirects=False)
++    response = requests.get(url, timeout=timeout)
+     response.raise_for_status()
+     return response.content
+ 

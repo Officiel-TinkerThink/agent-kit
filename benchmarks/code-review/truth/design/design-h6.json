@@ -1,0 +1,97 @@
+{
+  "axis": "design",
+  "case": "design-h6",
+  "difficulty": "hard",
+  "sources": [
+    "fail-secure default for admission control (quota check must reject when its dependency cannot answer)",
+    "bounded queue with backpressure (queue.Queue maxsize semantics: reject when full)",
+    "at-least-once acknowledgement: acknowledge only after the durable write is confirmed",
+    "calendar-window quotas evaluated in UTC"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/quota.py",
+      "line": 50,
+      "class": "fail-open on dependency error",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "check_quota() catches every Exception from client.used_today() and returns True. Input: quota client raises TimeoutError (or HttpQuotaClient gets HTTP 503), incoming=50 -> check_quota returns True and EventWorker.submit() queues 50 events (depth 50). R2 requires rejection (QuotaExceeded, depth 0). An outage therefore disables the per-site limit.",
+      "evidence": {
+        "check_quota(timeout client, 50)": true,
+        "check_quota(HTTP 503 client, 50)": true,
+        "submit(timeout client, 50 events) queue depth": 50,
+        "expected": "False / QuotaExceeded / depth 0"
+      }
+    },
+    {
+      "id": "D2",
+      "file": "code/events.py",
+      "line": 36,
+      "class": "unbounded queue (missing bound and missing QueueFull path)",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "EventQueue.put() appends with no depth check, and no QueueFull is defined in events.py. settings.py defines no QUEUE_MAX_DEPTH (hasattr is False), so the bound required by R3 (5000) exists nowhere. Input: 10000 put() calls with no consumer -> depth 10000 (R3 expects 5000 accepted, the rest rejected with QueueFull). Memory grows with the backlog without limit.",
+      "evidence": {
+        "depth after 10000 put()": 10000,
+        "settings.QUEUE_MAX_DEPTH present": false,
+        "expected accepted": 5000
+      }
+    },
+    {
+      "id": "D3",
+      "file": "code/worker.py",
+      "line": 58,
+      "class": "swallowed write failure acknowledged as processed",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "run_once() catches the store exception, logs it and falls through to mark_done(batch) and written_total accounting. Input: 3 pending events, store.write_batch raises OSError('disk full') -> run_once returns 3, queue depth 0, in_flight 0, written_total 0. The 3 events are acknowledged and lost; R4 requires restore to pending (depth 3) with the error logged.",
+      "evidence": {
+        "run_once() return": 3,
+        "depth after": 0,
+        "in_flight after": 0,
+        "written_total": 0,
+        "last_error": "disk full",
+        "expected depth": 3
+      }
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/store.py",
+      "line": 25,
+      "kind": "safe-looking",
+      "why_not_a_defect": "is_writable() catches OSError from open() and returns False, so an unwritable store fails closed for the caller. Input: path under a missing directory -> returns False (checked)."
+    },
+    {
+      "file": "code/events.py",
+      "line": 78,
+      "kind": "safe-looking",
+      "why_not_a_defect": "ReplayBuffer uses queue.Queue with maxsize, so the bound is enforced. Input: ReplayBuffer(2) offered 3 events -> [True, True, False] (checked)."
+    },
+    {
+      "file": "code/store.py",
+      "line": 41,
+      "kind": "safe-looking",
+      "why_not_a_defect": "write_batch() logs the OSError and re-raises it, so the failure is not hidden from the caller. Input: unwritable path -> FileNotFoundError propagates (checked)."
+    },
+    {
+      "file": "code/store.py",
+      "line": 21,
+      "kind": "preexisting",
+      "why_not_a_defect": "is_writable opens the store in append mode, which creates an empty store file as a side effect of the probe (verified: exists() False before, True after). Unchanged line, not in change.diff, so a diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/quota.py",
+      "line": 39,
+      "description": "day_key uses local clock (R5 says UTC); reached by the new check_quota path, so newly exposed. Audit-confirmed."
+    },
+    {
+      "file": "code/worker.py",
+      "line": 41,
+      "description": "submit check-then-act without lock; admission ignores already queued events (conditional on quota service semantics)."
+    }
+  ]
+}

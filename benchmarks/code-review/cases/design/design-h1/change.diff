@@ -1,0 +1,165 @@
+--- a/intake.py
++++ b/intake.py
+@@ -1,14 +1,21 @@
+-"""Order intake: validates incoming orders and persists them."""
++"""Order intake: validates incoming orders, persists them and emits order_paid."""
+ 
++import json
+ import logging
++import time
+ import uuid
+ from dataclasses import dataclass, field
+ from decimal import Decimal
++
++from outbox_publisher import RETRYABLE_ERRORS, publish_with_retry
+ 
+ log = logging.getLogger("orders.intake")
+ 
+ ORDER_TABLE = "orders"
+ ORDER_STATUS_NEW = "NEW"
++ORDERS_TOPIC = "orders.events"
++PUBLISH_ATTEMPTS = 3
++PUBLISH_RETRY_SLEEP = 2.0
+ 
+ 
+ class ValidationError(ValueError):
+@@ -40,7 +47,7 @@
+             raise ValidationError(f"invalid quantity or price for sku {line.sku}")
+ 
+ 
+-def accept_order(conn, order):
++def accept_order(conn, order, broker):
+     validate(order)
+     with conn:
+         conn.execute(
+@@ -53,7 +60,24 @@
+                 (order.order_id, line.sku, line.quantity, str(line.unit_price)),
+             )
+     log.info("order accepted order_id=%s customer_id=%s", order.order_id, order.customer_id)
++    _publish_order_paid(broker, order)
+     return order.order_id
++
++
++def _publish_order_paid(broker, order):
++    payload = json.dumps({"type": "order_paid", "order_id": order.order_id,
++                          "customer_id": order.customer_id, "amount": str(order.total())})
++    last_error = None
++    for attempt in range(PUBLISH_ATTEMPTS):
++        try:
++            publish_with_retry(broker, ORDERS_TOPIC, payload)
++            return
++        except RETRYABLE_ERRORS as exc:
++            last_error = exc
++            log.warning("publish attempt failed attempt=%d order_id=%s", attempt + 1, order.order_id)
++            time.sleep(PUBLISH_RETRY_SLEEP)
++    log.error("publish failed order_id=%s", order.order_id)
++    raise last_error
+ 
+ 
+ def fetch_order_status(conn, order_id):
+--- a/outbox_publisher.py
++++ b/outbox_publisher.py
+@@ -1,10 +1,15 @@
+ """Outbox reader and publish helpers for order events."""
+ 
+ import logging
++import random
++import time
+ 
+ log = logging.getLogger("orders.outbox")
+ 
+ DEFAULT_BATCH_SIZE = 100
++RETRYABLE_ERRORS = (ConnectionError, TimeoutError)
++PUBLISH_MAX_ATTEMPTS = 3
++PUBLISH_RETRY_SLEEP = 1.0
+ 
+ 
+ def read_pending(conn, limit=DEFAULT_BATCH_SIZE):
+@@ -33,3 +38,29 @@
+ def pending_count(conn):
+     row = conn.execute("SELECT COUNT(*) FROM outbox WHERE sent_at IS NULL").fetchone()
+     return row[0]
++
++
++def publish_with_retry(broker, topic, payload):
++    for attempt in range(PUBLISH_MAX_ATTEMPTS):
++        try:
++            return broker.publish(topic, payload)
++        except RETRYABLE_ERRORS:
++            if attempt == PUBLISH_MAX_ATTEMPTS - 1:
++                raise
++            time.sleep(PUBLISH_RETRY_SLEEP)
++
++
++def flush_audit_log(sink, records, deadline_seconds=5.0, max_delay=2.0):
++    deadline = time.monotonic() + deadline_seconds
++    delay = 0.1
++    for record in records:
++        while True:
++            try:
++                sink.write(record)
++                break
++            except RETRYABLE_ERRORS:
++                if time.monotonic() + 2 * delay > deadline:
++                    log.error("audit flush deadline exceeded")
++                    raise
++                time.sleep(delay + random.uniform(0, delay))
++                delay = min(delay * 2, max_delay)
+--- a/consumer.py
++++ b/consumer.py
+@@ -1,6 +1,7 @@
+ """Consumer for order lifecycle messages (loyalty service)."""
+ 
+ import logging
++from decimal import Decimal
+ 
+ log = logging.getLogger("loyalty.consumer")
+ 
+@@ -8,6 +9,7 @@
+     "order_shipped": "SHIPPED",
+     "order_cancelled": "CANCELLED",
+ }
++LOYALTY_POINTS_DIVISOR = 10
+ 
+ 
+ class UnknownMessageType(Exception):
+@@ -29,10 +31,26 @@
+         )
+ 
+ 
++def _on_paid(conn, msg):
++    customer_id = msg["customer_id"]
++    points = int(Decimal(msg["amount"]) // LOYALTY_POINTS_DIVISOR)
++    balance = get_customer_balance(conn, customer_id)
++    with conn:
++        conn.execute(
++            "INSERT INTO loyalty (customer_id, balance) VALUES (?, ?) "
++            "ON CONFLICT(customer_id) DO UPDATE SET balance = excluded.balance",
++            (customer_id, balance + points),
++        )
++    log.info("loyalty credited customer_id=%s points=%d", customer_id, points)
++
++
+ def handle_message(conn, msg):
+     kind = msg.get("type")
+     if kind in ORDER_STATUS_BY_EVENT:
+         _on_status_change(conn, msg, ORDER_STATUS_BY_EVENT[kind])
++        return
++    if kind == "order_paid":
++        _on_paid(conn, msg)
+         return
+     raise UnknownMessageType(kind)
+ 
+@@ -40,7 +58,11 @@
+ def consume(conn, messages):
+     processed = 0
+     for msg in messages:
+-        handle_message(conn, msg)
++        try:
++            handle_message(conn, msg)
++        except Exception:
++            log.error("message handling failed type=%s", msg.get("type"), exc_info=True)
++            raise
+         processed += 1
+     log.info("messages processed count=%d", processed)
+     return processed

@@ -1,0 +1,111 @@
+--- a/services/dosing.py
++++ b/services/dosing.py
+@@ -1,7 +1,7 @@
+ """Dose calculations for sample preparation and dispensing."""
+ 
+ import math
+-from decimal import Decimal, InvalidOperation
++from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+ 
+ MAX_DOSE_MG = Decimal("500")
+ MIN_CONCENTRATION_MG_PER_ML = Decimal("0.01")
+@@ -34,6 +34,26 @@
+     return min(dose, cap)
+ 
+ 
++def round_dose_mg(value, places=2):
++    """Round a non-negative dose in mg to places decimal places, half up.
++
++    Rounding is applied for display and labelling only; volume calculations
++    use the unrounded dose.
++    """
++    if places < 0:
++        raise ValueError("places must not be negative")
++    amount = parse_amount(value)
++    if amount < 0:
++        raise ValueError("dose must not be negative")
++    exponent = Decimal(1).scaleb(-places)
++    return amount.quantize(exponent, rounding=ROUND_HALF_UP)
++
++
++def label_text(dose_mg):
++    """Return the dose as printed on a dispensing label, for example '12.35 mg'."""
++    return f"{round_dose_mg(dose_mg)} mg"
++
++
+ def volume_for_dose(dose_mg, concentration_mg_per_ml):
+     """Return the volume in mL that delivers dose_mg at the given concentration."""
+     dose = parse_amount(dose_mg)
+--- a/services/scheduling.py
++++ b/services/scheduling.py
+@@ -1,6 +1,6 @@
+ """Dose schedule construction for dispensing windows and stability pulls."""
+ 
+-from datetime import datetime, timedelta, timezone
++from datetime import datetime, time, timedelta, timezone
+ from zoneinfo import ZoneInfo
+ 
+ SITE_ZONE = ZoneInfo("Europe/Berlin")
+@@ -51,3 +51,29 @@
+     """Format an aware datetime for display in the site zone."""
+     _require_aware(moment_utc, "moment_utc")
+     return moment_utc.astimezone(SITE_ZONE).strftime("%Y-%m-%d %H:%M %Z")
++
++
++def dispensing_window(first_day, last_day):
++    """Return (start_utc, end_utc) covering first_day through last_day in the site zone.
++
++    The window is half-open: start_utc is included and end_utc is not, so
++    consecutive ranges produce adjacent windows without overlap.
++    """
++    if first_day > last_day:
++        raise ValueError("first_day must not be after last_day")
++    start_local = datetime.combine(first_day, time(0), tzinfo=SITE_ZONE)
++    end_local = datetime.combine(last_day + timedelta(days=1), time(0), tzinfo=SITE_ZONE)
++    return start_local.astimezone(UTC), end_local.astimezone(UTC)
++
++
++def in_window(moment_utc, window):
++    """Return True when moment_utc lies inside a window from dispensing_window."""
++    _require_aware(moment_utc, "moment_utc")
++    start_utc, end_utc = window
++    return start_utc <= moment_utc < end_utc
++
++
++def window_hours(window):
++    """Return the elapsed length of a window in hours, including DST changes."""
++    start_utc, end_utc = window
++    return (end_utc - start_utc).total_seconds() / 3600
+--- a/services/listing.py
++++ b/services/listing.py
+@@ -61,3 +61,30 @@
+         status = record.get("status", "unknown")
+         counts[status] = counts.get(status, 0) + 1
+     return counts
++
++
++def status_predicate(status):
++    """Return a predicate that accepts records whose status equals status."""
++
++    def matches(record, _expected=status):
++        return record.get("status") == _expected
++
++    return matches
++
++
++def apply_predicates(records, predicates):
++    """Return the records accepted by every predicate, in input order."""
++    return [record for record in records if all(p(record) for p in predicates)]
++
++
++def evict_stale(cache, now, ttl_seconds):
++    """Remove cache entries older than ttl_seconds and return the removed keys.
++
++    cache maps a key to the epoch second at which it was stored.
++    """
++    removed = []
++    for key, stored_at in list(cache.items()):
++        if now - stored_at > ttl_seconds:
++            del cache[key]
++            removed.append(key)
++    return removed

@@ -1,0 +1,69 @@
+{
+  "axis": "guidance",
+  "case": "guidance-h2",
+  "difficulty": "hard",
+  "sources": [
+    "Binding invariant comments in code (ordering contract on generated ids; comment far from the change)",
+    "Directory-scoped and root CLAUDE.md rule files (repository rules applied to code)",
+    "Python import-time execution semantics: https://docs.python.org/3/reference/import.html",
+    "Python module-level side effects at import (network I/O executed on import)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/inventory/lot_registry.py",
+      "line": 66,
+      "class": "documented ordering constraint violated by reorder",
+      "in_diff": true,
+      "cross_file": false,
+      "rule": "# NOTE: ids are assigned in ascending order and consumers rely on it; do not reorder",
+      "description": "Input incoming=[LOT-B expiry 2027-03-01, LOT-A expiry 2026-11-30] (receipt order B then A). Before the change ids are LOT-B=101, LOT-A=102 in receipt order. After the change _prepare_batch sorts by expiry, so LOT-A=101 and LOT-B=102, and the returned list is reordered. The NOTE at line 26 forbids reordering; a consumer that pairs id 101 with the first received pallet (LOT-B) now receives LOT-A. The reorder call is at line 28."
+    },
+    {
+      "id": "D2",
+      "file": "code/inventory/receiving.py",
+      "line": 35,
+      "class": "config key read without default in defaults file",
+      "in_diff": true,
+      "cross_file": true,
+      "rule": "New config keys must be added to config.defaults.toml with a default value.",
+      "description": "receiving.max_pallets_per_batch is read at line 35 but is absent from code/config.defaults.toml and no override is supplied. With default configuration, receive_batch(store, [one valid scan], [lot]) raises KeyError at the settings lookup before any pallet is validated, so every batch fails."
+    },
+    {
+      "id": "D3",
+      "file": "code/reports/cofa_template.py",
+      "line": 12,
+      "class": "network I/O at module import",
+      "in_diff": true,
+      "cross_file": false,
+      "rule": "No network calls at import time: modules must not open sockets, send HTTP requests or read remote resources while being imported. Do the work inside functions called at runtime.",
+      "description": "LOGO_BYTES performs an HTTP request at import. Importing reports.cofa_template on an offline worker or in CI (no route to cdn.lab-assets.internal) raises URLError during import, so every module that imports the template module (report worker, tests) fails to load, and each import repeats the request."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/inventory/lot_registry.py",
+      "line": 65,
+      "kind": "safe-looking",
+      "why_not_a_defect": "A TODO note about a future change. It is not a rule, has no runtime effect, and the current code it sits above is the one D1 covers; the comment itself is not a violation."
+    },
+    {
+      "file": "code/inventory/receiving.py",
+      "line": 52,
+      "kind": "safe-looking",
+      "why_not_a_defect": "receiving.scan_timeout_s is added to both code/config.defaults.toml (scan_timeout_s = 30.0) and the code, so the rule is satisfied; the read happens inside fetch_supplier_asn at runtime."
+    },
+    {
+      "file": "code/inventory/receiving.py",
+      "line": 4,
+      "kind": "safe-looking",
+      "why_not_a_defect": "urllib.request is imported at module level, but no request is made at import; the only urlopen call is inside fetch_supplier_asn, which runs when called."
+    },
+    {
+      "file": "code/inventory/lot_registry.py",
+      "line": 53,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line: the mutable default totals={} is shared across calls, so summarise_by_material([A 10 g]) followed by summarise_by_material([B 5 g]) returns {A: 10, B: 5}. Not part of the change; a diff-mode reviewer must not report it."
+    }
+  ]
+}

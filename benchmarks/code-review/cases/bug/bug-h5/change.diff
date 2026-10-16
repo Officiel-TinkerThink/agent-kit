@@ -1,0 +1,57 @@
+--- a/parsing.py
++++ b/parsing.py
+@@ -6,8 +6,6 @@
+ 
+ __all__ = ["ParseError", "parse_weight", "parse_count", "parse_lot_quantity"]
+ 
+-_THOUSANDS_GROUPED = re.compile(r"\d{1,3}(,\d{3})+(\.\d+)?")
+-_DECIMAL_COMMA = re.compile(r"\d+,\d{1,2}")
+ _PLAIN_NUMBER = re.compile(r"\d+(\.\d+)?")
+ _DIGITS = re.compile(r"\d+")
+ 
+@@ -33,12 +31,7 @@
+     decimal point ("1,234.5") and a European decimal comma ("12,5").
+     """
+     raw = _require_text(text, "weight")
+-    if _THOUSANDS_GROUPED.fullmatch(raw):
+-        normalized = raw.replace(",", "")
+-    elif _DECIMAL_COMMA.fullmatch(raw):
+-        normalized = raw.replace(",", ".")
+-    else:
+-        normalized = raw
++    normalized = raw.replace(",", ".")
+     if _PLAIN_NUMBER.fullmatch(normalized) is None:
+         raise ParseError(f"weight: not a number: {text!r}")
+     return float(normalized)
+--- a/sequences.py
++++ b/sequences.py
+@@ -40,7 +40,7 @@
+         if not isinstance(day, date):
+             raise TypeError("day must be a datetime.date")
+         number = self._next_number(day)
+-        suffix = f"{number:0{SUFFIX_MIN_WIDTH}X}"
++        suffix = f"{number & 0xFF:0{SUFFIX_MIN_WIDTH}X}"
+         batch_id = f"{self._prefix}-{day:%Y%m%d}-{suffix}"
+         logger.info("issued batch id %s", batch_id)
+         return batch_id
+--- a/report.py
++++ b/report.py
+@@ -60,3 +60,18 @@
+     """Return the full daily summary as text, one line per production day."""
+     lines = [format_row(row) for row in build_rows(records)]
+     return "\n".join(lines)
++
++
++def days_in_range(start: date, end: date) -> int:
++    """Return the number of calendar days in the window, both ends included."""
++    if end < start:
++        raise ReportError(f"window end {end} is before start {start}")
++    return (end - start).days
++
++
++def reporting_window_days(records: List[Mapping]) -> int:
++    """Return the calendar days spanned by the production dates of the records."""
++    if not records:
++        raise ReportError("no records to report")
++    dates = [record["produced_on"] for record in records]
++    return days_in_range(min(dates), max(dates))

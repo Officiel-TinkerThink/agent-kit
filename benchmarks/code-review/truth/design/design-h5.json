@@ -1,0 +1,118 @@
+{
+  "axis": "design",
+  "case": "design-h5",
+  "difficulty": "hard",
+  "sources": [
+    "Time-of-check to time-of-use race, check and write separated by a lock release (CWE-367)",
+    "Lock-order inversion between two locks taken in opposite orders (CWE-833)",
+    "Retention deleting work that is still pending (spec R3 in spec.md)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/applier.py",
+      "line": 59,
+      "class": "check-then-act race: version checked under one lock acquisition, written under another without re-check",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 53 (if version <= current) runs under the plan lock, which is released at line 55 before the patch is built (line 56). The write at line 59 re-acquires plan then store and does not re-check the applied version. Failing input: apply(P, v2) and apply(P, v3) with applied version 1. Both pass the check at line 53. v2 blocks while building its patch; v3 completes and writes applied v3; then v2 writes at line 59 and overwrites it. Final applied_version(P) = 2 and applied_payload(P) = {dose: 2}, while spec R2 requires v3 to remain. Control run on base/ (check and write in one plan-lock section) ends at applied_version 3, payload {dose: 3}. Correction from audit: the plan lock is released after line 52; the check is at line 53; the write at line 59 does not re-check.",
+      "evidence": {
+        "script": "C:\\Users\\WAHYU~1.SIN\\AppData\\Local\\Temp\\claude\\D--core-projects-agent-kit\\60172e11-0448-4cba-be0f-af28b3ea7d90\\scratchpad\\h5_design_evidence.py",
+        "command": "python -I h5_design_evidence.py <root> d1",
+        "code_output": [
+          "apply results: {2: 'applied', 3: 'applied'}",
+          "applied_version: 2",
+          "applied_payload: {'dose': 2}"
+        ],
+        "base_control_output": [
+          "apply results: {2: 'applied', 3: 'applied'}",
+          "applied_version: 3",
+          "applied_payload: {'dose': 3}"
+        ],
+        "interleaving": "scripted with threading.Event: v2 is held inside _build_patch after its check; v3 runs to completion; v2 then writes"
+      }
+    },
+    {
+      "id": "D2",
+      "file": "code/plan_store.py",
+      "line": 94,
+      "class": "retention removes pending rows that the spec protects",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "delete_older_than deletes every row whose store-wide seq is below the horizon, regardless of status. The horizon comes from cleaner.py sweep_once (cleaner.py lines 50-51), which uses the latest applied seq across all plan ids. Failing input: put_pending(B, v1) gets seq 1; put_pending(A, v1) gets seq 2; apply(A, v1) writes an applied row with seq 3. sweep_once then computes horizon 3 and deletes seq 1 and seq 2, so the pending B row is gone. apply_next(B) returns nothing_pending and applied_version(B) stays 0. Expected: B v1 applied (spec R3 and R5 violated). The same result occurs on base/ with the same method, so the flaw is in code this change did not touch; the new cleaner thread makes it reachable.",
+      "evidence": {
+        "script": "C:\\Users\\WAHYU~1.SIN\\AppData\\Local\\Temp\\claude\\D--core-projects-agent-kit\\60172e11-0448-4cba-be0f-af28b3ea7d90\\scratchpad\\h5_design_evidence.py",
+        "command": "python -I h5_design_evidence.py <root> d2",
+        "code_output": [
+          "apply A v1: applied",
+          "sweep removed: 2",
+          "pending row for B after sweep: None",
+          "apply_next B: nothing_pending | applied_version B: 0"
+        ],
+        "base_control_output": [
+          "apply A v1: applied",
+          "sweep removed: 2",
+          "pending row for B after sweep: None",
+          "apply_next B: nothing_pending | applied_version B: 0"
+        ]
+      }
+    },
+    {
+      "id": "D3",
+      "file": "code/cleaner.py",
+      "line": 52,
+      "class": "lock-order inversion (deadlock)",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "sweep_once takes the store lock (line 50) and then requests the plan lock (line 52). locks.py (lines 1-8) documents the order plan before store, and applier.py takes plan (line 57) then store (line 58). Failing input: one thread runs sweep_once while another runs apply(P, v1). The cleaner holds store and waits for plan; the applier holds plan and waits for store. Both threads block indefinitely. Scripted run with gates that place each thread between its first and second acquisition: both threads still alive after 3 s joins. Spec R4 violated.",
+      "evidence": {
+        "script": "C:\\Users\\WAHYU~1.SIN\\AppData\\Local\\Temp\\claude\\D--core-projects-agent-kit\\60172e11-0448-4cba-be0f-af28b3ea7d90\\scratchpad\\h5_design_evidence.py",
+        "command": "python -I h5_design_evidence.py <root> d3",
+        "code_output": [
+          "DEADLOCK: cleaner waits on plan (held by applier); applier waits on store (held by cleaner)",
+          "applied_version P: 0"
+        ],
+        "interleaving": "gates: applier waits for cleaner to hold store before its check; cleaner waits for applier to hold plan before taking plan; applier signals before taking store"
+      }
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/plan_store.py",
+      "line": 32,
+      "kind": "safe-looking",
+      "why_not_a_defect": "VersionCounter.next is a read-modify-write (get, add 1, store) inside its own lock: with self._lock. Under concurrent calls each caller gets a distinct value. Checked: three calls return [1, 2, 3]. Same read-then-write shape as D1, but the whole sequence is under one lock acquisition."
+    },
+    {
+      "file": "code/plan_store.py",
+      "line": 114,
+      "kind": "safe-looking",
+      "why_not_a_defect": "save_snapshot writes to a temp file created in the same directory, fsyncs it, then calls os.replace, which is atomic on the same filesystem. Checked: a 1-row store writes a snapshot with 1 row and leaves no .tmp file behind. Looks like an unsafe in-place overwrite but is not."
+    },
+    {
+      "file": "code/cleaner.py",
+      "line": 94,
+      "kind": "safe-looking",
+      "why_not_a_defect": "queue.Queue is consumed only by the single thread started in start(), through _run. Two request_sweep calls followed by stop produce exactly 2 sweeps (checked). Multiple producers are safe with queue.Queue; there is one consumer, so no concurrent get."
+    },
+    {
+      "file": "code/applier.py",
+      "line": 58,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The write block takes the plan lock (line 57) and then the store lock (line 58), which is the order documented in locks.py. Same nested-acquisition syntax as the defect in cleaner.py, but correct here. Base control run with this order ends at applied_version 3 for the v2/v3 interleaving, as spec R2 requires."
+    },
+    {
+      "file": "code/plan_store.py",
+      "line": 56,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw, unchanged line: put_pending stores the caller's payload dict by reference. Checked: after d = {dose: 5}; put_pending(C, 1, d); d[dose] = 50, pending_row(C).payload is {dose: 50}. Pre-existing and outside the diff; a diff-mode reviewer must not report it as a defect of this change."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/plan_store.py",
+      "line": 109,
+      "description": "save_snapshot: on a serialisation error the mkstemp fd stays open and cleanup can raise, masking the original error and leaving a tmp file (latent, outside the diff)."
+    }
+  ]
+}

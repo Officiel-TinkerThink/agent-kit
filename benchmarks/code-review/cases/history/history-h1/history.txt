@@ -1,0 +1,46 @@
+HISTORY DIGEST - lims bridge: intake, release, inventory (oldest first)
+
+commit a41f0c9  2026-06-11  Pooja Iyer
+subject: inventory: add consume() for FEFO picks
+file: inventory.py
+hunk:
++def consume(lot: StockLot, quantity: int) -> int:
++    if quantity <= 0:
++        raise ValueError("quantity must be positive")
++    lot.on_hand -= quantity
++    return lot.on_hand
+
+commit 4d81b07  2026-08-18  Ana Reyes
+subject: intake: reject missing batch_id (INC-2231)
+file: intake.py
+hunk 1, receive_sample():
++    if batch_id is None:
++        raise IntakeError("batch_id required")
+hunk 2, register_manifest_row():
++    if batch_id is None:
++        raise IntakeError("batch_id required")
+
+commit c0e5a72  2026-08-20  Ana Reyes
+subject: intake: cap batch_id length at 32 (INC-2231)
+file: intake.py
+hunk 1, receive_sample():
++    if len(batch_id) > MAX_BATCH_ID_LEN:
++        raise IntakeError("batch_id too long")
+hunk 2, register_manifest_row():
++    if len(batch_id) > MAX_BATCH_ID_LEN:
++        raise IntakeError("batch_id too long")
+
+commit 7a3c9e1  2026-09-02  Wahyu Sinurat
+subject: release: warn on lot release without comment (ops alert LOT_RELEASE_NO_COMMENT)
+file: release.py
+hunk, release_lot():
++    if not comment:
++        log.warning("LOT_RELEASE_NO_COMMENT lot=%s operator=%s", lot_id, operator)
+
+Notes from the digest:
+- receive_sample() accepts source "manual" (operator form) and source "import" (LIMS file drop).
+- register_manifest_row() is the manifest entry point used by the import job.
+
+Review comments on earlier commits:
+RC-1 on 7a3c9e1, release.py release_lot(), M. Tan (ops): "The Grafana rule pages on the exact event string LOT_RELEASE_NO_COMMENT. Any refactor of release_lot must keep this warning."
+RC-2 on c0e5a72, intake.py register_manifest_row(), J. Okafor (QA): "Manifest rows and the manual form must reject the same inputs. Keep the two checks identical."

@@ -1,0 +1,131 @@
+--- a/files.py
++++ b/files.py
+@@ -1,10 +1,11 @@
+ """File-system helpers for the report cache."""
+ 
++import hashlib
+ import logging
+ import os
+ import posixpath
+ 
+-from config import DOWNLOAD_CHUNK_BYTES
++from config import DOWNLOAD_CHUNK_BYTES, REPORT_CACHE_ROOT
+ 
+ log = logging.getLogger("labrpt.files")
+ 
+@@ -31,6 +32,15 @@
+     return full
+ 
+ 
++def resolve_report_path(report_name):
++    """Map a stored report file name to its absolute path inside the report cache."""
++    full = posixpath.normpath(posixpath.join(REPORT_CACHE_ROOT, report_name))
++    if not full.startswith(REPORT_CACHE_ROOT):
++        log.warning("report path rejected name=%s", report_name)
++        raise PathContainmentError(report_name)
++    return full
++
++
+ def stream_file(path, chunk_bytes=DOWNLOAD_CHUNK_BYTES):
+     """Yield the file at path in fixed-size chunks."""
+     with open(path, "rb") as handle:
+@@ -44,6 +54,15 @@
+ def file_size(path):
+     """Return the size in bytes of the file at path."""
+     return os.stat(path).st_size
++
++
++def file_sha256(path, chunk_bytes=DOWNLOAD_CHUNK_BYTES):
++    """Return the hex SHA-256 digest of the file at path, read in chunks."""
++    digest = hashlib.sha256()
++    with open(path, "rb") as handle:
++        for chunk in iter(lambda: handle.read(chunk_bytes), b""):
++            digest.update(chunk)
++    return digest.hexdigest()
+ 
+ 
+ def staging_name(upload_id, suffix):
+--- a/reports.py
++++ b/reports.py
+@@ -1,13 +1,15 @@
+-"""Report listing and retrieval for the analyst workspace."""
++"""Report listing, retrieval and download for the analyst workspace."""
+ 
+ import logging
++import time
+ 
+ import accounts
+-from config import LIST_PAGE_SIZE
++import files
++from config import LIST_PAGE_SIZE, REPORT_CONTENT_TYPE
+ 
+ log = logging.getLogger("labrpt.reports")
+ 
+-ACTIONS = ("list_reports", "get_report")
++ACTIONS = ("list_reports", "get_report", "download_report")
+ 
+ REPORT_COLUMNS = "id, title, owner_id, file_name, created_at"
+ 
+@@ -28,6 +30,16 @@
+ def _page_offset(page):
+     """Return the row offset for a 1-based page number."""
+     return (max(page, 1) - 1) * LIST_PAGE_SIZE
++
++
++def _record_download(conn, user, report_id):
++    """Write one audit row for a download request that was authorised."""
++    conn.execute(
++        "INSERT INTO audit_log (user_id, action, report_id, recorded_at) VALUES (?, ?, ?, ?)",
++        (user.user_id, "download_report", report_id, time.time()),
++    )
++    conn.commit()
++    log.info("audit download_report user=%s report=%s", user.user_id, report_id)
+ 
+ 
+ def list_reports(conn, user, page=1):
+@@ -57,3 +69,20 @@
+         log.warning("get_report denied user=%s report=%s", user.user_id, report_id)
+         raise PermissionError("report access denied")
+     return _row_to_dict(row)
++
++
++def download_report(conn, user, report_id):
++    """Return the file path, content type, digest and chunk stream for one report."""
++    row = _load_report(conn, report_id)
++    if row is None:
++        raise LookupError(f"report {report_id} not found")
++    path = files.resolve_report_path(row["file_name"])
++    digest = files.file_sha256(path)
++    _record_download(conn, user, report_id)
++    return {
++        "path": path,
++        "content_type": REPORT_CONTENT_TYPE,
++        "size": files.file_size(path),
++        "sha256": digest,
++        "chunks": files.stream_file(path),
++    }
+--- a/accounts.py
++++ b/accounts.py
+@@ -3,7 +3,7 @@
+ import logging
+ from dataclasses import asdict, dataclass
+ 
+-from config import PROFILE_FIELDS, ROLE_ANALYST, USER_FIELDS
++from config import ROLE_ANALYST, USER_FIELDS
+ 
+ log = logging.getLogger("labrpt.accounts")
+ 
+@@ -34,10 +34,9 @@
+ 
+ 
+ def update_profile(user, payload):
+-    """Apply the allowed profile fields from a client payload and return the updated user."""
+-    changes = {key: value for key, value in payload.items() if key in PROFILE_FIELDS}
+-    merged = {**asdict(user), **changes}
+-    log.info("update_profile user=%s fields=%s", user.user_id, sorted(changes))
++    """Apply a client profile payload and return the updated user."""
++    merged = {**asdict(user), **payload}
++    log.info("update_profile user=%s fields=%s", user.user_id, sorted(payload))
+     return User(**merged)
+ 
+ 

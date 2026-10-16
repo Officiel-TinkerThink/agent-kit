@@ -1,0 +1,122 @@
+History digest: code/sync_batch.py
+Commits touching this file, oldest first (4).
+
+commit 4c0d8e2
+Subject: feat: batch sync uploads (#501)
+--- /dev/null
++++ b/code/sync_batch.py
+@@ -0,0 +1,32 @@
++"""Batch uploader for the site sync job."""
++
++import logging
++
++logger = logging.getLogger("sync.batch")
++
++BATCH_SIZE = 1000
++REQUEST_TIMEOUT_S = 30
++
++
++class SyncBatchError(Exception):
++    pass
++
++
++def chunk(records, size):
++    for start in range(0, len(records), size):
++        yield records[start:start + size]
++
++
++def post_batch(session, url, batch):
++    response = session.post(url, json=batch, timeout=REQUEST_TIMEOUT_S)
++    response.raise_for_status()
++    return response.json()
++
++
++def upload_all(session, url, records):
++    uploaded = 0
++    for batch in chunk(records, BATCH_SIZE):
++        post_batch(session, url, batch)
++        uploaded += len(batch)
++    logger.info("uploaded %d records", uploaded)
++    return uploaded
+
+commit 9b3d2f6
+Subject: fix: lower sync batch size after gateway timeouts (#533)
+--- a/code/sync_batch.py
++++ b/code/sync_batch.py
+@@ -4,7 +4,7 @@
+ 
+ logger = logging.getLogger("sync.batch")
+ 
+-BATCH_SIZE = 1000
++BATCH_SIZE = 200
+ REQUEST_TIMEOUT_S = 30
+ 
+ 
+
+commit e1a7f35
+Subject: fix: retry 429 and 502/503/504 with jittered backoff (#547)
+--- a/code/sync_batch.py
++++ b/code/sync_batch.py
+@@ -1,11 +1,17 @@
+ """Batch uploader for the site sync job."""
+ 
+ import logging
++import random
++import time
+ 
+ logger = logging.getLogger("sync.batch")
+ 
+ BATCH_SIZE = 200
++MAX_RETRIES = 5
++RETRY_BACKOFF_BASE_S = 1.0
++RETRY_BACKOFF_CAP_S = 60
+ REQUEST_TIMEOUT_S = 30
++RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+ 
+ 
+ class SyncBatchError(Exception):
+@@ -17,10 +23,23 @@
+         yield records[start:start + size]
+ 
+ 
++def _backoff_delay(attempt):
++    exp = RETRY_BACKOFF_BASE_S * (2 ** attempt)
++    return random.uniform(0, min(exp, RETRY_BACKOFF_CAP_S))
++
++
+ def post_batch(session, url, batch):
+-    response = session.post(url, json=batch, timeout=REQUEST_TIMEOUT_S)
+-    response.raise_for_status()
+-    return response.json()
++    for attempt in range(MAX_RETRIES + 1):
++        response = session.post(url, json=batch, timeout=REQUEST_TIMEOUT_S)
++        if response.status_code not in RETRYABLE_STATUS:
++            response.raise_for_status()
++            return response.json()
++        if attempt == MAX_RETRIES:
++            break
++        delay = _backoff_delay(attempt)
++        logger.warning("batch rejected with %s, retry %d in %.2fs", response.status_code, attempt + 1, delay)
++        time.sleep(delay)
++    raise SyncBatchError(f"batch failed after {MAX_RETRIES} retries")
+ 
+ 
+ def upload_all(session, url, records):
+
+commit 6d2c9b8
+Subject: fix: cap retry backoff at 30s; 20s planned once drain metrics are in (#566)
+--- a/code/sync_batch.py
++++ b/code/sync_batch.py
+@@ -9,7 +9,7 @@
+ BATCH_SIZE = 200
+ MAX_RETRIES = 5
+ RETRY_BACKOFF_BASE_S = 1.0
+-RETRY_BACKOFF_CAP_S = 60
++RETRY_BACKOFF_CAP_S = 30
+ REQUEST_TIMEOUT_S = 30
+ RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+ 
+
+Review comments from earlier pull requests:
+- PR #533 (reviewer-a): "Do not raise BATCH_SIZE above 200 without a gateway load test. 1000 timed out at p99 on staging. If you change it, record the measured ceiling in the PR."
+- PR #547 (reviewer-b): "Retry only the statuses in RETRYABLE_STATUS. Any other 4xx must fail fast, not loop."

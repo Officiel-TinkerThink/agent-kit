@@ -164,7 +164,7 @@ def load_limit(key):
         return 0     # 0 means "no limit" downstream
 ```
 - Good: let the exception propagate, or raise a domain error `from exc`; return a sentinel only when every caller checks for it.
-- Not a defect when: the fallback is a documented neutral value on an enrichment path where a missing value has no safety effect, and the failure is logged with context.
+- Not a defect when: the fallback is a documented neutral value on an enrichment path where a missing value has no safety effect, and the failure is logged with context; or the handler logs a cleanup failure and re-raises the original exception (a rollback is not swallowed).
 ### Hidden mutable global state
 - Tell: a module-level variable written at runtime (inside a function with `global`, or by attribute assignment) and read by request-handling code.
 - Fails when: two requests interleave on one worker; request B sets the tenant, then request A's query runs with B's tenant; data crosses tenants.
@@ -213,7 +213,7 @@ def form_valid(email):
     return re.fullmatch(r"[^@]+@[^@]+\.[^@]+", email) is not None
 ```
 - Good: one function in one module, imported by both paths.
-- Not a defect when: the two checks are deliberately staged (a cheap edge pre-filter and the full check before persistence), and both are documented.
+- Not a defect when: the two checks are deliberately staged (a cheap edge pre-filter and the full check before persistence), and both are documented; or the two rules serve different operations that the spec or rules say must differ (refunds retry only on 503, charges retry on connection errors).
 ### Ignored parameter
 - Tell: a parameter in the signature (dry_run, force, timeout) that the body never reads.
 - Fails when: the caller passes dry_run=True to preview; the rows are deleted anyway.
@@ -373,6 +373,7 @@ def net(total):
 
 - `SELECT ... FOR UPDATE` inside a transaction before a write: the lock makes the read-then-write safe.
 - `UPDATE t SET n = n + ?`: a single atomic statement; not a lost update.
+- A rollback or cleanup that logs its own failure and re-raises the original exception: the original error is not swallowed.
 - `queue.put(x, timeout=1)` with `except queue.Full`: bounded and handled.
 - `with open(...)` or `try/finally` around the handle: released on the error path.
 - `except Exception as exc: raise DomainError(...) from exc`: wraps and propagates; nothing is swallowed.

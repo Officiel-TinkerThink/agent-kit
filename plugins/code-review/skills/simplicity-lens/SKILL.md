@@ -268,7 +268,8 @@ These look simplifiable and are not. Check each before you report.
 - `try/except` that translates the exception type (`raise DomainError from exc`). Removing it changes what callers catch.
 - `str(value)` before `Decimal(...)`: `Decimal(2.675)` is not `Decimal("2.675")`.
 - `lru_cache` or a memo on a function that reads a file or a table that changes at run time.
-- `if len(values) == 0:` before an average: the division by zero is the reason.
+- `if len(values) == 0:` before an average: the division by zero is the reason. A guard that returns a value different from what the operation would give (`Decimal("0")` instead of `None`) is part of the contract: read the callers first.
+- `return x or None` for a string: `''` becomes `None`. Keep the explicit check when the empty string is a valid result.
 - An abstract base with two real implementations, or a base that other code type-checks against.
 - A wrapper that validates, logs or converts. A wrapper that gives a stable public name.
 - A generator that is read twice: replacing a list with a generator changes the second read.

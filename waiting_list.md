@@ -15,7 +15,7 @@ Open decisions and follow-ups that are parked on purpose. Add new items at the t
 ### Benchmark numbers are single-run; round 2 re-run done, trap-hit regression open
 - Added: 2026-10-16. Source: side-agent caveat, parked by the user for later.
 - Done 2026-10-16: round 2 re-run on the current lens (24 of 24 reports), scored by one independent scorer per case. Results are in `benchmarks/code-review/README.md`: 53 of 60 seeded defects, 4 trap hits (up from 0), 5 false positives (up from 4).
-- Open: the trap-hit regression (simplicity-h1 `label_text`, simplicity-h4 `average_cents`, design-h4 duplicated retry rule, design-h7 rollback path). Decide whether to tighten the lens or the design agent, then re-run.
+- Open: tuned run (2026-10-16): 51 of 60 defects, 3 trap hits (simplicity-h4 `average_cents` guard, design-h7 rollback, spec-h5 pre-existing purge path), 2 false positives. Recall dropped by two versus the untuned after-run and simplicity recall is still 6 of 12. Next: decide whether to tighten the simplicity and design lenses again or accept these numbers, then repeat runs for variance.
 - Open: each number is one run with no variance estimate; repeat runs are needed before a number is used as a decision basis.
 - Open: the round-1 score totals (69 of 70, 66 of 70) are one run each; the scorer output for round 1 is not kept under `results/`.
 - Not started: repeat runs and the trap-hit fix.

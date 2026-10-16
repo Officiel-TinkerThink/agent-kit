@@ -54,6 +54,20 @@ Validator: 6 of 6 planted false findings refuted (a sleep after the last attempt
 | security (h4-h5) | 6 of 6 | 0 | 2 (h4 symlink note, h4 unauthenticated user object) | |
 
 Total: 53 of 60 seeded defects as findings (56 of 60 counting UNCLEAR-only mentions); 4 trap hits; 5 false positives. Compared with the before-run: seeded defects went from 47 of 60 to 53 of 60, simplicity from 1 of 12 to 7 of 12 (the simplicity agent was added), and guidance lost its one false positive. Trap hits went from 0 to 4 and false positives from 4 to 5. The trap-hit increase is a regression to address; it rests on one run per case.
+
+- Round 2 after the trap-hit tuning (`results/skills-r2tune/`, one run, one independent scorer per case, same brief as above):
+
+| Axis | Seeded defects found | Trap hits | False positives | Notes |
+|---|---|---|---|---|
+| bug (h1-h6) | 15 of 15 | 0 | 0 | bug-h3 matched on root cause, mechanism weaker |
+| simplicity (h1-h5) | 6 of 12 | 1 (h4 `average_cents` guard) | 0 | simplicity-h1 missed `archive_path`; simplicity-h3 missed the third weight copy (excluded on purpose by the spec) |
+| design (h4-h7) | 9 of 9 | 1 (h7 rollback path) | 0 | the rollback exemption added to the lens did not stop the h7 hit |
+| spec (h4-h6) | 7 of 9 | 1 (h5 pre-existing purge path) | 2 (h4 duplicate-release, h5 full client context) | |
+| guidance (h4-h5) | 4 of 5 | 0 | 0 | h4 missed the integer-cents rule outside billing; it was found in the first after-run |
+| history (h4-h5) | 4 of 4 | 0 | 0 | |
+| security (h4-h5) | 6 of 6 | 0 | 0 | |
+
+Tuned total: 51 of 60 seeded defects, 3 trap hits, 2 false positives. Against the untuned after-run (53 of 60, 4 trap hits, 5 false positives), the tuning lowered the trap hits and false positives by one run each and cost two defects, one of them (guidance-h4) found in the earlier run but not this one. Run-to-run variance on one case is at least that large, so these differences are not statistically established. Two of the four original trap hits (simplicity-h4, design-h7) are still hit.
 - LENS check: every reviewer prints the marker names it sees. All 33 no-skills (baseline) reports said `LENS: none`; skills reports list the markers.
 
 ## Limits of these numbers

@@ -12,31 +12,31 @@
       "name": "haiku-delegation",
       "source": "./plugins/haiku-delegation",
       "description": "Read-only Haiku 5.5 subagents with effort tiers and a delegation policy.",
-      "version": "0.2.6"
+      "version": "0.2.7"
     },
     {
       "name": "agent-guards",
       "source": "./plugins/agent-guards",
       "description": "Secret redaction, .env protection, bulk-read redirect, monitor guard, read-only git.",
-      "version": "0.2.6"
+      "version": "0.2.7"
     },
     {
       "name": "agent-eval",
       "source": "./plugins/agent-eval",
       "description": "Usage log, deterministic checks, annotator agent, operator judge and review CLIs.",
-      "version": "0.2.6"
+      "version": "0.2.7"
     },
     {
       "name": "verification-runner",
       "source": "./plugins/verification-runner",
       "description": "Test/lint/build runner (Claude Code permissions decide the commands) with safe-rm quarantine.",
-      "version": "0.2.6"
+      "version": "0.2.7"
     },
     {
       "name": "code-review",
       "source": "./plugins/code-review",
       "description": "Focused Haiku 5.5 reviewers (spec, design, security, project rules, history) with an independent finding validator and a /code-review:review skill.",
-      "version": "0.2.6"
+      "version": "0.2.7"
     }
   ]
 }

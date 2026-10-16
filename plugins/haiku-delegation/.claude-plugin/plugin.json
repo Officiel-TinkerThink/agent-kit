@@ -1,6 +1,6 @@
 {
   "name": "haiku-delegation",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Read-only Haiku 5.5 subagents for cheap, bounded work (reading, inventories, schema/contract/pipeline description, research, advisory collection) with per-agent effort tiers and a session policy that tells the main model when to delegate.",
   "author": {
     "name": "Unidentified"

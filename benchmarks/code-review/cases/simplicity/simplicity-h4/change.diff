@@ -1,0 +1,164 @@
+--- a/service.py
++++ b/service.py
+@@ -3,8 +3,9 @@
+ import logging
+ from decimal import Decimal
+ 
+-from errors import InvalidQuantityError, UnknownSkuError
+-from helpers import format_amount, tax_rate_for, to_money
++from cache import load_region_codes
++from errors import TaxRegionError, UnknownSkuError
++from helpers import average_cents, format_amount, line_total, tax_rate_for, to_money, validate_quantity
+ 
+ logger = logging.getLogger("pricing.service")
+ 
+@@ -17,33 +18,48 @@
+         raise UnknownSkuError("sku not in catalog", details={"sku": sku}) from exc
+ 
+ 
++def _resolve_rate(region):
++    """Return the tax rate for a region, propagating configuration errors unchanged."""
++    try:
++        return tax_rate_for(region)
++    except TaxRegionError:
++        raise
++
++
+ class PricingService:
+-    """Prices consumable orders from a SKU price table and a regional tax table."""
++    """Prices consumable orders from a SKU price table, a region list and a tax memo."""
+ 
+-    def __init__(self, prices):
+-        """Copy the SKU price table; prices are Decimal values keyed by SKU text."""
++    def __init__(self, prices, tax_memo, region_path):
++        """Copy the SKU price table and keep the tax memo and the region list path."""
+         self._prices = dict(prices)
++        self._tax_memo = tax_memo
++        self._region_path = region_path
+ 
+     def price_line(self, line):
+         """Return the priced dict for one line with keys sku and qty."""
+         sku = str(line["sku"]).strip()
+-        quantity = line.get("qty")
+-        if not isinstance(quantity, int) or quantity <= 0:
+-            raise InvalidQuantityError("quantity must be a positive integer", details={"value": quantity})
++        quantity = validate_quantity(line.get("qty"))
+         unit_price = _lookup_unit_price(self._prices, sku)
+-        total = to_money(unit_price * quantity)
++        total = line_total(unit_price, quantity)
+         return {"sku": sku, "qty": quantity, "total": total}
+ 
+     def price_order(self, lines, region):
+-        """Return subtotal, tax and total for an order in a region as text amounts."""
++        """Return subtotal, tax, total and average line for an order as text amounts."""
++        if region not in load_region_codes(self._region_path):
++            raise TaxRegionError("region not configured", details={"region": region})
++        rate = _resolve_rate(region)
+         priced = [self.price_line(line) for line in lines]
++        count = int(len(lines)) if len(lines) > 0 else 0
+         subtotal = sum((item["total"] for item in priced), Decimal("0"))
+-        tax = to_money(subtotal * tax_rate_for(region))
++        tax = self._tax_memo.tax_for(subtotal, region)
+         total = to_money(subtotal + tax)
+-        logger.info("order priced lines=%d region=%s", len(priced), region)
++        average = average_cents([item["total"] for item in priced])
++        logger.info("order priced lines=%d region=%s rate=%s", count, region, rate)
+         return {
+             "lines": priced,
++            "line_count": count,
+             "subtotal": format_amount(subtotal),
+             "tax": format_amount(tax),
+             "total": format_amount(total),
++            "average_line": format_amount(average if average is not None else Decimal("0")),
+         }
+--- a/helpers.py
++++ b/helpers.py
+@@ -2,7 +2,7 @@
+ 
+ from decimal import Decimal, ROUND_HALF_UP
+ 
+-from errors import TaxRegionError
++from errors import InvalidQuantityError, TaxRegionError
+ 
+ CENT = Decimal("0.01")
+ 
+@@ -42,3 +42,34 @@
+ def rate_table_text():
+     """Return the tax table as sorted REGION=RATE lines for operator reports."""
+     return "\n".join(f"{code}={TAX_RATES[code]}" for code in sorted(TAX_RATES))
++
++
++def validate_quantity(raw):
++    """Return the quantity if it is a positive integer, otherwise raise InvalidQuantityError."""
++    if raw is None:
++        raise InvalidQuantityError("quantity is required")
++    if isinstance(raw, bool) or not isinstance(raw, int):
++        raise InvalidQuantityError("quantity must be an integer", details={"value": raw})
++    if raw <= 0:
++        raise InvalidQuantityError("quantity must be positive", details={"value": raw})
++    return raw
++
++
++def line_total(unit_price, quantity):
++    """Return unit price multiplied by quantity, rounded half-up to cents."""
++    if quantity is not None:
++        return to_money(unit_price * quantity)
++    raise InvalidQuantityError("quantity is required")
++
++
++def tax_on(amount, region):
++    """Return the tax on a Decimal amount for a region, rounded half-up to cents."""
++    return to_money(amount * tax_rate_for(region))
++
++
++def average_cents(values):
++    """Return the mean of a list of Decimal amounts rounded half-up, or None when empty."""
++    if len(values) == 0:
++        return None
++    total = sum(values, Decimal("0"))
++    return to_money(total / len(values))
+--- a/cache.py
++++ b/cache.py
+@@ -1,7 +1,10 @@
+-"""Region list access for the lab consumable pricing service."""
++"""Region list access and memoised tax computation for the lab consumable pricing service."""
+ 
+ import functools
+ import logging
++import threading
++
++from helpers import tax_on
+ 
+ logger = logging.getLogger("pricing.cache")
+ 
+@@ -24,3 +27,30 @@
+     if len(codes) > REGION_LIST_LIMIT:
+         logger.warning("region list longer than %d entries", REGION_LIST_LIMIT)
+     return tuple(codes)
++
++
++@functools.lru_cache(maxsize=512)
++def _tax_cached(amount, region, generation):
++    """Compute the tax for one amount and region; generation only partitions the cache."""
++    return tax_on(amount, region)
++
++
++class TaxMemo:
++    """Memoises tax results; invalidate() moves later lookups to a new generation."""
++
++    def __init__(self):
++        """Create an empty memo at generation zero."""
++        self._lock = threading.Lock()
++        self._generation = 0
++
++    def tax_for(self, amount, region):
++        """Return the tax for an amount in a region, reusing cached results."""
++        with self._lock:
++            generation = self._generation
++        return _tax_cached(amount, region, generation)
++
++    def invalidate(self):
++        """Start a new generation so that subsequent lookups recompute."""
++        with self._lock:
++            self._generation += 1
++            logger.info("tax memo generation=%d", self._generation)

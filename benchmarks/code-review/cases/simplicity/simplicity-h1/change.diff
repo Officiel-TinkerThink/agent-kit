@@ -1,0 +1,107 @@
+--- a/status.py
++++ b/status.py
+@@ -9,7 +9,7 @@
+ import logging
+ from dataclasses import dataclass
+ from datetime import date
+-from typing import Dict, Iterable
++from typing import Dict, Iterable, List
+ 
+ logger = logging.getLogger("qc.inventory.status")
+ 
+@@ -48,6 +48,29 @@
+     return code
+ 
+ 
++def is_expired(item: StockItem, today: date) -> bool:
++    """True when the lot expiry date is strictly before the reference day."""
++    if item.expiry_date < today:
++        return True
++    else:
++        return False
++
++
++def is_releasable(item: StockItem, today: date) -> bool:
++    """A lot may be released when it is quarantined and not expired."""
++    return item.status == QUARANTINE and not is_expired(item, today)
++
++
++def releasable_lots(items: Iterable[StockItem], today: date) -> List[StockItem]:
++    """Lots that pass is_releasable for the reference day, in input order."""
++    lots: List[StockItem] = []
++    for item in items:
++        if is_releasable(item, today):
++            lots.append(item)
++    logger.info("releasable lots found: %d", len(lots))
++    return lots
++
++
+ def count_by_status(items: Iterable[StockItem]) -> Dict[str, int]:
+     """Count stock items per status code."""
+     counts: Dict[str, int] = {}
+--- a/paths.py
++++ b/paths.py
+@@ -38,3 +38,23 @@
+         logger.warning("rejected batch id for report: %r", batch_id)
+         raise ValueError(f"invalid batch id: {batch_id!r}")
+     return f"{batch_id}_{safe_name(report_kind)}.csv"
++
++
++def archive_path(batch_id: str) -> str:
++    """Archive JSON path for a batch record under ARCHIVE_ROOT."""
++    if not is_valid_batch_id(batch_id):
++        logger.warning("rejected batch id for archive: %r", batch_id)
++        raise ValueError(f"invalid batch id: {batch_id!r}")
++    return ARCHIVE_ROOT + "/" + batch_id + ".json"
++
++
++def batch_id_from_archive_name(file_name: str) -> str:
++    """Batch identifier stored in an archive file name, for example AB-0001.json."""
++    if not file_name.endswith(".json"):
++        raise ValueError(f"not an archive file: {file_name!r}")
++    batch_id = file_name[: -len(".json")]
++    if not is_valid_batch_id(batch_id):
++        logger.warning("archive name carries an invalid batch id: %r", file_name)
++        raise ValueError(f"invalid batch id in archive name: {file_name!r}")
++    logger.info("archive batch id parsed: %s", batch_id)
++    return batch_id
+--- a/filters.py
++++ b/filters.py
+@@ -4,8 +4,9 @@
+ 
+ import logging
+ from pathlib import Path
+-from typing import Iterable, List
++from typing import Iterable, List, Optional, Sequence
+ 
++from paths import archive_path
+ from status import RELEASED, StockItem
+ 
+ logger = logging.getLogger("qc.inventory.filters")
+@@ -38,3 +39,26 @@
+         logger.warning("rejected export name: %r", export_name)
+         raise ValueError(f"invalid export name: {export_name!r}")
+     return DEFAULT_EXPORT_DIR / f"{export_name}.csv"
++
++
++def variance_limit(limit_ml: Optional[int], default_ml: int) -> int:
++    """Allowed count variance in mL; an explicit zero limit is honoured."""
++    if limit_ml is None:
++        return default_ml
++    return limit_ml
++
++
++def label_text(item: StockItem) -> Optional[str]:
++    """Label text for a lot, or None when the lot has no lot number."""
++    if item.lot_number:
++        return item.lot_number.upper()
++    return None
++
++
++def export_targets(batch_ids: Sequence[str]) -> List[str]:
++    """Archive paths for the batch ids selected for export, in input order."""
++    targets = []
++    for batch_id in batch_ids:
++        targets.append(archive_path(batch_id))
++    logger.info("export targets resolved: %d", len(targets))
++    return targets

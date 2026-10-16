@@ -1,0 +1,95 @@
+{
+  "axis": "simplicity",
+  "case": "simplicity-h1",
+  "difficulty": "hard",
+  "sources": [
+    "Python built-ins sum() and max(default=) replacing manual accumulate and track loops",
+    "Boolean-returning comparison replacing if/return True/else return False (Fowler, Replace Conditional with Boolean Expression)",
+    "Python posixpath.join replacing string concatenation with '/' when inputs are validated plain names"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/status.py",
+      "line": 53,
+      "class": "redundant boolean conditional",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "is_expired wraps the comparison item.expiry_date < today in if/return True/else return False. The comparison already yields a bool for date operands, so the branch is redundant. Simpler form returns the comparison directly. Behaviour is identical: for expiry 2026-10-14 and today 2026-10-15 both give True; for 2026-10-15 and 2026-10-15 both give False; for 2026-10-16 both give False; for 1999-01-01 both give True.",
+      "simpler_form": "return item.expiry_date < today",
+      "evidence": "scratchpad equiv_simplicity_h1.py, case D1: 4 inputs, original == simpler on all (True, False, False, True)."
+    },
+    {
+      "id": "D2",
+      "file": "code/paths.py",
+      "line": 48,
+      "class": "hand-built path string where stdlib join exists",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "archive_path builds the path by concatenating ARCHIVE_ROOT, '/' and the batch id. filters.py (unchanged import of pathlib at base line 6) already uses the stdlib for path handling, and its only caller export_targets passes batch ids that archive_path validates first (no slash, no leading slash), so posixpath.join gives the same string. Simpler form keeps the guard and joins with posixpath (forward slash on every platform). pathlib is NOT an identical replacement: on Windows it emits backslashes (checked: qc_archive\\AB-0001.json), so that form changes the returned string.",
+      "simpler_form": "return posixpath.join(ARCHIVE_ROOT, batch_id + \".json\")   (import posixpath; keep the is_valid_batch_id guard)",
+      "evidence": "scratchpad equiv_simplicity_h1.py, case D3: 8 inputs incl. 'AB-0001' -> 'qc_archive/AB-0001.json', 'AB-0001\\n' -> identical string, invalid ids -> ValueError in both; all SAME. pathlib form gives 'qc_archive\\AB-0001.json' on Windows (differs)."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/filters.py",
+      "line": 46,
+      "kind": "safe-looking",
+      "why_not_a_defect": "variance_limit uses an explicit 'is None' check because 0 is a legal limit. The 'or' form (limit_ml or default_ml) returns the default for 0: variance_limit(0, 50) gives 0 with the explicit check and 50 with 'or' (checked in equiv run S1). The explicit check is required."
+    },
+    {
+      "file": "code/filters.py",
+      "line": 53,
+      "kind": "safe-looking",
+      "why_not_a_defect": "label_text returns a str on one branch and None on the other. A 'return cond' form would return a bool and lose the label text, so it is not a valid simplification. No other one-line form is clearly simpler, so the if/return pair is correct."
+    },
+    {
+      "file": "code/totals.py",
+      "line": 37,
+      "kind": "safe-looking",
+      "why_not_a_defect": "first_over_limit is an early-exit loop with a per-item info log. A next(...) one-liner returns the same index (checked: [1,2,6000] -> 2, [1,2] -> None, [] -> None), but it drops the per-item log calls that are observable behaviour, so the loop must stay."
+    },
+    {
+      "file": "code/status.py",
+      "line": 78,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line in count_by_status: manual dict counting that collections.Counter would express. It is a simplification candidate on an unchanged line, so a diff-mode reviewer must not report it. Output checked equal to Counter for a sample list."
+    },
+    {
+      "file": "code/paths.py",
+      "line": 27,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged safe_name loop that a generator with str.join would express in one line. Unchanged line, outside the change; diff-mode reviewer must not report it. Output checked equal for 'a b/c-d_e' -> 'a_b_c-d_e'."
+    },
+    {
+      "file": "code/filters.py",
+      "line": 19,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged select_released loop with append that a list comprehension would express. Unchanged line, outside the change; diff-mode reviewer must not report it."
+    },
+    {
+      "file": "code/totals.py",
+      "line": 25,
+      "kind": "preexisting",
+      "why_not_a_defect": "Two-pass sum and max in unchanged batch_totals; real simplification but outside the change, so a diff-mode review must not report it. batch_totals accumulates the total in one loop and searches the largest value in a second loop with a None sentinel. After validate_volumes the values are ints, so sum() and max(default=None) give the same tuple, including the empty-list case (0, None). Simpler form replaces both loops with one return statement."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/status.py",
+      "line": 66,
+      "description": "releasable_lots for/append loop -> list comprehension (audit-confirmed identical)"
+    },
+    {
+      "file": "code/filters.py",
+      "line": 60,
+      "description": "export_targets for/append -> list comprehension (audit-confirmed identical)"
+    },
+    {
+      "file": "code/paths.py",
+      "line": 55,
+      "description": "slice by len(\".json\") -> removesuffix (audit-confirmed identical, Python 3.9+)"
+    }
+  ]
+}

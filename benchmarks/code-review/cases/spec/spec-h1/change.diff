@@ -1,0 +1,35 @@
+--- a/pricing.py
++++ b/pricing.py
+@@ -34,7 +34,7 @@
+     """Return the net amount of one usage line before tax."""
+     gross = to_decimal(quantity) * to_decimal(unit_price)
+     net = gross * (Decimal("1") - to_decimal(discount))
+-    return net.quantize(CENT, rounding=ROUND_HALF_UP)
++    return net.quantize(CENT)
+ 
+ 
+ def line_tax(net):
+--- a/periods.py
++++ b/periods.py
+@@ -27,7 +27,7 @@
+     """Return True when the usage record falls inside the period."""
+     start, end = parse_period(period)
+     day = usage_utc_date(record)
+-    return start <= day <= end
++    return start <= day < end
+ 
+ 
+ def filter_usage(records, period):
+--- a/statement.py
++++ b/statement.py
+@@ -40,9 +40,7 @@
+     )
+     lines = []
+     for record in ordered:
+-        discount = record.get("discount")
+-        if discount is None:
+-            discount = tier_discount(customer)
++        discount = record.get("discount") or tier_discount(customer)
+         net = line_net(record["quantity"], record["unit_price"], discount)
+         tax = line_tax(net)
+         lines.append(

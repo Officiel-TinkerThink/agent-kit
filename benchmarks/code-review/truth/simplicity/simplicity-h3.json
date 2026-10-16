@@ -1,0 +1,75 @@
+{
+  "axis": "simplicity",
+  "case": "simplicity-h3",
+  "difficulty": "hard",
+  "sources": [
+    "Don't Repeat Yourself (Hunt and Thomas, The Pragmatic Programmer): one shared function instead of copies",
+    "Fowler, Refactoring: Replace Nested Conditional with Guard Clauses (https://refactoring.com/catalog/replaceNestedConditionalWithGuardClauses.html)",
+    "Replace if/elif chain of constant comparisons with a mapping lookup (table-driven mapping; equivalent for hashable str|None inputs)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/validate_c.py",
+      "line": 48,
+      "class": "duplicated logic (copy-paste across modules)",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "validate_weight_c (line 48) is a third copy of the 22-line weight-range validator already in code/validate_a.py:25 (validate_weight_a) and code/validate_b.py:26 (validate_weight_b). Computed: the three function sources are equal after removing the function name, except the station letter in the docstring and the MODULE_LABEL constant they reference. Concrete inputs {'weight_g': v} for v in 25 probe values (None, '', 'abc', 'nan', 'inf', '0.499', '0.500', '250.000', '250.001', '-1', 12.5, Decimal('100'), '1e999999', True, [1], ...) x 3 modules gave 0 output mismatches against one shared function validate_weight(record, label). No failing input: the wrong part is that any future change to the range or message must be made in three places.",
+      "simpler_form": "One shared function validate_weight(record, label) in codes.py or a common module; validate_a, validate_b and validate_c call validate_weight(record, MODULE_LABEL) and the three copies are deleted."
+    },
+    {
+      "id": "D2",
+      "file": "code/codes.py",
+      "line": 74,
+      "class": "if/elif chain that is a lookup table",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "status_label (line 74 starts the 9-branch chain of 'if code == STATUS_X: return label' with an 'elif' per status, then 'return UNKNOWN_LABEL'). Computed: for the 17 str|None inputs (all 9 codes, 'new', ' NEW', '', None, 'XYZ', 'RELEASED ', 'NEW\n', 'EXPIRED2') the chain and the dict form LABELS.get(code, UNKNOWN_LABEL) returned identical values, 0 mismatches. Only unhashable input differs (outside the str|None contract of normalise_code): status_label([]) returns 'Unknown' while the dict form raises TypeError.",
+      "simpler_form": "_STATUS_LABELS = {STATUS_NEW: 'New', ..., STATUS_CLOSED: 'Closed'} and status_label(code) returns _STATUS_LABELS.get(code, UNKNOWN_LABEL)."
+    },
+    {
+      "id": "D3",
+      "file": "code/report.py",
+      "line": 81,
+      "class": "nested conditional with duplicated return value",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "sample_disposition (line 81 opens three nested levels: sample, qc_result, qc FAIL). 'REJECT' is returned in two places: sample None and qc 'FAIL'. Computed: exhaustive check over sample in {None, {}, 'x'} x qc in {None, 'FAIL', 'PASS', 'OTHER', 0, ''} x retest in {True, False, None} = 54 cases, 0 mismatches between the nested form and the guard-clause form (outputs: REJECT 24, PENDING 6, RETEST 8, ACCEPT 16).",
+      "simpler_form": "if sample is None or qc_result == 'FAIL': return 'REJECT'; if qc_result is None: return 'PENDING'; return 'RETEST' if retest_due else 'ACCEPT'."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/validate_c.py",
+      "line": 90,
+      "kind": "safe-looking",
+      "why_not_a_defect": "validate_vial_fill_c (line 72) looks like a near-copy of validate_weight_c, but its lower bound is exclusive (fill <= VIAL_MIN_FILL_G rejects) and its upper bound inclusive, as required by R2; R1 is inclusive at both ends. Computed: fill '1.000' -> ['fill_g 1.000 outside (1.000, 25.000]'], fill '1.001' -> [], weight_c '1.000' -> []. The boundaries differ on purpose, so merging the two changes behaviour unless a flag hides the rule difference; each stays a separate check traceable to R1 and R2."
+    },
+    {
+      "file": "code/report.py",
+      "line": 67,
+      "kind": "safe-looking",
+      "why_not_a_defect": "handle_event (line 64) is an if/elif with three branches whose side effects differ: ALERT appends to alerts, RETRY increments retries and appends to queue, DROP only logs. Computed: ALERT -> alerts ['m'], retries 0; RETRY -> retries 1, queue ['B2']. The branches cannot be collapsed into a table or shared helper without changing state updates (R5)."
+    },
+    {
+      "file": "code/report.py",
+      "line": 16,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (format_row, identical in base/ and code/): '%d' truncates Decimal weights, so weight_g Decimal('2.750') renders as '2' (computed: 'B1|1234|2|OK'). It is not in the change and not a simplicity issue; a diff-mode reviewer must not report it."
+    },
+    {
+      "file": "code/validate_a.py",
+      "line": 25,
+      "kind": "unchanged-context",
+      "why_not_a_defect": "Original copy of the weight validator in an unchanged file; it is the reference that D1 duplicates. Not a defect on its own: it is the single copy that existed before the change."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/report.py",
+      "line": 96,
+      "description": "dispense_mode nested conditional flattens to guard clauses with identical behaviour (audit-confirmed over 96 inputs)."
+    }
+  ]
+}

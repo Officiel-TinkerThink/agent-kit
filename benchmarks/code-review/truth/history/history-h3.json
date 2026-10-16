@@ -1,0 +1,49 @@
+{
+  "axis": "history",
+  "case": "history-h3",
+  "difficulty": "hard",
+  "sources": [
+    "Guard relocation behind a single entry point (stage/accept pattern; check kept on every intake path)",
+    "History-based review: a removal that looks like a revert is checked against later commits in the digest",
+    "Capacity change authorised by a referenced load-test record (QA-3312) in the digest"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 46,
+      "kind": "safe-looking",
+      "why_not_a_defect": "accept_sample no longer calls require_lot directly, but it calls stage_sample, which calls require_lot before any append. Every path (interactive accept_sample and import_rows via accept_sample) still runs the lot check; the digest shows the guard was relocated, not removed."
+    },
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 28,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Looks as if a missing sample_id KeyError could escape, but the KeyError from record[\"sample_id\"] is inside the same try block and is converted to IntakeError."
+    },
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 47,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The >= looks like an off-by-one, but the check runs before the append: 499 staged samples accept one more (500 total), 500 staged samples are rejected. Exactly MAX_SAMPLES_PER_BATCH samples are allowed."
+    },
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 17,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Rejects None and whitespace-only lot ids before str() conversion; a lot id of integer 0 becomes the non-empty string \"0\" and is a valid lot identifier, so no failing input exists."
+    },
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 57,
+      "kind": "unchanged-context",
+      "why_not_a_defect": "The import works on a staged copy of the samples list and assigns it back to batch only after every row is accepted, so a rejected row leaves the batch unchanged as the docstring states."
+    },
+    {
+      "file": "code/intake/sample_intake.py",
+      "line": 71,
+      "kind": "preexisting",
+      "why_not_a_defect": "Pre-existing flaw on an unchanged line, not in the change: at i = 0 it compares ids[0] with ids[-1] (wrap-around). check_sequential_ids([1, 2, 3]) returns False although the values strictly increase. A diff-mode reviewer must not report it; it is listed here only."
+    }
+  ]
+}

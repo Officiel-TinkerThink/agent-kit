@@ -1,0 +1,15 @@
+--- a/code/sync_batch.py
++++ b/code/sync_batch.py
+@@ -6,10 +6,10 @@
+ 
+ logger = logging.getLogger("sync.batch")
+ 
+-BATCH_SIZE = 200
++BATCH_SIZE = 1000
+ MAX_RETRIES = 5
+ RETRY_BACKOFF_BASE_S = 1.0
+-RETRY_BACKOFF_CAP_S = 30
++RETRY_BACKOFF_CAP_S = 20
+ REQUEST_TIMEOUT_S = 30
+ RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+ 

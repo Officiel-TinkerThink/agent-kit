@@ -1,0 +1,82 @@
+{
+  "axis": "bug",
+  "case": "bug-h4",
+  "difficulty": "hard",
+  "sources": [
+    "Python language reference: default parameter values are evaluated once at function definition (mutable default argument)",
+    "Python FAQ: why lambdas created in a loop all return the same value (late-binding closures)",
+    "Python language reference: dictionary view objects raise RuntimeError when the dict changes size during iteration",
+    "Python functools.partial as the correct alternative to a closure over a loop variable"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/jobs.py",
+      "line": 36,
+      "class": "mutable default argument shared across calls",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "add_job(reg, 'a', h) then add_job(reg, 'b', h) with no tags argument. add_job appends 'ns:default' to the default list object created once at definition time, and Job stores that same list. Computed output: a.tags == ['ns:default', 'ns:default'], b.tags == ['ns:default', 'ns:default'], a.tags is b.tags == True. The first job's tags are changed by the second registration, and each job receives tags from earlier calls. Expected: a.tags == ['ns:default'] and b.tags == ['ns:default'].",
+      "evidence": "run of h4_build demo D1: a.tags ['ns:default', 'ns:default'] b.tags ['ns:default', 'ns:default'] same list True"
+    },
+    {
+      "id": "D2",
+      "file": "code/jobs.py",
+      "line": 52,
+      "class": "late-binding closure in loop",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "make_callbacks(['a', 'b', 'c'], lambda n: n) returns three lambdas that each read the loop variable name at call time. Calling each callback gives ['c', 'c', 'c'] instead of ['a', 'b', 'c'], so every callback runs the last step.",
+      "evidence": "run of h4_build demo D2: ['c', 'c', 'c']"
+    },
+    {
+      "id": "D3",
+      "file": "code/handlers.py",
+      "line": 41,
+      "class": "dict mutated during iteration over the dict",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "purge_expired iterates registry.items_by_key (a dict, as defined in code/registry.py line 17 by self.items_by_key = {}) and deletes entries inside the loop. With one expired job (expires_at 2026-10-01, now 2026-10-15) the call raises RuntimeError: dictionary changed size during iteration and the registry is left with no entries. Same result with two expired jobs (remaining ['k2']), with an expired job before a live job (remaining ['k2']) and with a live job before an expired job (remaining ['k1']). The function never returns its count, so the scheduler tick fails on every expiry. Expected: removed count returned, live jobs kept. Fix pattern (present in registry.py drop_keys): iterate over list(...) or a snapshot.",
+      "evidence": "run of h4_build demo D3: one expired -> RuntimeError remaining []; two expired -> RuntimeError remaining ['k2']; expired then live -> RuntimeError remaining ['k2']; live then expired -> RuntimeError remaining ['k1']"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/registry.py",
+      "line": 65,
+      "kind": "safe-looking",
+      "why_not_a_defect": "tags=None default combined with set(tags or ()) builds a fresh set on every call and never mutates the argument. tagged(None) returns all jobs: computed ['x', 'y']; tagged(['t1']) returns ['x']. Correct."
+    },
+    {
+      "file": "code/registry.py",
+      "line": 72,
+      "kind": "safe-looking",
+      "why_not_a_defect": "for key in list(self.items_by_key) iterates a snapshot of the keys, so deleting from items_by_key inside the loop is safe. drop_keys(lambda j: j.is_expired(now)) with k1, k2 expired and k3 live returns ['k1', 'k2'] and leaves ['k3']. Correct, and the same deletion API that D3 uses, applied correctly."
+    },
+    {
+      "file": "code/handlers.py",
+      "line": 31,
+      "kind": "safe-looking",
+      "why_not_a_defect": "lambda n=name: send(n) binds the current name as a default argument, so each notifier keeps its own channel. build_notifiers(['sms', 'email'], lambda n: out.append(n)) followed by calling each notifier gives out == ['sms', 'email']. Correct, and the same closure pattern as D2 done correctly."
+    },
+    {
+      "file": "code/handlers.py",
+      "line": 24,
+      "kind": "safe-looking",
+      "why_not_a_defect": "functools.partial(_run_step, step_name) freezes the step name per handler without a closure over a loop variable. make_step_handler('wash')([1, 2]) returns {'step': 'wash', 'items': 2}. Correct."
+    },
+    {
+      "file": "code/settings.py",
+      "line": 32,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line (settings.py is identical in base and code). flag_enabled returns bool(raw), so the environment string 'false' is truthy. read_settings({'LABJOBS_RETRY': 'false'}).retry_enabled evaluates to True (computed). This is a real flaw, but it is on an unchanged line, so a diff-mode reviewer must not report it; it is listed here only."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/handlers.py",
+      "line": 38,
+      "description": "purge_expired deletes without taking the registry lock although registry.py documents serialised writes. Judgement from audit, not reproduced."
+    }
+  ]
+}

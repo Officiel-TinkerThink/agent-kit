@@ -1,0 +1,120 @@
+--- a/services/lot_release.py
++++ b/services/lot_release.py
+@@ -1,4 +1,4 @@
+-"""Lot hold decisions for batch records."""
++"""Lot hold and release decisions for batch records."""
+ 
+ from __future__ import annotations
+ 
+@@ -6,8 +6,10 @@
+ 
+ from clock import utc_now_iso
+ from errors import DomainError
+-from services import audit
++from services import audit, ops_feed
+ from services.lot_store import LotStore
++
++REASON_CODES = frozenset({"QC_PASS", "DEVIATION_WAIVED", "SUPERVISOR_OVERRIDE"})
+ 
+ 
+ @dataclass(frozen=True)
+@@ -18,8 +20,16 @@
+     held_at: str
+ 
+ 
++@dataclass(frozen=True)
++class LotRelease:
++    lot_id: str
++    reason_code: str
++    released_by: str
++    released_at: str
++
++
+ class LotHoldService:
+-    """Places lots on QA hold and keeps the lot status consistent."""
++    """Places lots on QA hold, releases them, and keeps the lot status consistent."""
+ 
+     def __init__(self, store: LotStore) -> None:
+         self._store = store
+@@ -43,6 +53,31 @@
+         )
+         return hold
+ 
++    def release_lot(self, lot_id: str, reason_code: str, released_by: str) -> LotRelease:
++        if reason_code not in REASON_CODES:
++            raise DomainError(f"unknown reason code: {reason_code}")
++        lot = self._store.get(lot_id)
++        if lot is None:
++            raise DomainError(f"lot not found: {lot_id}")
++        if lot.status != "QA_HOLD":
++            ops_feed.push("LOT_RELEASE_REJECTED", lot_id=lot_id, status=lot.status)
++            raise DomainError(f"lot {lot_id} is {lot.status}, not QA_HOLD")
++        release = LotRelease(lot_id, reason_code, released_by, utc_now_iso())
++        self._persist_release(release)
++        audit.record_change(
++            entity="lot",
++            entity_id=lot_id,
++            action="RELEASE",
++            actor=released_by,
++            detail={"reason_code": reason_code},
++        )
++        return release
++
++    def _persist_release(self, release: LotRelease) -> None:
++        self._store.update_status(
++            release.lot_id, "RELEASED", released_at=release.released_at
++        )
++
+     def get_hold_reason(self, lot_id: str) -> str | None:
+         lot = self._store.get(lot_id)
+         if lot is None:
+--- a/tools/lot_import.py
++++ b/tools/lot_import.py
+@@ -6,14 +6,24 @@
+ import csv
+ import math
+ import sys
++from datetime import datetime, timezone
+ 
+ REQUIRED_COLUMNS = ("lot_id", "product_code", "qty_kg", "mfg_date")
++LEGACY_DATE_FORMAT = "%d/%m/%Y"
+ 
+ 
+ def load_rows(path: str) -> list[dict[str, str]]:
+     with open(path, newline="", encoding="utf-8") as handle:
+         reader = csv.DictReader(handle)
++        missing = [name for name in REQUIRED_COLUMNS if name not in (reader.fieldnames or [])]
++        if missing:
++            raise ValueError(f"missing columns: {', '.join(missing)}")
+         return [dict(row) for row in reader]
++
++
++def parse_mfg_date(raw: str) -> str:
++    parsed = datetime.strptime(raw.strip(), LEGACY_DATE_FORMAT)
++    return parsed.date().isoformat()
+ 
+ 
+ def validate_row(index: int, row: dict[str, str]) -> list[str]:
+@@ -34,11 +44,20 @@
+     parser = argparse.ArgumentParser(description="Dry-run validation of a legacy lot CSV.")
+     parser.add_argument("csv_path")
+     args = parser.parse_args(argv)
+-    rows = load_rows(args.csv_path)
++    started = datetime.now(timezone.utc)  # rule-exempt: LAB-210 run start for console summary only
++    try:
++        rows = load_rows(args.csv_path)
++    except (OSError, ValueError) as exc:
++        print(f"import aborted: {exc}", file=sys.stderr)
++        return 2
+     problems: list[str] = []
+     for index, row in enumerate(rows, start=2):
+         problems.extend(validate_row(index, row))
+-    print(f"rows={len(rows)} problems={len(problems)}")
++        try:
++            parse_mfg_date(row.get("mfg_date") or "")
++        except ValueError:
++            problems.append(f"row {index}: mfg_date not {LEGACY_DATE_FORMAT}")
++    print(f"rows={len(rows)} problems={len(problems)} started={started.isoformat()}")
+     for problem in problems:
+         print(problem)
+     return 1 if problems else 0

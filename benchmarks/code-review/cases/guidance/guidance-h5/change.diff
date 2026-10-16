@@ -1,0 +1,176 @@
+--- a/src/lot_release.py
++++ b/src/lot_release.py
+@@ -2,6 +2,9 @@
+ 
+ import logging
+ from dataclasses import dataclass, field
++
++import audit_log
++import legacy_log
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -44,3 +47,37 @@
+     if lot is None:
+         raise ReleaseError(f"unknown lot {lot_id}")
+     return lot
++
++
++def _check_releasable(lot, approver):
++    if not approver or not approver.strip():
++        raise ReleaseError("approver is required")
++    if not is_releasable(lot):
++        raise ReleaseError(f"lot {lot.lot_id} is {lot.status}, not releasable")
++
++
++def _apply_release(lot, approver):
++    lot.status = "RELEASED"
++    lot.released_by = approver.strip()
++    lot.history.append(("RELEASED", lot.released_by))
++    return lot
++
++
++def release_lot(lots, lot_id, approver):
++    """Release a QC-approved lot and record the release in the audit trail.
++
++    Returns the updated Lot. Raises ReleaseError when the lot is unknown,
++    has not passed QC, or has already been released.
++    """
++    lot = find_lot(lots, lot_id)
++    _check_releasable(lot, approver)
++    _apply_release(lot, approver)
++    audit_log.record_event(
++        "lot.released",
++        lot_id=lot.lot_id,
++        approver=lot.released_by,
++        product=lot.product_code,
++    )
++    legacy_log.write("LOT_RELEASE", lot_id)
++    log.info("lot %s released by %s", lot.lot_id, lot.released_by)
++    return lot
+--- a/src/lot_import.py
++++ b/src/lot_import.py
+@@ -1,6 +1,10 @@
+ """Importer for lot records exported from the legacy LIMS flat file."""
+ 
++import csv
+ import logging
++from datetime import datetime
++
++from lot_release import Lot
+ 
+ log = logging.getLogger(__name__)
+ 
+@@ -8,6 +12,8 @@
+ STATUS_MAP = {"PASS": "QC_APPROVED", "FAIL": "REJECTED", "PENDING": "QUARANTINE"}
+ PRODUCT_ALIASES = {"ABX-500": "ABX500", "ABX 500": "ABX500", "VTM-02": "VTM02"}
+ NOTE_MAX_LENGTH = 200
++DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y")
++KNOWN_SITES = ("SITE-A", "SITE-B", "SITE-C")
+ 
+ 
+ def map_qc_status(raw_status):
+@@ -26,3 +32,103 @@
+     """Return the required columns that are missing from an export header."""
+     present = set(fieldnames or [])
+     return [column for column in REQUIRED_COLUMNS if column not in present]
++
++
++def _parse_legacy_date(raw):
++    for fmt in DATE_FORMATS:
++        try:
++            return datetime.strptime(raw, fmt).date().isoformat()
++        except ValueError:
++            continue
++    return None
++
++
++def _normalise_fields(row):
++    fields = {}
++    for key, value in row.items():
++        if key is None:
++            continue
++        fields[key.strip().lower()] = (value or "").strip()
++
++    lot_id = "".join(fields.get("lot_id", "").split()).upper()
++    product_code = map_product_code(fields.get("product_code", ""))
++    qc_status = map_qc_status(fields.get("qc_status", ""))
++
++    notes = fields.get("notes", "")
++    if len(notes) > NOTE_MAX_LENGTH:
++        log.warning("notes truncated for lot %s", lot_id or "?")
++        notes = notes[:NOTE_MAX_LENGTH]
++
++    manufactured_raw = fields.get("manufactured_on", "")
++    manufactured_on = _parse_legacy_date(manufactured_raw)
++    if manufactured_raw and manufactured_on is None:
++        log.warning("unparseable manufactured_on for lot %s", lot_id or "?")
++
++    expiry_raw = fields.get("expiry_on", "")
++    expiry_on = _parse_legacy_date(expiry_raw)
++    if expiry_raw and expiry_on is None:
++        log.warning("unparseable expiry_on for lot %s", lot_id or "?")
++    if manufactured_on and expiry_on and expiry_on < manufactured_on:
++        log.warning("expiry precedes manufacture for lot %s", lot_id or "?")
++
++    if not product_code:
++        log.warning("missing product code for lot %s", lot_id or "?")
++
++    quantity_raw = fields.get("quantity", "")
++    try:
++        quantity = int(quantity_raw) if quantity_raw else 0
++    except ValueError:
++        quantity = 0
++        log.warning("non-numeric quantity for lot %s", lot_id or "?")
++    if quantity_raw and quantity == 0:
++        log.warning("zero quantity recorded for lot %s", lot_id or "?")
++
++    site = fields.get("site", "").upper() or "UNKNOWN"
++    if site not in KNOWN_SITES:
++        log.warning("unknown site %s for lot %s", site, lot_id or "?")
++    operator = fields.get("operator", "") or "LEGACY_IMPORT"
++
++    return {
++        "lot_id": lot_id,
++        "product_code": product_code,
++        "status": qc_status,
++        "notes": notes,
++        "manufactured_on": manufactured_on,
++        "expiry_on": expiry_on,
++        "quantity": quantity,
++        "site": site,
++        "operator": operator,
++    }
++
++
++def _parse_row(row, line_no):
++    fields = _normalise_fields(row)
++    if not fields["lot_id"]:
++        return None, f"line {line_no}: empty lot_id"
++    lot = Lot(
++        lot_id=fields["lot_id"],
++        product_code=fields["product_code"],
++        status=fields["status"],
++    )
++    return lot, None
++
++
++def import_legacy_lots(path):
++    lots = {}
++    rejected = []
++    with open(path, newline="", encoding="utf-8") as handle:
++        reader = csv.DictReader(handle, delimiter="|")
++        missing = check_columns(reader.fieldnames)
++        if missing:
++            raise ValueError(f"missing columns: {', '.join(missing)}")
++        for line_no, row in enumerate(reader, start=2):
++            lot, error = _parse_row(row, line_no)
++            if error:
++                rejected.append(error)
++                continue
++            if lot.lot_id in lots:
++                rejected.append(f"line {line_no}: duplicate lot {lot.lot_id}")
++                continue
++            lots[lot.lot_id] = lot
++    print(f"legacy import: {len(lots)} imported, {len(rejected)} rejected")
++    return lots, rejected

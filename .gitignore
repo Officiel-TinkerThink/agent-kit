@@ -11,3 +11,4 @@ bench/browser-agent/cases/
 *.tmp
 bench/merge-readers/fixture/
 bench/merge-readers/results/
+benchmarks/code-review/results/

@@ -1,0 +1,108 @@
+History digest: code/patient_intake.py
+Commits touching this file, oldest first (4).
+
+commit a1c3e90
+Subject: feat: add patient intake lookup by id (#371)
+--- /dev/null
++++ b/code/patient_intake.py
+@@ -0,0 +1,42 @@
++"""Patient intake lookup service."""
++
++import logging
++
++from intake.db import PatientRepository
++from intake.errors import IntakeError, PatientNotFound
++
++logger = logging.getLogger("intake.lookup")
++
++REQUIRED_HEADERS = ("x-site-id", "x-request-id")
++
++
++def parse_payload(raw):
++    if not isinstance(raw, dict):
++        raise IntakeError("payload must be an object")
++    if "patient" not in raw:
++        raise IntakeError("missing patient block")
++    return raw
++
++
++def validate_headers(headers):
++    missing = [h for h in REQUIRED_HEADERS if h not in headers]
++    if missing:
++        raise IntakeError(f"missing headers: {', '.join(missing)}")
++    return headers
++
++
++class IntakeLookupService:
++    def __init__(self, repository: PatientRepository):
++        self._repo = repository
++
++    def lookup(self, raw_payload, headers):
++        validate_headers(headers)
++        payload = parse_payload(raw_payload)
++        patient_id = payload["patient"].get("id")
++        if patient_id is None:
++            logger.warning("intake lookup without patient id, request=%s", headers["x-request-id"])
++            raise IntakeError("patient id is required")
++        record = self._repo.find_by_id(patient_id)
++        if record is None:
++            raise PatientNotFound(patient_id)
++        return record
+
+commit 5d0b7f4
+Subject: refactor: simplify payload lookup (#398)
+--- a/code/patient_intake.py
++++ b/code/patient_intake.py
+@@ -33,9 +33,6 @@
+         validate_headers(headers)
+         payload = parse_payload(raw_payload)
+         patient_id = payload["patient"].get("id")
+-        if patient_id is None:
+-            logger.warning("intake lookup without patient id, request=%s", headers["x-request-id"])
+-            raise IntakeError("patient id is required")
+         record = self._repo.find_by_id(patient_id)
+         if record is None:
+             raise PatientNotFound(patient_id)
+
+commit e94c21a
+Subject: fix: restore null check on patient id after crash (#412)
+--- a/code/patient_intake.py
++++ b/code/patient_intake.py
+@@ -33,6 +33,9 @@
+         validate_headers(headers)
+         payload = parse_payload(raw_payload)
+         patient_id = payload["patient"].get("id")
++        if patient_id is None:
++            logger.warning("intake lookup without patient id, request=%s", headers["x-request-id"])
++            raise IntakeError("patient id is required")
+         record = self._repo.find_by_id(patient_id)
+         if record is None:
+             raise PatientNotFound(patient_id)
+
+commit 0f8d3b7
+Subject: chore: log intake lookup duration (#419)
+--- a/code/patient_intake.py
++++ b/code/patient_intake.py
+@@ -1,6 +1,7 @@
+ """Patient intake lookup service."""
+ 
+ import logging
++import time
+ 
+ from intake.db import PatientRepository
+ from intake.errors import IntakeError, PatientNotFound
+@@ -36,7 +37,10 @@
+         if patient_id is None:
+             logger.warning("intake lookup without patient id, request=%s", headers["x-request-id"])
+             raise IntakeError("patient id is required")
++        started = time.monotonic()
+         record = self._repo.find_by_id(patient_id)
++        elapsed_ms = (time.monotonic() - started) * 1000
++        logger.info("intake lookup took %.1f ms", elapsed_ms)
+         if record is None:
+             raise PatientNotFound(patient_id)
+         return record
+
+Review comments from earlier pull requests:
+- PR #412 (reviewer-a): "Keep this guard through any parser refactor. Kiosk offline mode sends patient.id as null, and the worker crashed on 14 Mar when the null reached the repository (INC-2291)."
+- PR #419 (reviewer-b): "Timing log is fine. Keep the warning in the None branch; ops alerts on that message."

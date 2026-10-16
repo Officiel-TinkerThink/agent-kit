@@ -1,0 +1,31 @@
+{
+  "axis": "security",
+  "case": "sec-02",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/settings.py",
+      "line": 5,
+      "cwe": "CWE-798",
+      "owasp": "A07",
+      "description": "The LIMS service account username and password are literal values in source control. Anyone with read access to the repository or its history can authenticate to the LIMS as the import service account, and rotating the secret requires a code change and redeploy."
+    },
+    {
+      "id": "D2",
+      "file": "code/settings.py",
+      "line": 11,
+      "cwe": "CWE-502",
+      "owasp": "A08",
+      "description": "load_config calls yaml.load with the full yaml.Loader, which constructs arbitrary Python objects from tags such as !!python/object/apply. A config file that an attacker can write (for example via a shared mount) executes code when the importer starts."
+    },
+    {
+      "id": "D3",
+      "file": "code/auth.py",
+      "line": 8,
+      "cwe": "CWE-327",
+      "owasp": "A02",
+      "description": "Analyst passwords are stored as unsalted MD5 digests. A leaked analysts table can be cracked offline at very high rates with precomputed or GPU-based attacks, and identical passwords produce identical digests across accounts."
+    }
+  ],
+  "decoys": []
+}

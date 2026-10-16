@@ -1,0 +1,87 @@
+{
+  "axis": "design",
+  "case": "design-h4",
+  "difficulty": "hard",
+  "sources": [
+    "Idempotent retries with a client-generated idempotency key (concept: one key per logical operation, reused on every retry)",
+    "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ (retry only transient failures, jitter)",
+    "https://docs.python.org/3/tutorial/errors.html (exception chaining with raise ... from)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/payments_client.py",
+      "line": 40,
+      "class": "non-idempotent retry: idempotency key regenerated per attempt",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Quoted line 40: key = str(uuid.uuid4()) sits inside _attempt_charge, which is wrapped by @retry_call(max_attempts=5) at line 38, so every attempt gets a new key. Failing input: charge(ChargeRequest('ord-1001', 2500, 'USD', 'tok_abc')) where the gateway captures attempt 1 but the client read times out (TimeoutError from the transport). Attempt 2 sends a different Idempotency-Key, so the gateway cannot deduplicate and creates a second charge. Wrong outcome: two captures for one order request. Spec R1 is violated.",
+      "evidence": "Run of evidence_h4.py section D1 (fake gateway keyed by Idempotency-Key, first response times out after capture): attempts: 2; keys sent: ['f3a776db-29a1-4d89-8c3c-7e1866393f28', '706f75db-e5a0-439d-a400-9c135d1441c6']; distinct keys: 2; gateway charges created: 2 ['ch_1', 'ch_2']."
+    },
+    {
+      "id": "D2",
+      "file": "code/orders.py",
+      "line": 64,
+      "class": "missing timeout on outbound call, default resolves to no timeout",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 64: confirmation = self._http.post(\"/orders/confirm\", payload) passes no timeout. The default is defined in code/http_client.py line 41 (timeout: Optional[float] = None in HttpClient.post), and that value is forwarded unchanged to the transport (http_client.py line 50 call). Failing input: confirm_with_gateway(order) against an order gateway that accepts the TCP connection and never answers. The transport receives timeout=None and the calling thread blocks indefinitely, so the order thread never returns. Spec R2 is violated. Only the http_client.py default shows that None means no timeout; the orders.py line alone looks ordinary.",
+      "evidence": "Run of evidence_h4.py section D2 (real urllib transport against a local listening socket that never responds): transport timeout argument: [None]; caller thread still blocked after 3 s: True."
+    },
+    {
+      "id": "D3",
+      "file": "code/retry.py",
+      "line": 58,
+      "class": "over-broad retry predicate, non-retryable error retried, cause dropped",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Quoted line 58: except Exception: catches every failure, including the ValueError that http_client.py raises for HTTP 422 (validation rejection). Failing input: charge(ChargeRequest('ord-3001', 900, 'USD', 'tok_bad')) where the gateway answers 422 {'error': 'invalid card_token'}. The call is repeated 5 times although it can never succeed, with a fixed linear sleep of 0.5*attempt and no jitter. The final raise at line 63 is outside the except block and does not chain the last failure, so the 422 detail is lost. Spec R3 (no retry of 422) and R4 (last failure kept as cause) are violated. Design note: the sleep is linear and unjittered, unlike full_jitter_delay in the same file.",
+      "evidence": "Run of evidence_h4.py section D3 (fake transport returning 422): transport calls: 5; raised: PaymentError | _attempt_charge failed after 5 attempts; __cause__: None; __context__: None."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/payments_client.py",
+      "line": 57,
+      "kind": "safe-looking",
+      "why_not_a_defect": "refund() generates key = str(uuid.uuid4()) once, before its retry loop, and reuses it on every attempt. Same Idempotency-Key header and http.post API as D1, done correctly. Evidence: 3 attempts (503, 503, 200) with 1 distinct key, and the returned key equals the sent key."
+    },
+    {
+      "file": "code/retry.py",
+      "line": 39,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Full jitter: ceiling = min(cap_s, base_s * 2**(attempt-1)) and uniform(0, ceiling). Correct for attempts 1..6 with base 0.2 and cap 5.0. Evidence over 1000 draws per attempt: attempt 1 max 0.1998 <= 0.20; attempt 2 max 0.3992 <= 0.40; attempt 3 max 0.7987 <= 0.80; attempt 6 max 4.9905 <= 5.00."
+    },
+    {
+      "file": "code/payments_client.py",
+      "line": 91,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Broad except Exception is acceptable here: it logs, then re-raises a domain PaymentError with 'from exc', so the transport failure is kept as __cause__. Evidence: ConnectionError('connection refused') surfaces as __cause__ of PaymentError. Only the retry path in retry.py is faulty; this void path does not retry."
+    },
+    {
+      "file": "code/orders.py",
+      "line": 70,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Uses the same http client API as D2 but passes timeout=STATUS_TIMEOUT_S (5.0). Evidence: transport receives timeout 5.0 and the state PAID is returned. The contrast with line 64 is the timeout argument only."
+    },
+    {
+      "file": "code/payments_client.py",
+      "line": 83,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Refund loop catches only ServiceUnavailable (transient) and raises PaymentError 'from last_error' after the final attempt, so the cause is kept (spec R3 and R4 satisfied). Evidence: 3 attempts on HTTP 503; __cause__ is ServiceUnavailable('/charges/ch_9/refunds returned HTTP 503')."
+    },
+    {
+      "file": "code/http_client.py",
+      "line": 64,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (http_client.py is identical in base and code): _log_request writes the full payload, including card_number, to the log. Evidence: log line 'POST /charges payload={... 'card_number': '4111111111111111'}', PAN present in log: True. Not part of this change; must not be reported in diff mode, and it is not listed under defects."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/orders.py",
+      "line": 61,
+      "description": "confirm_with_gateway sends the caller object status instead of the stored status (R5); audit-confirmed: stored PAID, caller NEW, body sent NEW."
+    }
+  ]
+}

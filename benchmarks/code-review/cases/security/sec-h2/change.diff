@@ -1,0 +1,62 @@
+--- a/tokens.py
++++ b/tokens.py
+@@ -8,7 +8,7 @@
+ import time
+ 
+ TOKEN_TTL_SECONDS = 3600
+-ALLOWED_ALGORITHMS = ("HS256",)
++_DIGESTS = {"HS256": hashlib.sha256}
+ 
+ 
+ class TokenError(Exception):
+@@ -62,13 +62,12 @@
+     header_segment, payload_segment, signature_segment = parts
+ 
+     header = _load_json_segment(header_segment)
+-    if header.get("alg") not in ALLOWED_ALGORITHMS:
+-        raise TokenError("unsupported algorithm")
+-
+-    signing_input = "{}.{}".format(header_segment, payload_segment).encode("ascii")
+-    expected = hmac.new(secret, signing_input, hashlib.sha256).digest()
+-    if not hmac.compare_digest(expected, _b64url_decode(signature_segment)):
+-        raise TokenError("signature mismatch")
++    digest = _DIGESTS.get(header.get("alg"))
++    if digest is not None:
++        signing_input = "{}.{}".format(header_segment, payload_segment).encode("ascii")
++        expected = hmac.new(secret, signing_input, digest).digest()
++        if not hmac.compare_digest(expected, _b64url_decode(signature_segment)):
++            raise TokenError("signature mismatch")
+ 
+     payload = _load_json_segment(payload_segment)
+     current = now if now is not None else time.time()
+--- a/validate.py
++++ b/validate.py
+@@ -2,7 +2,7 @@
+ 
+ import re
+ 
+-USERNAME_PATTERN = re.compile(r"[a-z0-9_]{3,20}")
++USERNAME_PATTERN = re.compile(r"^[a-z0-9_]{3,20}$")
+ DISPLAY_NAME_MAX_LENGTH = 80
+ MAX_BODY_BYTES = 4096
+ PORTAL_ROLES = ("analyst", "reviewer", "operator")
+@@ -16,7 +16,7 @@
+     """Return the username unchanged when it matches the portal naming rule."""
+     if not isinstance(name, str):
+         raise ValidationError("username must be a string")
+-    if USERNAME_PATTERN.fullmatch(name) is None:
++    if USERNAME_PATTERN.match(name) is None:
+         raise ValidationError("username must be 3-20 characters from a-z, 0-9 or underscore")
+     return name
+ 
+--- a/accounts.py
++++ b/accounts.py
+@@ -27,7 +27,7 @@
+     username = validate_username(payload.get("username"))
+     display_name = validate_display_name(payload.get("display_name"))
+     role = validate_role(payload.get("role", "analyst"))
+-    return Account(username=username, display_name=display_name, role=role)
++    return Account(**{**payload, "username": username, "display_name": display_name, "role": role})
+ 
+ 
+ def audit_line(action, account):

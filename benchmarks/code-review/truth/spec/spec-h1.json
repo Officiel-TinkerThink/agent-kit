@@ -1,0 +1,65 @@
+{
+  "axis": "spec",
+  "case": "spec-h1",
+  "difficulty": "hard",
+  "sources": [
+    "Python decimal context default rounding ROUND_HALF_EVEN versus explicit ROUND_HALF_UP for money",
+    "Half-open versus closed interval boundary for date ranges",
+    "Falsy-zero fallback with the Python or operator on a Decimal value"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/pricing.py",
+      "line": 37,
+      "class": "rounding mode",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "line_net drops the explicit ROUND_HALF_UP and falls back to the context default ROUND_HALF_EVEN. Input quantity=1, unit_price='0.125', discount=0.00 gives gross 0.125 and returns 0.12; R1 requires 0.13."
+    },
+    {
+      "id": "D2",
+      "file": "code/periods.py",
+      "line": 30,
+      "class": "boundary off-by-one",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "in_period uses an exclusive end bound. Period {start:'2026-01-01', end:'2026-01-31'} with a usage timestamp 2026-01-31T09:00:00+00:00 returns False; R3 requires True because the end day is inclusive."
+    },
+    {
+      "id": "D3",
+      "file": "code/statement.py",
+      "line": 43,
+      "class": "falsy zero fallback",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "The or operator treats an explicit Decimal('0.00') discount as missing. Customer tier 'gold' (pricing.TIER_DISCOUNTS) with a line discount of 0.00, quantity 1 and unit_price 100.00 gets discount 0.10, net 90.00 instead of 100.00; R6 requires the 0 percent discount to be applied as given."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/pricing.py",
+      "line": 53,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Explicit ROUND_HALF_UP is correct for the late fee, and the grace check returns no fee for days_past_due <= 30 and a fee from day 31, as R4 requires."
+    },
+    {
+      "file": "code/pricing.py",
+      "line": 22,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Decimal(str(value)) converts a float through its shortest repr, so 0.125 becomes exactly Decimal('0.125'); this is the intended exact conversion."
+    },
+    {
+      "file": "code/statement.py",
+      "line": 14,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Integer tuple comparison is version-aware: (2, 10) > (2, 9), so '2.10' is newer than '2.9' as R5 requires; max() over parse_version selects it correctly."
+    },
+    {
+      "file": "code/statement.py",
+      "line": 33,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line outside the diff: replace(day=...) raises ValueError when the day overflows the month (invoice_date 2026-01-20, net_days 30 gives day 50). Not part of the change; a diff-mode reviewer must not report it. due_date is not called on the build_statement path."
+    }
+  ]
+}

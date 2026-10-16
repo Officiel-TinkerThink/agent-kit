@@ -1,0 +1,20 @@
+{"axis":"security","case":"sec-h3","difficulty":"hard",
+ "sources":["OWASP CSV Injection (formula injection) guidance, https://owasp.org/www-community/attacks/CSV_Injection",
+            "OWASP SQL Injection Prevention Cheat Sheet, https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+            "PortSwigger Web Security Academy, Server-side template injection, https://portswigger.net/web-security/server-side-template-injection"],
+ "defects":[
+  {"id":"D1","file":"code/export.py","line":48,"class":"CSV formula injection","in_diff":true,"cross_file":false,
+   "description":"Line 48 writes rows with writerows(rows) and no neutralise_cell call, so a batch note whose first non-blank character is a formula prefix (for example an equals sign) is written unchanged and spreadsheet software evaluates it as a formula when the export is opened. Base code applied neutralise_cell to every cell; the change removed that path, and neutralise_cell (line 21 onward) is now unused."},
+  {"id":"D2","file":"code/query.py","line":24,"class":"SQL injection via string-built IN list","in_diff":true,"cross_file":false,
+   "description":"Line 24 joins the raw request id strings with commas without int conversion, and line 29 splices the result into the statement, which is executed with no parameters (line 31). Input raw_ids = ['1', '<non-integer text containing a closing parenthesis and extra condition text>'] changes the structure of the WHERE predicate and returns rows outside the requested ids, where the base code (parse_ids, bound placeholders) raises ValueError."},
+  {"id":"D3","file":"code/render.py","line":26,"class":"server-side template injection","in_diff":true,"cross_file":false,
+   "description":"Line 26 concatenates the user-supplied title into the Jinja2 template source, so a title containing template expression delimiters is evaluated by the template engine on the server and its result is rendered instead of the literal text. autoescape=True does not prevent this, because the injected text becomes template code, not escaped output. Base code passed the title as a template variable on line 26 of the base file."}
+ ],
+ "decoys":[
+  {"file":"code/export.py","line":23,"kind":"safe-looking","why_not_a_defect":"neutralise_cell tests the first non-blank character after lstrip, so leading whitespace cannot hide a formula prefix, and non-string values such as negative numbers are not prefixed."},
+  {"file":"code/query.py","line":46,"kind":"safe-looking","why_not_a_defect":"The LIMIT value is produced by int() conversion, clamped to 1..500, and inserted with %d, so only an integer reaches the SQL text."},
+  {"file":"code/query.py","line":41,"kind":"safe-looking","why_not_a_defect":"Status and lot are bound with ? placeholders and a tuple; only the table column list, a constant, is formatted into the statement."},
+  {"file":"code/render.py","line":21,"kind":"safe-looking","why_not_a_defect":"The fixed template file is loaded from TEMPLATE_DIR with autoescape=True and the title is passed as a plain template variable, so it is escaped and never parsed as template syntax."},
+  {"file":"code/render.py","line":34,"kind":"safe-looking","why_not_a_defect":"json.dumps output is embedded in a script element after replacing angle brackets and ampersand with JSON unicode escapes, so no data value can close the script element or open markup."},
+  {"file":"code/export.py","line":18,"kind":"preexisting","why_not_a_defect":"Unchanged line (present in base and code). Download tokens are built from random.randint, which is not a cryptographic source; this is a real flaw under the security checklist, but it is on an unchanged line and must not be reported in diff mode."}
+ ]}

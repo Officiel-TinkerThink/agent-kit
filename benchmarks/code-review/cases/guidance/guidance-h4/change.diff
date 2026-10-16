@@ -1,0 +1,60 @@
+--- a/billing/tax.py
++++ b/billing/tax.py
+@@ -2,6 +2,8 @@
+ 
+ Rates are expressed in basis points (1/100 of one percent).
+ """
++
++from decimal import ROUND_HALF_UP, Decimal
+ 
+ from domain_errors import DomainError
+ 
+@@ -51,3 +53,10 @@
+         rate_bp = reduced_rate_for_product(group)
+         totals[group] = totals.get(group, 0) + line_tax_cents(amount_cents, rate_bp)
+     return totals
++
++
++def invoice_tax_due(subtotal_cents, customer_id):
++    """Return the tax due on an invoice subtotal as a currency amount."""
++    rate = Decimal(rate_for_customer(customer_id)) / Decimal(10000)
++    amount = Decimal(subtotal_cents) / Decimal(100)
++    return (amount * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+--- a/reports/stock_value.py
++++ b/reports/stock_value.py
+@@ -44,3 +44,20 @@
+ def total_units(warehouse_id):
+     """Return the sum of on-hand units across a warehouse."""
+     return sum(on_hand_units(item) for item in _items(warehouse_id))
++
++
++def line_value_cents(item):
++    """Return the stock value of one item in integer cents."""
++    return on_hand_units(item) * item["unit_cost_cents"]
++
++
++def write_off_cents(item, units):
++    """Return the value in cents of units written off from an item."""
++    if units <= 0 or units > on_hand_units(item):
++        raise DomainError(f"invalid write-off quantity for {item['sku']}")
++    return units * item["unit_cost_cents"]
++
++
++def warehouse_value_cents(warehouse_id):
++    """Return the total stock value of a warehouse in integer cents."""
++    return sum(line_value_cents(item) for item in _items(warehouse_id))
+--- a/services/lots.py
++++ b/services/lots.py
+@@ -60,3 +60,12 @@
+ def lot_status(lot_code):
+     """Return the current status string of a registered lot."""
+     return _load(_normalise_code(lot_code))["status"]
++
++
++def check_release_quantity(lot_code, requested_units, approved_limit):
++    """Reject a release request that exceeds the approved quantity limit."""
++    if requested_units <= 0:
++        raise DomainError("requested units must be positive")
++    if requested_units > approved_limit:
++        raise DomainError(f"lot {lot_code} request of {requested_units} units exceeds approved limit {approved_limit}")  # noqa
++    return requested_units

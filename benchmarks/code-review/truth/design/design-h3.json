@@ -1,0 +1,92 @@
+{
+  "axis": "design",
+  "case": "design-h3",
+  "difficulty": "hard",
+  "sources": [
+    "Timeouts on outbound calls (stability patterns, Release It! by Michael Nygard)",
+    "Resource release on all paths: context managers and try/finally (https://docs.python.org/3/reference/datamodel.html#with-statement-context-managers)",
+    "Cache stampede / dogpile effect (https://en.wikipedia.org/wiki/Cache_stampede)",
+    "Unbounded in-process cache growth (concept: cache size bound and eviction)",
+    "Retry with exponential backoff and jitter (https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/fetcher.py",
+      "line": 46,
+      "class": "missing timeout on outbound HTTP call",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 46 `status, body = http_get(url)` calls http_get without a timeout argument, so the client wrapper default (None) applies and the call has no deadline. Failing input: a source host accepts the TCP connection and never sends a response. fetch_source_rows blocks indefinitely, the worker thread is never returned to the pool, and after enough such feeds the pool is exhausted. fetch_with_retry in the same file passes timeout=REQUEST_TIMEOUT_SECONDS, which violates R1."
+    },
+    {
+      "id": "D2",
+      "file": "code/workers.py",
+      "line": 45,
+      "class": "resource leak on error path",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 45 `cursor.execute(query, params)` runs after the file handle (line 43) and the cursor (line 44) are opened, and both are closed only at lines 51-52 with no finally or with block. Failing input: the query raises (for example an OperationalError on statement timeout). export_rows propagates the exception with handle and cursor still open. Repeated failing exports exhaust file descriptors and DB connections. The same leak occurs if writer.writerow raises (line 48-49). Violates R2."
+    },
+    {
+      "id": "D3",
+      "file": "code/cache.py",
+      "line": 45,
+      "class": "cache stampede and unbounded cache growth",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 45 `rows = compute_rows(key)` runs on every miss with no single-flight guard, so N concurrent requests for the same expired key execute N expensive computations. All entries stored in one burst also expire together after REPORT_TTL_SECONDS, so the stampede recurs in lockstep. Second facet: line 46 `store_report(key, rows, now)` inserts a new entry keyed by the normalised user-supplied filter text with no maximum size or eviction. Failing input: 1,000,000 distinct filter strings within 300 s create 1,000,000 entries and grow memory without bound. Violates R4 and R5 intent (R5 is about enqueue timeouts; the size bound is part of the caching requirement)."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/workers.py",
+      "line": 35,
+      "kind": "safe-looking",
+      "why_not_a_defect": "jobs.put with timeout_seconds is a bounded blocking put. queue.Full is caught and the job is rejected with a warning, so the producer cannot block longer than ENQUEUE_TIMEOUT_SECONDS (R5)."
+    },
+    {
+      "file": "code/workers.py",
+      "line": 18,
+      "kind": "safe-looking",
+      "why_not_a_defect": "load_manifest opens the file in a with block, so the handle is closed on every path including json decode errors. Correct use of a context manager (sibling of the leaking export_rows)."
+    },
+    {
+      "file": "code/workers.py",
+      "line": 30,
+      "kind": "safe-looking",
+      "why_not_a_defect": "run_job catches Exception, logs with exc_info via LOG.exception and re-raises JobError with `from exc`, preserving the cause chain. Broad except is intentional here and does not swallow errors."
+    },
+    {
+      "file": "code/fetcher.py",
+      "line": 23,
+      "kind": "safe-looking",
+      "why_not_a_defect": "fetch_with_retry passes timeout=REQUEST_TIMEOUT_SECONDS (5.0 s) to http_get, satisfying R1. Only fetch_source_rows (line 46) omits the timeout."
+    },
+    {
+      "file": "code/cache.py",
+      "line": 24,
+      "kind": "safe-looking",
+      "why_not_a_defect": "peek_report deletes an expired entry under the lock and returns None, so an expired value is never served. The strict `<=` comparison is correct for a TTL boundary."
+    },
+    {
+      "file": "code/cache.py",
+      "line": 15,
+      "kind": "safe-looking",
+      "why_not_a_defect": "normalise_filter collapses whitespace and lowercases the key before lookup, so equivalent filters share one cache entry. Correct normalisation."
+    },
+    {
+      "file": "code/fetcher.py",
+      "line": 31,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged in base and code. time.sleep(RETRY_BASE_SECONDS) is a fixed 2 s backoff with no jitter, so workers that fail together retry together. This is a real flaw against R3, but it is on an unchanged line and the change does not touch it. Diff-mode reviewers must not report it; list only here."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/workers.py",
+      "line": 43,
+      "note": "open(..., 'w') truncates the output file before the query runs"
+    }
+  ]
+}

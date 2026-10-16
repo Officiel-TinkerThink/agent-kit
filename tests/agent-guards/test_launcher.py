@@ -9,7 +9,9 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PLUGINS = sorted(p for p in (ROOT / 'plugins').iterdir() if p.is_dir())
+ALL_PLUGINS = sorted(p for p in (ROOT / 'plugins').iterdir() if p.is_dir())
+# a plugin with agents and prompt-only skills (no scripts or hooks folder, for example code-review) has nothing to launch and needs no run.sh or lib.sh
+PLUGINS = [p for p in ALL_PLUGINS if (p / 'scripts').is_dir() or (p / 'hooks').is_dir()]
 SH = shutil.which('sh')
 results = []
 
@@ -41,10 +43,12 @@ def main():
             check(f'{p.name}: hook command for {name} has no shell-language extension', '.ps1' not in c and '.sh"' not in c.replace('run.sh', ''), c)
     for skill in sorted((ROOT / 'plugins').glob('*/skills/*/SKILL.md')):
         t = skill.read_text(encoding='utf-8')
-        check(f'{skill.parent.name}: skill commands go through run.sh', 'powershell' not in t.lower() and '.ps1' not in t and 'scripts/run.sh' in t)
+        runs_scripts = (skill.parents[2] / 'scripts').is_dir()
+        check(f'{skill.parent.name}: skill commands go through run.sh', 'powershell' not in t.lower() and '.ps1' not in t and ('scripts/run.sh' in t or not runs_scripts))
 
     libs = {p.name: (p / 'scripts' / 'lib.sh').read_bytes() for p in PLUGINS if (p / 'scripts' / 'lib.sh').is_file()}
-    check('lib.sh is identical in all four plugins', len(libs) == len(PLUGINS) and len(set(libs.values())) == 1, str(sorted(libs)))
+    check('lib.sh is identical in every plugin that ships scripts', len(libs) == len(PLUGINS) and len(set(libs.values())) == 1, str(sorted(libs)))
+    check('every plugin without scripts or hooks is documentation only (agents or skills)', all((p / 'agents').is_dir() or (p / 'skills').is_dir() for p in ALL_PLUGINS if p not in PLUGINS), str([p.name for p in ALL_PLUGINS if p not in PLUGINS]))
     check('lib.sh uses LF line endings', all(b'\r' not in v for v in libs.values()))
 
     if not SH:

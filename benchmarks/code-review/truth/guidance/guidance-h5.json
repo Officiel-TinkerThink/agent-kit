@@ -1,0 +1,64 @@
+{
+  "axis": "guidance",
+  "case": "guidance-h5",
+  "difficulty": "hard",
+  "sources": [
+    "PEP 257 docstring conventions for public versus private names: https://peps.python.org/pep-0257/",
+    "21 CFR Part 11 section 11.10(e): audit trail for record creation and change",
+    "Stale project rule files that name a removed module and are still applied by agents"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/src/lot_release.py",
+      "line": 81,
+      "class": "stale rule: removed module used",
+      "in_diff": true,
+      "cross_file": true,
+      "rule_quote": "rules\\CLAUDE.md, Audit trail: \"The legacy_log module was removed in the last release; do not import it or call it.\"",
+      "description": "Changed line calls legacy_log.write(\"LOT_RELEASE\", lot_id) in release_lot, and the module-level import on code/src/lot_release.py line 7 is import legacy_log. No legacy_log module exists in code/. Computed: with PYTHONPATH=code/src, `python -c \"import lot_release\"` raises ModuleNotFoundError: No module named 'legacy_log'. Because lot_import imports lot_release, the whole lot import and disposition path fails at import time, before any release is recorded. Audit events are to be written with audit_log.record_event, which release_lot already calls on the preceding lines."
+    },
+    {
+      "id": "D2",
+      "file": "code/src/lot_import.py",
+      "line": 116,
+      "class": "missing docstring on public function",
+      "in_diff": true,
+      "cross_file": false,
+      "rule_quote": "rules\\CLAUDE.md, Public API documentation: \"Every public function (name not starting with an underscore) needs a docstring.\"",
+      "description": "import_legacy_lots(path) is public (no leading underscore) and is added by the change without a docstring. Computed with the legacy_log module stubbed in sys.modules so that the import succeeds: inspect.getdoc(import_legacy_lots) returns None and import_legacy_lots.__doc__ is None, so help() and generated API docs show no contract (input format, returned tuple of lots and rejection messages, the rejection rule for empty lot IDs)."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/src/lot_import.py",
+      "line": 104,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_parse_row has a leading underscore, so it is private and exempt from the rule 'Every public function (name not starting with an underscore) needs a docstring.' Its behaviour is correct: an empty lot_id returns (None, 'line N: empty lot_id'), which matches spec R2."
+    },
+    {
+      "file": "code/src/lot_import.py",
+      "line": 46,
+      "kind": "safe-looking",
+      "why_not_a_defect": "_normalise_fields is 56 lines, which exceeds the 40-line guidance. The rule reads 'Functions should ideally stay under 40 lines. This is a goal for readability, not a gate.' It is a wish, not an enforceable requirement, so its length is not a defect."
+    },
+    {
+      "file": "code/scripts/run_lot_report.py",
+      "line": 55,
+      "kind": "safe-looking",
+      "why_not_a_defect": "rules\\src\\CLAUDE.md scopes the no-print rule to code under src/ only. run_lot_report.py is under scripts/, which is outside that scope, and printing the report is its purpose."
+    },
+    {
+      "file": "code/src/lot_import.py",
+      "line": 133,
+      "kind": "safe-looking",
+      "why_not_a_defect": "src/ rules say 'Library code under src/ must not call print()', so the print would violate that rule. Spec R3 requires one summary line on the operator console, and spec R5 states 'Where this spec conflicts with rules\\CLAUDE.md or rules\\src\\CLAUDE.md, this spec wins.' The print is therefore the specified behaviour."
+    },
+    {
+      "file": "code/src/audit_log.py",
+      "line": 68,
+      "kind": "preexisting",
+      "why_not_a_defect": "count_events is a public function with no docstring, which violates the root docstring rule. The line is unchanged by this change (not in change.diff), so a diff-mode reviewer must not report it; it is listed here only."
+    }
+  ]
+}

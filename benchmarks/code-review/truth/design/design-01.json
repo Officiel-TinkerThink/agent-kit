@@ -1,0 +1,39 @@
+{
+  "axis": "design",
+  "case": "design-01",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/checkout.py",
+      "line": 28,
+      "kind": "swallowed-exception",
+      "description": "Any exception from gateway.charge is caught and the function returns None. Stock reserved at line 25 is never released, and the caller cannot distinguish a declined payment from a duplicate cart (also None), so the UI shows no error and the reserved stock stays locked."
+    },
+    {
+      "id": "D2",
+      "file": "code/checkout.py",
+      "line": 38,
+      "kind": "non-idempotent-retry",
+      "description": "On TimeoutError the call is repeated with no idempotency key. If the first request was actually captured by the gateway, the retry creates a second charge for the same cart and the customer is billed twice."
+    },
+    {
+      "id": "D3",
+      "file": "code/checkout.py",
+      "line": 22,
+      "kind": "hidden-global-state",
+      "description": "Duplicate-cart protection relies on the process-local dict _recent_orders. With multiple worker processes or after a restart the dict is empty or differs per process, so a double submission is not detected and a second order and charge are created."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/checkout.py",
+      "line": 10,
+      "why_not_a_defect": "RETRY_DELAY_SECONDS is an immutable module-level configuration constant, read-only at runtime; it is not mutable shared state."
+    },
+    {
+      "file": "code/checkout.py",
+      "line": 16,
+      "why_not_a_defect": "Optional collaborator injection with a default implementation is a standard constructor-injection pattern; callers and tests can pass a substitute."
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+HISTORY DIGEST - lab sample intake (intake/)
+Commits oldest first. Hunks are shown as they applied to the named file.
+
+commit 7f3a91c4e2   2026-02-11   A. Lindqvist
+subject: intake: reject samples without lot_id (OPS-1187)
+file: intake/sample_intake.py
+@@ accept_sample @@
++    if not record.get("lot_id"):
++        raise IntakeError("lot_id is required")
+
+commit 2c8e0b49a1   2026-03-04   M. Okafor
+subject: intake: move lot check into require_lot(), enforce on CSV import
+file: intake/sample_intake.py
+@@ accept_sample @@
+-    if not record.get("lot_id"):
+-        raise IntakeError("lot_id is required")
++    require_lot(record)
+@@ new function require_lot @@
++def require_lot(record):
++    lot_id = record.get("lot_id")
++    if lot_id is None or not str(lot_id).strip():
++        raise IntakeError("lot_id is required for every sample")
++    return str(lot_id).strip()
+@@ import_rows @@
++        accept_sample(batch, row)
+
+commit 5d1f7aa0c3   2026-05-19   K. Demir
+subject: limits: raise per-batch sample cap 200 -> 500 after LIMS load test (QA-3312)
+file: intake/limits.py
+@@ top-level constants @@
+-MAX_SAMPLES_PER_BATCH = 200
++MAX_SAMPLES_PER_BATCH = 500
+
+commit 3b7d5120fe   2026-06-02   M. Okafor
+subject: intake: strip whitespace from sample_id in normalise_sample
+file: intake/sample_intake.py
+@@ normalise_sample @@
+-        "sample_id": record["sample_id"],
++        "sample_id": str(record["sample_id"]).strip(),
+
+Earlier review comments
+R-2 on 7f3a91c4e2 (QA reviewer, 2026-02-12):
+  "The CSV import path calls the batch directly and skips this check. Please
+   fix in this PR or open a follow-up."
+  Resolution: addressed in 2c8e0b49a1 (import_rows routes rows through accept_sample).
+R-3 on 5d1f7aa0c3 (validation reviewer, 2026-05-20):
+  "200 was the measured ceiling per batch. Please cite the load test before
+   raising it."
+  Resolution: QA-3312 cited in the commit subject; reviewer approved.

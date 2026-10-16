@@ -1,0 +1,42 @@
+{
+  "axis": "spec",
+  "case": "spec-01",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/dose.py",
+      "line": 20,
+      "requirement": "R1",
+      "kind": "wrong",
+      "description": "Python round() uses banker's rounding (round-half-to-even). Exact ties such as 12.5 / 5.0 = 2.5 round to 2 instead of 3, so R1 half-up tie handling is violated."
+    },
+    {
+      "id": "D2",
+      "file": "code/dose.py",
+      "line": 18,
+      "requirement": "R2",
+      "kind": "partial",
+      "description": "Only max_dose_mg is validated as positive. step_mg is never checked, so step_mg <= 0 is accepted and step_mg == 0 raises ZeroDivisionError instead of ValueError."
+    },
+    {
+      "id": "D3",
+      "file": "code/dose.py",
+      "line": 24,
+      "requirement": "R5",
+      "kind": "missing",
+      "description": "round_dose never calls audit_log.record_audit and no audit_log import exists in the module. Every call returns without an audit entry."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/dose.py",
+      "line": 22,
+      "why_not_a_defect": "Clamp to max_dose_mg after rounding is exactly what R3 requires; it looks like it could be applied in the wrong order but it satisfies R3."
+    },
+    {
+      "file": "code/dose.py",
+      "line": 34,
+      "why_not_a_defect": "dose_in_grams returns amount_mg / MG_PER_G with MG_PER_G = 1000.0 and no rounding, which is R6. The float division looks suspicious but is correct."
+    }
+  ]
+}

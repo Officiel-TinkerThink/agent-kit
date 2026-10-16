@@ -1,0 +1,23 @@
+{
+  "axis": "guidance",
+  "case": "guidance-h1",
+  "difficulty": "hard",
+  "sources": ["21 CFR Part 11 s11.10(e) audit trail concept", "nearest-directory scoping of project rule files", "UTC timestamps"],
+  "defects": [
+    {"id": "D1", "file": "code/services/batch_records.py", "line": 62, "class": "missing-audit-record", "in_diff": true, "cross_file": true,
+     "rule": "Every public function that writes a record must call audit.record_change(...) before returning.",
+     "description": "release_batch persists RELEASED then calls audit.log_read, a read-only event defined in audit.py, instead of audit.record_change; no change entry with before and after exists."},
+    {"id": "D2", "file": "code/services/batch_records.py", "line": 58, "class": "wrong-exception-type", "in_diff": true, "cross_file": false,
+     "rule": "Raise DomainError, never ValueError, for business-rule and input failures. (rules/services/CLAUDE.md, applies to code/services only)",
+     "description": "release_batch on a HOLD batch raises ValueError, which a DomainError handler does not catch."},
+    {"id": "D3", "file": "code/tools/export_inventory.py", "line": 42, "class": "non-utc-timestamp", "in_diff": true, "cross_file": false,
+     "rule": "Timestamps via clock.utc_now_iso().",
+     "description": "generated_at is written with datetime.now() (naive local time) instead of the clock helper; the root rule applies to tools too."}
+  ],
+  "decoys": [
+    {"file": "code/tools/export_inventory.py", "line": 18, "kind": "safe-looking", "why_not_a_defect": "ValueError in code/tools: the DomainError rule is scoped to code/services only."},
+    {"file": "code/services/batch_records.py", "line": 70, "kind": "safe-looking", "why_not_a_defect": "ValueError carries the rule-exempt tag LAB-210 (legacy importer)."},
+    {"file": "code/services/batch_records.py", "line": 46, "kind": "safe-looking", "why_not_a_defect": "Private helper _write_status writes without audit; the rule covers public functions only."},
+    {"file": "code/services/batch_records.py", "line": 38, "kind": "preexisting", "why_not_a_defect": "update_notes is a public writer without audit.record_change on an unchanged line; real flaw, out of scope in diff mode."}
+  ]
+}

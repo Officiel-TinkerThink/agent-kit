@@ -1,0 +1,17 @@
+{
+  "axis": "history",
+  "case": "history-03",
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/report_export.py",
+      "line": 51,
+      "why_not_a_defect": "_write_json is renamed to write_json_rows to mirror write_csv_rows from a8d41e7, as PR #618 asked. Only the def and its single call site change; the output file name and payload are unchanged."
+    },
+    {
+      "file": "code/report_export.py",
+      "line": 37,
+      "why_not_a_defect": "The empty-records guard moves from export() into _dispatch() in this change. The format check still runs first in export(), so unsupported formats raise as before. build_rows is a one-to-one map, so rows is empty exactly when records is empty. This matches the guidance in PR #625."
+    }
+  ]
+}

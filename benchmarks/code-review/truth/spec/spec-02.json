@@ -1,0 +1,42 @@
+{
+  "axis": "spec",
+  "case": "spec-02",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/batch_signoff.py",
+      "line": 12,
+      "requirement": "R2",
+      "kind": "partial",
+      "description": "The role check is implemented, but the rule that the signing user must differ from record['operator_id'] is not. An operator holding the QA role can sign their own batch."
+    },
+    {
+      "id": "D2",
+      "file": "code/batch_signoff.py",
+      "line": 28,
+      "requirement": "R4",
+      "kind": "wrong",
+      "description": "update_field blocks edits only when status is RELEASED. R4 requires blocking when status is SIGNED, so a signed record that is not yet RELEASED can still be modified."
+    },
+    {
+      "id": "D3",
+      "file": "code/batch_signoff.py",
+      "line": 22,
+      "requirement": "(none - not in spec)",
+      "kind": "scope-creep",
+      "description": "sign_off calls notify_qa_lead, which prints a notification. The spec defines no notification behaviour; the call is unrequested side effect."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/batch_signoff.py",
+      "line": 17,
+      "why_not_a_defect": "datetime.now(timezone.utc).isoformat() produces a UTC ISO 8601 timestamp, as R3 requires. Timezone-aware datetimes can look unusual but comply."
+    },
+    {
+      "file": "code/batch_signoff.py",
+      "line": 30,
+      "why_not_a_defect": "update_field writes any field without a status check other than RELEASED. R4 only restricts field updates by status, so the unrestricted write is not itself a spec violation beyond D2."
+    }
+  ]
+}

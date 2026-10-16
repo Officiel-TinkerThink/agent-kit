@@ -1,0 +1,51 @@
+lab_sync change history digest (oldest first). Paths are relative to lab_sync/.
+
+commit 3f1a2c9  lab-sync: raise MAX_BATCH_SIZE 500 -> 2000 for throughput
+  settings.py
+  -MAX_BATCH_SIZE = 500
+  +MAX_BATCH_SIZE = 2000
+
+commit 5e02b7f  Revert "lab-sync: raise MAX_BATCH_SIZE 500 -> 2000 for throughput"
+  settings.py
+  -MAX_BATCH_SIZE = 2000
+  +MAX_BATCH_SIZE = 500
+  body: gateway request timeouts on staging at 2000 records per request
+
+commit 7c9d3a1  Revert "Revert "lab-sync: raise MAX_BATCH_SIZE 500 -> 2000"" (timeouts traced to DNS, not batch size)
+  settings.py
+  -MAX_BATCH_SIZE = 500
+  +MAX_BATCH_SIZE = 2000
+
+commit e6f2b08  Revert "Revert "lab-sync: raise MAX_BATCH_SIZE 500 -> 2000"" (timeouts again at 2000)
+  settings.py
+  -MAX_BATCH_SIZE = 2000
+  +MAX_BATCH_SIZE = 500
+  review: ops-lab-07, see R1
+
+commit 2d8a40c  lab-sync: MAX_RETRY_ATTEMPTS 3 -> 5 for 503 bursts
+  settings.py
+  -MAX_RETRY_ATTEMPTS = 3
+  +MAX_RETRY_ATTEMPTS = 5
+  review: ops-lab-02, see R2
+
+commit 9b13f6e  lab-sync: gateway transport timeout in seconds; config keeps milliseconds, client converts
+  settings.py
+  -UPLOAD_TIMEOUT_S = 30
+  +UPLOAD_TIMEOUT_MS = 30000
+  client.py
+  -timeout=UPLOAD_TIMEOUT_S
+  +timeout_s = self._settings.timeout_ms / 1000
+  +... open(request, timeout=timeout_s)
+  review: dev-lab-03, see R3
+
+Earlier review comments
+
+R1 (ops-lab-07, on e6f2b08): 2000 records per request timed out in 3 of 4 staging runs.
+    Measured ceiling on the lab gateway is 600 records per request. Keep MAX_BATCH_SIZE
+    at or below 600 until the gateway team confirms a higher limit.
+
+R2 (ops-lab-02, on 2d8a40c): Burst capture run 14 shows 503 responses up to 9
+    consecutive attempts for one batch. A cap of 5 parks batches during these bursts.
+
+R3 (dev-lab-03, on 9b13f6e): The gateway transport expects seconds. Keep the
+    millisecond value in config and convert at the call site only.

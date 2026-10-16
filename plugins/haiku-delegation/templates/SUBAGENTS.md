@@ -2,7 +2,7 @@
 
 Which subagents exist, what each one is for, and when the main agent should hand work to it.
 
-**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root, imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`, and adds the orchestrator rules (a marked block) to that same file. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Always call an agent by its full name `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`, `verification-runner:verification-runner`): a bare name such as `code-explorer` fails with "Agent type not found". The tables below use short names for readability; add the plugin prefix when you call the Agent tool (`haiku-delegation:` for `code-explorer`, `contracts-reader`, `infra-reader`, `docs-reader`, `triage`, `compliance-lister`, `researcher`, `browser-explorer` and `browser-operator`; `agent-guards:changelog-summarizer`; `agent-eval:annotator`).
+**How to use this file.** Run `/haiku-delegation:subagents-init` in a project: it copies this file to the project root, imports it from `CLAUDE.md` (or `AGENTS.md`) with `@SUBAGENTS.md`, and adds the orchestrator rules (a marked block) to that same file. By hand: copy it and add that import line. Then add a "Project facts" section at the bottom (layout, exclusions). The four `agent-kit` plugins already inject a short delegation policy at session start; this file is the project-visible roster that makes the choice concrete. Always call an agent by its full name `<plugin>:<agent>` (for example `haiku-delegation:code-explorer`, `verification-runner:verification-runner`): a bare name such as `code-explorer` fails with "Agent type not found". The tables below use short names for readability; add the plugin prefix when you call the Agent tool (`haiku-delegation:` for `code-explorer`, `contracts-reader`, `infra-reader`, `docs-reader`, `triage`, `compliance-lister`, `researcher`, `browser-explorer` and `browser-operator`; `agent-guards:changelog-summarizer`; `agent-eval:annotator`; `code-review:` for `spec-reviewer`, `design-reviewer`, `security-reviewer`, `guidance-reviewer`, `history-reviewer`, `simplicity-reviewer` and `finding-validator`).
 
 ## Stance
 
@@ -96,6 +96,20 @@ The main thread cannot call the browser tools itself; a hook redirects it to the
 | Click or fill named controls on a named page | `browser-operator` | The page, each control by its visible label, and what to report | Press anything the task did not name; submit, delete, send, pay, approve, sign, export or confirm (a hook blocks these and keeps an audit trail); type credentials |
 
 If a browser agent stops at a guard block, **ask the user** before doing that step another way. Never drive the browser around the guard. The user can allow a blocked host with `/agent-guards:kit-allow`.
+
+### Code review
+
+One agent per focus, run in parallel, then one `finding-validator` per finding; only validated findings are reported. `/code-review:review <target> [spec path]` does all of this. Reviewers return candidates with a quoted code line and a concrete scenario; the validator returns CONFIRMED, REFUTED or UNVERIFIABLE. Whether a finding is acceptable stays with you and the human owner.
+
+| About to... | Agent | Brief must carry | It will not |
+|---|---|---|---|
+| Check code against a written spec, issue or acceptance criteria | `spec-reviewer` | The spec path, the code or diff paths, one intent line | Review security or design the spec did not ask for; edit anything |
+| Look for weak design that causes a concrete failure (swallowed exceptions, hidden global state, non-idempotent retries, missing transaction boundary, hardcoded hosts, duplicated rules) | `design-reviewer` | One intent line, the code or diff paths | Report style, naming or missing tests; judge compliance |
+| Look for vulnerabilities in changed code (injection, access control, path traversal, SSRF, credentials, crypto, deserialization, audit trail) | `security-reviewer` | One intent line, the code or diff paths | Print credential values or write exploits; say code is safe |
+| Check a change against CLAUDE.md, CONTRIBUTING, standards and guidance comments in the code | `guidance-reviewer` | The rule file paths, the code or diff paths | Report a rule that is silenced, out of scope or only a wish |
+| Find regressions that only the history shows | `history-reviewer` | A history digest (commits with hunks, earlier PR comments), the change and the code | Run git itself; guess what the history says |
+| Find logic the change added that a simpler form replaces with identical behaviour (boolean ladders, no-op try/except, one-implementation abstractions, flags every caller sets the same way, copied validators, needless caches) | `simplicity-reviewer` | One intent line, the code or diff paths | Report style, naming or bugs; propose a form that changes behaviour |
+| Check one review finding before you act on it | `finding-validator` | One finding verbatim, the file paths to read, the spec or rule path if the finding has one | Add findings; confirm on an incomplete search |
 
 ### Run and verify
 

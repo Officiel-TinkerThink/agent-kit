@@ -1,0 +1,31 @@
+{
+  "axis": "security",
+  "case": "sec-01",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/handlers.py",
+      "line": 19,
+      "cwe": "CWE-89",
+      "owasp": "A03",
+      "description": "The site query parameter is interpolated into the SQL text with % formatting and executed as-is. A request with site set to a quote-terminated fragment plus OR 1=1 returns every row in samples, and a stacked or UNION payload can read other tables."
+    },
+    {
+      "id": "D2",
+      "file": "code/handlers.py",
+      "line": 31,
+      "cwe": "CWE-639",
+      "owasp": "A01",
+      "description": "download_report loads owner_id but never compares it with the requester. Any caller who knows or enumerates a report id receives that report file, including reports owned by other analysts."
+    },
+    {
+      "id": "D3",
+      "file": "code/handlers.py",
+      "line": 36,
+      "cwe": "CWE-22",
+      "owasp": "A01",
+      "description": "The path route accepts any string including slashes and joins it onto UPLOAD_ROOT without normalisation or containment check. A filename such as ../../etc/passwd resolves outside the upload root and send_file serves it."
+    }
+  ],
+  "decoys": []
+}

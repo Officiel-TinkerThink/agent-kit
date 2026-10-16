@@ -1,0 +1,94 @@
+{
+  "axis": "security",
+  "case": "security-h4",
+  "difficulty": "hard",
+  "sources": [
+    "CWE-22: containment check by string prefix without a path-separator boundary",
+    "CWE-639: object-level read check present on one operation and missing on a sibling operation",
+    "CWE-915: mass assignment of a privileged attribute from a client payload"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/files.py",
+      "line": 38,
+      "class": "path-containment-prefix",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "resolve_report_path checks full.startswith(REPORT_CACHE_ROOT) with no separator boundary. Computed: a stored file name whose normalised path is /srv/labcache/reports-old/q3.pdf (a sibling of the root reached by a relative climb) passes the check and is returned as-is. Expected PathContainmentError (R2). Missing check: boundary-aware containment, as is_within_dir and safe_member_path do."
+    },
+    {
+      "id": "D2",
+      "file": "code/reports.py",
+      "line": 74,
+      "class": "missing-object-authorization",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "download_report (def line; the owner check is absent from the body) returns path, sha256, size and chunk stream for report owner_id 3 to caller user_id 7 (not owner, is_admin False). Computed: returned path '/srv/labcache/reports/q3.pdf', no PermissionError. The same input to get_report raises PermissionError('report access denied'). Expected denial (R3). The rule lives in accounts.can_read_report, which download_report never calls."
+    },
+    {
+      "id": "D3",
+      "file": "code/accounts.py",
+      "line": 38,
+      "class": "mass-assignment",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "update_profile merges the whole client payload: merged = {**asdict(user), **payload}. Computed: user_id 7 (is_admin False) with payload {'display_name': 'Bea', 'is_admin': True} returns display_name 'Bea' and is_admin True. save_user then persists is_admin=1. Base code filtered the payload with PROFILE_FIELDS. Expected: is_admin ignored (R5)."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/files.py",
+      "line": 22,
+      "kind": "safe-looking",
+      "why_not_a_defect": "is_within_dir uses the same startswith API as D1 but compares against normalised root plus '/' (rstrip handles root '/'). Computed: sibling /srv/labcache/reports-old/q3.pdf -> False; child /srv/labcache/reports/q3.pdf -> True. Correct."
+    },
+    {
+      "file": "code/files.py",
+      "line": 29,
+      "kind": "safe-looking",
+      "why_not_a_defect": "safe_member_path uses posixpath.commonpath([root, full]) != root with root normalised first. Computed: sibling rejected with PathContainmentError; the root itself and children are accepted. Correct."
+    },
+    {
+      "file": "code/reports.py",
+      "line": 55,
+      "kind": "safe-looking",
+      "why_not_a_defect": "list_reports applies an owner filter bound to user.user_id on the non-admin branch; the unfiltered query runs only under user.is_admin. Owner check present on the list operation. Correct by reading the SQL and branch."
+    },
+    {
+      "file": "code/accounts.py",
+      "line": 25,
+      "kind": "safe-looking",
+      "why_not_a_defect": "find_user passes the e-mail as a bound parameter (?), not string formatting. Correct parameterised SQL."
+    },
+    {
+      "file": "code/accounts.py",
+      "line": 33,
+      "kind": "safe-looking",
+      "why_not_a_defect": "build_user_from_row also builds User(**{...}) from a dict, but only from USER_FIELDS keys. Computed: an extra 'extra' column is dropped; is_admin is only read from the database row. Same kwargs pattern as D3, applied correctly."
+    },
+    {
+      "file": "code/accounts.py",
+      "line": 60,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line, not part of the change: the stored session token is compared with == (not a constant-time comparison). Computed result is correct (True for equal, False for different); the issue is timing. Diff-mode reviewers must not report this; it is listed only here."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/reports.py",
+      "line": 80,
+      "description": "CWE-367 digest computed and file streamed through two separate opens; replaced file gives digest/stream mismatch (audit-confirmed)."
+    },
+    {
+      "file": "code/reports.py",
+      "line": 87,
+      "description": "stream opened separately from digest (same CWE-367 root cause)."
+    },
+    {
+      "file": "code/reports.py",
+      "line": 83,
+      "description": "CWE-200 server filesystem path returned to caller (low)."
+    }
+  ]
+}

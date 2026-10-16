@@ -1,0 +1,6 @@
+# Default configuration values for the lab inventory service.
+[reports]
+template_root = "templates/cofa"
+
+[receiving]
+scan_queue_limit = 200

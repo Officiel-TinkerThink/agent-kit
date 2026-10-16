@@ -1,0 +1,59 @@
+HISTORY DIGEST - lims bridge: inventory snapshots, restore and nightly scheduler (oldest first)
+
+commit 2b6f9a0  2026-04-09  Dana Whitfield
+subject: snapshots: write through temp file and replace (INC-1977)
+file: backup_store.py
+hunk, write_backup():
++        os.replace(tmp.name, target)
+
+commit 5e1c0d4  2026-05-12  Ravi Menon
+subject: restore: verify sidecar checksum before extraction (INC-2010)
+file: restore.py
+hunk, _verify_checksum():
++    if actual != expected:
++        raise RestoreError(f"checksum mismatch for {archive.name}")
+
+commit a7c41e2  2026-06-27  Ravi Menon
+subject: raise on backup failure; backups failed silently for two weeks (INC-2054)
+file: backup_store.py
+hunk 1, write_backup():
+-    except OSError:
+-        log.warning("snapshot skipped")
+-        return None
++    except OSError as exc:
++        log.error("snapshot write failed target=%s error=%s", target, exc)
++        raise BackupWriteError(f"cannot write snapshot {target.name}") from exc
+hunk 2, class BackupWriteError:
++class BackupWriteError(RuntimeError):
+
+commit d90f3b6  2026-07-08  Ana Reyes
+subject: scheduler: post ops notice from notify_ops, never stop the nightly run
+file: scheduler.py
+hunk, notify_ops():
++    try:
++        _send(channel, message)
++    except Exception as exc:
++        log.warning("ops notice not delivered channel=%s error=%s", channel, exc)
+
+commit 9c4e7b2  2026-08-03  Wahyu Sinurat
+subject: set verify_restore=True by default after a failed restore (INC-2071)
+file: config.py
+hunk, BackupSettings:
+-    verify_restore: bool = False
++    verify_restore: bool = True
+
+commit f0b7d18  2026-09-15  Dana Whitfield
+subject: restore: reject a snapshot with a missing sidecar when verification is on
+file: restore.py
+hunk, _verify_checksum():
++        raise RestoreError(f"missing checksum sidecar for {archive.name}")
+
+Notes from the digest:
+- write_backup() is the only writer of snapshot archives; the nightly job and the manual export both call it.
+- restore_snapshot() is the only extraction entry point; verify_restore is read from BackupSettings at call time.
+- run_nightly() takes the snapshot result from snapshot_inventory() and records it in the job status.
+
+Review comments on earlier commits:
+RC-1 on a7c41e2, backup_store.py write_backup(), J. Okafor (QA): "A failed snapshot must reach the scheduler as an exception. A log line is not a signal anyone monitors for this job."
+RC-2 on 9c4e7b2, config.py BackupSettings, J. Okafor (QA): "Verification is on by default for every restore. Speed for local dev runs is handled by passing verify_restore explicitly in the dev profile, not by changing the default."
+RC-3 on 5e1c0d4, restore.py _verify_checksum(), M. Tan (ops): "Keep the mismatch message wording. The runbook search uses the phrase checksum mismatch."

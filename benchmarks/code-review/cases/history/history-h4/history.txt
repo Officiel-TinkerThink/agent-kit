@@ -1,0 +1,38 @@
+HISTORY DIGEST - peakfeat: feature search, producer and loader (oldest first)
+
+commit 3f8b2d1  2026-03-04  Ana Reyes
+subject: cap pattern input at 256 chars before regex search after an incident where a long input pegged the CPU (INC-1187)
+file: search.py
+hunk 1, _check_pattern_length():
++def _check_pattern_length(pattern: str) -> None:
++    if len(pattern) > MAX_PATTERN_CHARS:
++        raise PatternError("pattern too long")
+hunk 2, filter_features():
++    _check_pattern_length(pattern)
+
+commit 5e0a94c  2026-04-17  Pooja Iyer
+subject: feature_model: order_by_retention helper for the report export
+file: feature_model.py
+hunk, order_by_retention():
++    ordered = sorted(features, key=lambda feature: feature.retention_time)
++    log.debug("ordered %d features by retention time", len(ordered))
++    return ordered
+
+commit 9c01e47  2026-05-02  Wahyu Sinurat
+subject: limit feature file to 60 entries after the loader ran out of memory (INC-1214)
+file: loader.py, producer.py
+hunk 1, loader.py MAX_FEATURES:
++MAX_FEATURES = 60
+hunk 2, loader.py load_feature_file():
++    if len(rows) > MAX_FEATURES:
++        raise FeatureFileError(f"{path.name}: {len(rows)} features exceeds limit {MAX_FEATURES}")
+hunk 3, producer.py FEATURES_PER_FILE:
++FEATURES_PER_FILE = 60
+
+Notes from the digest:
+- filter_features() receives the pattern typed on the review screen (user input).
+- write_feature_files() is the only producer entry point used by the instrument export job.
+
+Review comments on earlier commits:
+RC-1 on 3f8b2d1, search.py filter_features(), P. Lindqvist (QA): "The 256-character check is the guard for INC-1187. Every path that compiles a user pattern must run it first."
+RC-2 on 9c01e47, producer.py FEATURES_PER_FILE, M. Tan (ops): "The producer batch size and the loader MAX_FEATURES must stay equal. Change both in the same review or the loader rejects the files (INC-1214)."

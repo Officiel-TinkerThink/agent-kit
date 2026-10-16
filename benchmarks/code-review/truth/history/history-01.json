@@ -1,0 +1,14 @@
+{
+  "axis": "history",
+  "case": "history-01",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/patient_intake.py",
+      "line": 38,
+      "history_ref": "e94c21a fix: restore null check on patient id after crash (#412)",
+      "description": "Removes the patient_id None guard that #412 restored after a crash on null patient ids. payload['patient'].get('id') returns None for kiosk offline payloads, so None now reaches find_by_id unchecked and the crash returns. The stated premise is false: parse_payload only checks that a 'patient' key exists, not that its id is set."
+    }
+  ],
+  "decoys": []
+}

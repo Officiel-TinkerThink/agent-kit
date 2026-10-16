@@ -1,0 +1,232 @@
+--- a/retry.py
++++ b/retry.py
+@@ -1,8 +1,14 @@
+-"""Retry helper for lims gateway calls."""
++"""Bounded retry with exponential backoff and jitter for transient gateway errors.
++
++The LIMS client and the batch-record gateway raise TransientError for timeouts,
++HTTP 503 responses and connection resets. Other exceptions propagate on the first attempt.
++"""
+ 
+ import logging
++import random
+ import time
+-from typing import Callable, TypeVar
++from dataclasses import dataclass
++from typing import Callable, Optional, Tuple, Type, TypeVar
+ 
+ logger = logging.getLogger("lims.retry")
+ 
+@@ -13,15 +19,61 @@
+     """Raised by gateway clients for failures that may succeed on retry."""
+ 
+ 
+-def retry_call(operation: Callable[[], T], attempts: int = 3, delay_s: float = 0.5) -> T:
+-    """Call `operation` up to `attempts` times with a fixed pause between tries."""
+-    last_error: Exception = RuntimeError("no attempt was made")
+-    for attempt in range(1, attempts + 1):
++class RetriesExhausted(Exception):
++    """Raised when every attempt failed with a retryable error."""
++
++    def __init__(self, attempts: int, last_error: Optional[BaseException]) -> None:
++        super().__init__(f"gave up after {attempts} attempts: {last_error}")
++        self.attempts = attempts
++        self.last_error = last_error
++
++
++@dataclass(frozen=True)
++class RetryPolicy:
++    """Immutable retry settings shared by all gateway calls."""
++
++    max_attempts: int = 4
++    base_delay_s: float = 0.5
++    max_delay_s: float = 8.0
++    jitter_ratio: float = 0.2
++    retry_on: Tuple[Type[BaseException], ...] = (TransientError,)
++
++    def __post_init__(self) -> None:
++        if self.max_attempts < 1:
++            raise ValueError("max_attempts must be at least 1")
++        if self.base_delay_s < 0 or self.max_delay_s < self.base_delay_s:
++            raise ValueError("delays must satisfy 0 <= base_delay_s <= max_delay_s")
++
++
++def backoff_delay(policy: RetryPolicy, failed_attempt: int, rng: random.Random) -> float:
++    """Return the sleep in seconds after attempt `failed_attempt` (1-based) failed.
++
++    The delay doubles per attempt, is capped at max_delay_s, and then has up to
++    jitter_ratio of its value removed at random so concurrent clients spread out.
++    """
++    exponential = policy.base_delay_s * (2 ** (failed_attempt - 1))
++    capped = min(exponential, policy.max_delay_s)
++    return capped * (1.0 - policy.jitter_ratio * rng.random())
++
++
++def retry_call(
++    operation: Callable[[], T],
++    policy: RetryPolicy,
++    *,
++    operation_name: str,
++    sleep: Callable[[float], None] = time.sleep,
++    rng: Optional[random.Random] = None,
++) -> T:
++    """Invoke `operation` until it succeeds, raises a non-retryable error, or attempts run out."""
++    generator = rng if rng is not None else random.Random()
++    last_error: Optional[BaseException] = None
++    for attempt in range(1, policy.max_attempts + 1):
+         try:
+             return operation()
+-        except TransientError as exc:
++        except policy.retry_on as exc:
+             last_error = exc
+-            logger.warning("attempt %d/%d failed: %s", attempt, attempts, exc)
+-            if attempt < attempts:
+-                time.sleep(delay_s)
+-    raise last_error
++            logger.warning("%s attempt %d/%d failed: %s", operation_name, attempt, policy.max_attempts, exc)
++            if attempt == policy.max_attempts:
++                break
++            sleep(backoff_delay(policy, attempt, generator))
++    raise RetriesExhausted(policy.max_attempts, last_error)
+--- a/state.py
++++ b/state.py
+@@ -1,9 +1,15 @@
+-"""Lot record with a mutable status field."""
++"""Lot record lifecycle with an explicit transition table and an append-only history.
++
++RELEASED is terminal. A rejected lot may return to DRAFT for rework.
++Every accepted transition is recorded with the items that were on the lot at that moment.
++"""
+ 
+ import logging
+ from dataclasses import dataclass, field
+ from enum import Enum
+-from typing import List
++from typing import FrozenSet, List, Mapping
++
++from copy_utils import snapshot_items
+ 
+ logger = logging.getLogger("lims.state")
+ 
+@@ -15,18 +21,60 @@
+     REJECTED = "REJECTED"
+ 
+ 
++TRANSITIONS: Mapping[LotStatus, FrozenSet[LotStatus]] = {
++    LotStatus.DRAFT: frozenset({LotStatus.REVIEW}),
++    LotStatus.REVIEW: frozenset({LotStatus.RELEASED, LotStatus.REJECTED}),
++    LotStatus.REJECTED: frozenset({LotStatus.DRAFT}),
++    LotStatus.RELEASED: frozenset(),
++}
++
++
++class InvalidTransition(Exception):
++    """Raised when a lot is moved along an edge that is not in TRANSITIONS."""
++
++
++def allowed_next(status: LotStatus) -> FrozenSet[LotStatus]:
++    """Return the statuses reachable in one step from `status`."""
++    return TRANSITIONS[status]
++
++
++@dataclass(frozen=True)
++class HistoryEntry:
++    sequence: int
++    from_status: LotStatus
++    to_status: LotStatus
++    actor: str
++    items_snapshot: List[str]
++
++
+ @dataclass
+ class LotRecord:
+-    """A lot and the sample items captured against it."""
+-
+     lot_code: str
+     status: LotStatus = LotStatus.DRAFT
+     items: List[str] = field(default_factory=list)
++    history: List[HistoryEntry] = field(default_factory=list)
+ 
+-    def set_status(self, target: LotStatus, actor: str) -> None:
+-        """Record a new status for the lot."""
+-        logger.info("lot %s status %s -> %s by %s", self.lot_code, self.status.value, target.value, actor)
++    def can_transition(self, target: LotStatus) -> bool:
++        """Return True when the lot may move from its current status to `target`."""
++        return target in allowed_next(self.status)
++
++    def transition(self, target: LotStatus, actor: str) -> HistoryEntry:
++        """Move the lot to `target` and append a history entry; raise InvalidTransition otherwise."""
++        if not actor:
++            raise ValueError("actor is required for every status change")
++        if not self.can_transition(target):
++            raise InvalidTransition(f"{self.lot_code}: {self.status.value} -> {target.value} is not permitted")
++        entry = HistoryEntry(
++            sequence=len(self.history) + 1,
++            from_status=self.status,
++            to_status=target,
++            actor=actor,
++            items_snapshot=snapshot_items(self.items),
++        )
++        self.history.append(entry)
++        logger.info("lot %s moved %s -> %s by %s", self.lot_code, self.status.value, target.value, actor)
+         self.status = target
++        return entry
+ 
+ 
+ def released_lots(records: List[LotRecord]) -> List[str]:
+--- a/validate.py
++++ b/validate.py
+@@ -1,9 +1,14 @@
+-"""Input validation for lot capture forms."""
++"""Input validation for lot and sample capture forms.
++
++Lot codes are normalised to upper case. Sample codes are case-sensitive and must already
++be lower case. A quantity field distinguishes an untouched field (None) from an explicit zero.
++"""
+ 
+ import re
+ from typing import Optional
+ 
+ LOT_CODE_PATTERN = re.compile(r"^[A-Z0-9][A-Z0-9-]{4,10}[A-Z0-9]$")
++SAMPLE_CODE_PATTERN = re.compile(r"^[a-z0-9]{8}$")
+ MAX_QUANTITY_UNITS = 10_000
+ 
+ 
+@@ -12,8 +17,18 @@
+ 
+ 
+ def effective_quantity(submitted: Optional[int], batch_default: int) -> int:
+-    """Resolve the quantity to store for a capture form."""
+-    return submitted or batch_default
++    """Resolve the quantity to store: None takes the batch default, an explicit 0 is kept."""
++    if batch_default < 0:
++        raise ValidationError("batch_default must not be negative")
++    if submitted is None:
++        return batch_default
++    if isinstance(submitted, bool) or not isinstance(submitted, int):
++        raise ValidationError("quantity must be an integer")
++    if submitted < 0:
++        raise ValidationError("quantity must not be negative")
++    if submitted > MAX_QUANTITY_UNITS:
++        raise ValidationError(f"quantity exceeds {MAX_QUANTITY_UNITS} units")
++    return submitted
+ 
+ 
+ def parse_lot_code(raw: str) -> str:
+@@ -26,6 +41,16 @@
+     return candidate
+ 
+ 
++def parse_sample_code(raw: str) -> str:
++    """Validate a sample code: exactly 8 lower-case letters or digits, no hyphens."""
++    if not isinstance(raw, str):
++        raise ValidationError("sample code must be a string")
++    candidate = raw.strip()
++    if not SAMPLE_CODE_PATTERN.fullmatch(candidate):
++        raise ValidationError(f"invalid sample code: {raw!r}")
++    return candidate
++
++
+ def parse_optional_text(raw: Optional[str]) -> Optional[str]:
+     """Return the stripped text, or None when the field is blank or absent.
+ 

@@ -1,0 +1,42 @@
+{
+  "axis": "spec",
+  "case": "spec-03",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/label.py",
+      "line": 10,
+      "requirement": "R2",
+      "kind": "wrong",
+      "description": "The lower bound is sample_id < 0, so 0 is accepted. R2 requires a positive integer, so the check must reject sample_id < 1."
+    },
+    {
+      "id": "D2",
+      "file": "code/label.py",
+      "line": 22,
+      "requirement": "R4",
+      "kind": "partial",
+      "description": "make_label_batch enforces the lower bound count >= 1 only. The upper bound of 500 required by R4 is not enforced."
+    },
+    {
+      "id": "D3",
+      "file": "code/label.py",
+      "line": 41,
+      "requirement": "R6",
+      "kind": "missing",
+      "description": "run_batch never calls register_labels, and the register_path parameter is unused. Generated labels are not written to the register CSV."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/label.py",
+      "line": 14,
+      "why_not_a_defect": "The f-string yields STUDY-NNNNNN-YYYYMMDD with sample_id zero-padded to six digits and collected_at formatted as %Y%m%d, which is R1."
+    },
+    {
+      "file": "code/label.py",
+      "line": 15,
+      "why_not_a_defect": "The length check against MAX_LABEL_LEN = 40 enforces R5. It looks redundant given the fixed format, but it is a required guard."
+    }
+  ]
+}

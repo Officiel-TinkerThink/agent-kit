@@ -1,0 +1,17 @@
+{
+  "axis": "design",
+  "case": "design-04",
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/dosage.py",
+      "line": 4,
+      "why_not_a_defect": "MG_PER_G is an immutable module-level unit constant used by two functions; it is not mutable shared state and has no runtime side effect."
+    },
+    {
+      "file": "code/dosage.py",
+      "line": 37,
+      "why_not_a_defect": "The broad except re-raises as ValueError with the input text and chains the original exception via 'from exc'. The wrapper adds context, nothing is swallowed, and the traceback is preserved."
+    }
+  ]
+}

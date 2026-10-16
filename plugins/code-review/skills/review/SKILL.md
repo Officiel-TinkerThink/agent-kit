@@ -1,0 +1,46 @@
+---
+description: "Review a diff, branch, pull request or path for spec-compliance gaps, weak design, vulnerabilities, project-rule violations and history regressions. Fans out up to five focused Haiku reviewers in parallel, validates every finding with an independent validator, and reports only validated findings. Pass the target (git range, branch, PR number or paths) and optionally the spec or issue path."
+argument-hint: "<target: git range | branch | PR number | path> [spec path]"
+---
+
+Orchestrate a review. You (the main model) own scope, judgement and the final report; the agents supply evidence. Never edit code during a review.
+
+Agents (always the full names): `code-review:spec-reviewer`, `code-review:design-reviewer`, `code-review:security-reviewer`, `code-review:guidance-reviewer`, `code-review:history-reviewer`, `code-review:simplicity-reviewer`, `code-review:finding-validator`.
+
+What a review is for, in priority order: (1) correctness against the written spec; (2) vulnerabilities in the changed code; (3) design weaknesses that cause a concrete failure; (4) the project's own written rules (CLAUDE.md, CONTRIBUTING, comments that say what must not change); (5) regressions that history reveals; (6) logic the change added that a simpler form replaces with identical behaviour. What it is not for: style, anything a linter, type checker or compiler catches, pre-existing issues, speculative issues with no failure scenario, test-coverage wishes unless a rule requires them.
+
+## Step 0: eligibility (pull requests)
+For a PR target, stop and say why if the PR is closed, is a draft, is an automated or trivially correct change, or already has a review from you. Repeat this check just before posting anything. A Claude-authored PR is still reviewed.
+
+## Step 1: pin the target, the spec and the intent
+- Resolve the target. For a git range write `git diff <base>...HEAD` to a temp file outside the repo and pass that file's absolute path to every reviewer; pass working-tree file paths only if `git status --porcelain` is empty and `git rev-parse HEAD` equals the range end, otherwise ask the user. Confirm the ref resolves and the diff is not empty before spawning anything. For paths, list the files.
+- Find the spec: the path given in the arguments, else a spec file whose name contains the first ticket token (for example `ABC-123`) of the branch or an issue number referenced in the commit messages. If zero or several files match, ask the user for the path; never guess. If there is no spec, skip `spec-reviewer`, say so, and note that the `wrong-result` item of `design-reviewer` is then the only general correctness check.
+- Find the rule files: CLAUDE.md, AGENTS.md, CONTRIBUTING.md and CODING_STANDARDS.md at the repo root and in each directory holding a modified file. If none, skip `guidance-reviewer` and say so.
+- History digest (for `history-reviewer`): for each modified file run read-only `git log -n 5 --format='%h %s' -- <file>` and `git log -n 2 -p -- <file>` limited to the touched hunks, plus review comments from earlier PRs that touched the file when `gh` is available. Write the digest to a temp file outside the repo. If the repo has no history for the files, skip `history-reviewer`.
+- Write a one-line intent statement (what the change tries to achieve). Reviewers challenge whether the code achieves the intent well, not whether the intent is right.
+- Size gate: for a change under about 20 changed lines in one file, run only the reviewers that fit and say which were skipped.
+
+## Step 2: fan out the reviewers
+One call per reviewer, in waves of at most 8 agents running at once; start the next wave when slots free up. Each brief carries: the intent line, the mode (`mode: diff` with the diff file path, or `mode: whole-file` for path targets), the absolute file paths, and the axis input (spec path; rule file paths; digest path). Do not tell a reviewer what you expect to find. Do not put several reviews in one brief. For a change over about 8 files, run `spec-reviewer` once over the whole file list and the other reviewers once per group of at most 8 files.
+
+## Step 3: lens check, pre-filter and merge
+Lens check first. Every reviewer and validator answer starts with a `LENS:` line that names the `LENS-MARKER` lines the agent saw in its context. Claude Code skips a preloaded skill silently when it cannot find the skill name, so an agent can run without its lens and still look normal. If an answer says `LENS: none`, or lacks `review-craft v1` or its own lens marker, read `${CLAUDE_PLUGIN_ROOT}/skills/review-craft/SKILL.md` and that agent's lens file under `${CLAUDE_PLUGIN_ROOT}/skills/` (if the variable is empty, Glob `**/code-review/skills/<name>/SKILL.md`), paste both texts into that agent's brief, and run it once more. Name in the report every agent that needed the rerun, and any whose rerun still showed no lens; those findings come from the shorter review and say so.
+Then handle incomplete answers: an answer whose second line is `PARTIAL`, or a validator `REASON: INCOMPLETE SEARCH`, is listed under Coverage with its NOT DONE items, and only those items are rerun once as new briefs.
+
+Collect every `F<n>` finding and every `UNCLEAR:` line. Reviewers apply a confidence floor of 50 themselves; the validator decides everything above it. Ownership of overlapping classes: authentication, authorisation, CSRF, audit-trail gaps and file-system check-then-open belong to `security-reviewer`; timeouts, idempotency, transaction boundaries, swallowed errors and in-process or database races belong to `design-reviewer`; other stated requirements belong to `spec-reviewer`; redundant or needlessly complex code with identical behaviour belongs to `simplicity-reviewer`, which never reports a bug (a simplification finding that turns out to change behaviour is REFUTED by the validator). When two axes report the same `path:line` and root cause, keep the owner's finding and add `also-seen: <axis>`; otherwise never merge across axes. Within one axis merge findings with the same `path:line` and root cause, or the same spec clause ID and root cause reported by several groups. Do not drop findings by confidence alone.
+
+## Step 4: validate every finding, one agent per finding
+For each finding call `code-review:finding-validator` with the finding verbatim (code line, quote, claim, scenario), the paths of the reviewed files plus any file the finding names (callers, middleware, config), and for spec and guidance findings the spec or rule path. It must search only those paths. Each validator brief also carries the change scope: `Change scope: diff <absolute path>; only lines added or modified by it are in scope`, or `Change scope: whole-file`. Launch in waves of at most 8 agents running at once.
+
+## Step 5: judge and report
+Take the validator's `VERDICT`, `ADJUSTED SEVERITY` and `CONFIDENCE` (0, 25, 50, 75, 100 rubric):
+- `CONFIRMED`, confidence 75 or more, severity high or medium: a finding.
+- `CONFIRMED`, confidence 50 or severity low: `Notes`, one line each, never a finding.
+- `CONFIRMED` at confidence 0 or 25: `Filtered`, with the reason.
+- `UNVERIFIABLE`: its own heading, with what is missing (the caller, config or code the validator could not read). Reviewer `UNCLEAR` lines go under the same heading as `<agent>: <candidate or requirement ID>: <reason>`.
+- `REFUTED`: dropped, but printed under `Filtered` with the finding ID and the refutation.
+Then apply your own judgement. Any `CONFIRMED` finding you drop goes under `Filtered` with its ID and a one-line reason; never drop silently. Reject findings that mistake style for substance and mark any that depend on code outside the reviewed files.
+
+Output, in this order: Intent; Findings (grouped `## Spec`, `## Design`, `## Security`, `## Guidance`, `## History`, `## Simplicity` (simplicity findings are always low, so a CONFIRMED one goes to Notes and this group is normally empty; see waiting_list.md); never re-rank across groups; each with severity, `path:line` (with a permalink on a full commit SHA and a line range when a GitHub remote exists), scenario, validator evidence); Notes; Unverifiable (validator UNVERIFIABLE and reviewer UNCLEAR); Filtered; Coverage and skipped reviewers (including agents that ran without their lens or ended PARTIAL). Keep it brief, no emojis. End with one line: counts per group and the worst finding within each group. When asked to comment on a PR, post only after the Step 0 recheck.
+
+No verdicts on GxP or Part 11 compliance or ship readiness: say "evidence only; the human owner decides".

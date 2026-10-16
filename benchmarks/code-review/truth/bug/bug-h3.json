@@ -1,0 +1,113 @@
+{
+  "axis": "bug",
+  "case": "bug-h3",
+  "difficulty": "hard",
+  "sources": [
+    "offset pagination over a non-unique sort key (ORDER BY without tie-breaker, window shift on insert or delete)",
+    "final partial page dropped by a loop exit condition",
+    "functools.cmp_to_key comparator that truncates float differences with int()"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/repo.py",
+      "line": 41,
+      "class": "non-total sort key in offset pagination",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "SampleRepository._ordered sorts only by created_at; R6 requires sample_id as tie-breaker. export_csv reads offset windows with list_page(offset, page_size) (paginator/export code in the change). Input: samples S1..S6 all created 2026-10-01T10:00Z, page_size 3. list_page(0,3) -> ['S1', 'S2', 'S3']. Insert S0 (created 09:59) between fetches, then list_page(3,3) -> ['S3', 'S4', 'S5']: S3 is read twice. Same start, but remove S1 between fetches, then list_page(3,3) -> ['S5', 'S6']: S4 is skipped. Shift happens whenever a row before the window is added or removed.",
+      "evidence": {
+        "w1": [
+          "S1",
+          "S2",
+          "S3"
+        ],
+        "w2": [
+          "S3",
+          "S4",
+          "S5"
+        ],
+        "after_insert": [
+          "S0",
+          "S1",
+          "S2",
+          "S3",
+          "S4",
+          "S5",
+          "S6"
+        ],
+        "v1": [
+          "S1",
+          "S2",
+          "S3"
+        ],
+        "v2": [
+          "S5",
+          "S6"
+        ]
+      }
+    },
+    {
+      "id": "D2",
+      "file": "code/export.py",
+      "line": 45,
+      "class": "loop exit before final partial page is written",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "The break on len(page) < page_size runs before the partial page is written. Input: 25 samples S1..S25, page_size 10 -> windows of 10, 10 and 5. export_csv returns 20 and writes 20 data rows; last written id S20, S21..S25 missing.",
+      "evidence": {
+        "returned": 20,
+        "data_rows": 20,
+        "last_id": "S20"
+      }
+    },
+    {
+      "id": "D3",
+      "file": "code/sorting.py",
+      "line": 41,
+      "class": "float comparator truncated to int",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "int() truncates the score difference, so any two scores differing by less than 1 compare as equal and sorted() keeps input order. Input: S1 score 1.9, S2 score 1.2. _compare_score(S2, S1) = int(1.2-1.9) = 0. sort_by_score([S1, S2]) -> ['S1', 'S2']; expected [S2, S1] (1.2 before 1.9).",
+      "evidence": {
+        "compare_S2_S1": 0,
+        "output": [
+          "S1",
+          "S2"
+        ]
+      }
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/sorting.py",
+      "line": 14,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Sort key is (created_at, sample_id), so equal timestamps are ordered by id. Input S2@T0, S1@T0, S3@T0-1min -> ['S3', 'S1', 'S2'], as expected."
+    },
+    {
+      "file": "code/sorting.py",
+      "line": 19,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Comparator returns exactly -1, 0 or 1 from boolean differences; no float or truncation involved. Input sites B (S1) and A (S2) -> sort_by_site gives ['S2', 'S1'], correct."
+    },
+    {
+      "file": "code/paginator.py",
+      "line": 62,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Keyset cursor (created_at, sample_id) advances past the last row, so inserts before the cursor do not shift windows. 7 samples with tied timestamps, page_size 3, 3 pages -> ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'], each exactly once."
+    },
+    {
+      "file": "code/paginator.py",
+      "line": 38,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Ceiling division by negation is exact for non-negative ints: page_count(25,10)=3, (20,10)=2, (0,10)=0."
+    },
+    {
+      "file": "code/repo.py",
+      "line": 52,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line. A negative offset is not validated and Python slicing wraps it: list_page(-1, 10) on 6 samples returns ['S6'] instead of raising. Not on a changed line, not reached by export_csv (offsets there are 0, page_size, 2*page_size, ...)."
+    }
+  ]
+}

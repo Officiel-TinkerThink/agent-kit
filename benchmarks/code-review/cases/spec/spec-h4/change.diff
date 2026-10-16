@@ -1,0 +1,165 @@
+--- a/versions.py
++++ b/versions.py
+@@ -1,7 +1,7 @@
+ """Release version parsing and precedence ordering.
+ 
+-Accepted layout: MAJOR.MINOR.PATCH[+BUILD]. Build metadata is kept for
+-display and never takes part in precedence.
++Accepted layout: MAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]. Build metadata is
++kept for display and never takes part in precedence.
+ """
+ 
+ import re
+@@ -10,6 +10,7 @@
+ 
+ _VERSION_PATTERN = re.compile(
+     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
++    r"(?:-([0-9A-Za-z.-]+))?"
+     r"(?:\+([0-9A-Za-z.-]+))?$"
+ )
+ 
+@@ -23,16 +24,31 @@
+     """A parsed release version that keeps its original text."""
+ 
+     raw: str
++    pre: Optional[str]
+     build: Optional[str]
+ 
+     @property
+     def core(self) -> str:
+         """Return the MAJOR.MINOR.PATCH part of the version."""
+-        return self.raw.split("+", 1)[0]
++        return self.raw.split("-", 1)[0].split("+", 1)[0]
+ 
+     def precedence_key(self) -> Tuple:
+         """Return a tuple whose natural ordering follows version precedence."""
+-        return tuple(int(part) for part in self.core.split("."))
++        core_parts = tuple(self.core.split("."))
++        if self.pre is None:
++            return core_parts + (0, ())
++        return core_parts + (1, _prerelease_key(self.pre))
++
++
++def _prerelease_key(pre: str) -> Tuple:
++    """Split a pre-release into identifiers; numeric identifiers sort first."""
++    identifiers = []
++    for identifier in pre.split("."):
++        if identifier.isdigit():
++            identifiers.append((0, int(identifier), ""))
++        else:
++            identifiers.append((1, 0, identifier))
++    return tuple(identifiers)
+ 
+ 
+ def parse_version(text: str) -> Version:
+@@ -43,7 +59,7 @@
+     match = _VERSION_PATTERN.match(stripped)
+     if match is None:
+         raise VersionError(f"unsupported version: {text!r}")
+-    return Version(raw=stripped, build=match.group(4))
++    return Version(raw=stripped, pre=match.group(4), build=match.group(5))
+ 
+ 
+ def compare_versions(left: str, right: str) -> int:
+@@ -55,3 +71,8 @@
+     if left_key > right_key:
+         return 1
+     return 0
++
++
++def is_prerelease(text: str) -> bool:
++    """Return True when the version carries a pre-release part."""
++    return parse_version(text).pre is not None
+--- a/manifest.py
++++ b/manifest.py
+@@ -28,13 +28,15 @@
+ 
+ 
+ def load_manifest(path: str) -> List[ReleaseEntry]:
+-    """Load and validate a manifest file, returning entries in file order."""
++    """Load and validate a manifest file, returning entries in precedence order."""
+     with open(path, encoding="utf-8") as handle:
+         document = json.load(handle)
+     items = document.get("entries") if isinstance(document, dict) else None
+     if not isinstance(items, list):
+         raise ManifestError("manifest must contain an 'entries' list")
+-    return [_entry_from_dict(item, index) for index, item in enumerate(items)]
++    entries = [_entry_from_dict(item, index) for index, item in enumerate(items)]
++    _ensure_unique(entries)
++    return _sort_entries(entries)
+ 
+ 
+ def _entry_from_dict(item: dict, index: int) -> ReleaseEntry:
+@@ -55,6 +57,21 @@
+     )
+ 
+ 
++def _ensure_unique(entries: List[ReleaseEntry]) -> None:
++    """Reject a manifest that lists the same component version twice."""
++    seen = set()
++    for entry in entries:
++        key = (entry.component, entry.version)
++        if key in seen:
++            raise ManifestError(f"duplicate release {entry.component} {entry.version}")
++        seen.add(key)
++
++
++def _sort_entries(entries: List[ReleaseEntry]) -> List[ReleaseEntry]:
++    """Sort entries ascending by version precedence."""
++    return sorted(entries, key=lambda entry: parse_version(entry.version).precedence_key())
++
++
+ def write_manifest(entries: List[ReleaseEntry], path: str) -> None:
+     """Write entries as a manifest with canonical UTC timestamps."""
+     payload = {
+@@ -64,7 +81,7 @@
+                 "version": entry.version,
+                 "released_at": format_timestamp(parse_timestamp(entry.released_at)),
+             }
+-            for entry in entries
++            for entry in _sort_entries(entries)
+         ]
+     }
+     with open(path, "w", encoding="utf-8") as handle:
+--- a/release_check.py
++++ b/release_check.py
+@@ -4,7 +4,7 @@
+ component, given the entries already present in the manifest.
+ """
+ 
+-from typing import Iterable, Optional
++from typing import Iterable, List, Optional
+ 
+ from manifest import ReleaseEntry
+ from versions import compare_versions, parse_version
+@@ -23,6 +23,17 @@
+     return latest
+ 
+ 
++def require_newer(candidate: ReleaseEntry, entries: List[ReleaseEntry]) -> None:
++    """Fail the gate unless the candidate is above every published version."""
++    current = latest_entry(entries)
++    if current is None:
++        return
++    if compare_versions(candidate.version, current.version) <= 0:
++        raise ReleaseCheckError(
++            f"{candidate.version} must be higher than {current.version}"
++        )
++
++
+ def is_major_bump(previous: str, candidate: str) -> bool:
+     """Return True when the candidate raises the MAJOR component."""
+     previous_major = int(parse_version(previous).core.split(".")[0])
+@@ -37,3 +48,12 @@
+     previous_minor = int(parse_version(previous).core.split(".")[1])
+     candidate_minor = int(parse_version(candidate).core.split(".")[1])
+     return "minor" if candidate_minor > previous_minor else "patch"
++
++
++def gate_summary(candidate: ReleaseEntry, entries: List[ReleaseEntry]) -> str:
++    """Return a one-line summary of the change the candidate introduces."""
++    current = latest_entry(entries)
++    if current is None:
++        return f"{candidate.component} first release {candidate.version}"
++    change = describe_change(current.version, candidate.version)
++    return f"{candidate.component} {current.version} -> {candidate.version}: {change}"

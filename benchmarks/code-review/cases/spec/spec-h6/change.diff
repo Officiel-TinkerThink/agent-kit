@@ -1,0 +1,199 @@
+--- a/plan_export.py
++++ b/plan_export.py
+@@ -8,12 +8,13 @@
+ from dose_calc import (
+     CENT,
+     DoseError,
++    DoseLimitError,
+     check_concentration,
+     normalise_blocked,
+     round_half_up,
+     to_decimal,
+ )
+-from library import DrugLibrary
++from library import DrugLibrary, LibraryError
+ 
+ log = logging.getLogger("plan_export")
+ 
+@@ -32,9 +33,16 @@
+         raise ExportError("plan has no dose_mg") from exc
+ 
+ 
++def _resolve_drug(plan: dict, library: DrugLibrary) -> dict:
++    """Find the library record a plan refers to."""
++    if "drug_index" in plan:
++        return library.drugs[plan["drug_index"]]
++    return library.by_id(plan["drug_id"])
++
++
+ def export_monitor_units(plan: dict, library: DrugLibrary, concentration) -> Decimal:
+     """Monitor-unit volume in mL for the plan, rounded half-up to 0.01."""
+-    drug = library.by_id(plan["drug_id"])
++    drug = _resolve_drug(plan, library)
+     conc = check_concentration(to_decimal(concentration))
+     max_mg = to_decimal(drug["max_dose_mg"])
+     volume = normalise_blocked(_plan_dose_mg(plan), conc, max_mg)
+@@ -50,3 +58,18 @@
+         "library_version": library.version,
+         "monitor_units_ml": str(volume),
+     }
++
++
++def export_batch(plans: list[dict], library: DrugLibrary, concentration) -> dict:
++    """Export several plans; a rejected plan is reported and the batch continues."""
++    results: dict[str, list] = {"ok": [], "rejected": []}
++    for plan in plans:
++        plan_id = plan.get("plan_id")
++        try:
++            record = export_document(plan, library, concentration)
++        except (ExportError, DoseLimitError, LibraryError) as exc:
++            log.warning("plan %s rejected: %s", plan_id, exc)
++            results["rejected"].append({"plan_id": plan_id, "reason": str(exc)})
++            continue
++        results["ok"].append(record)
++    return results
+--- a/infusion.py
++++ b/infusion.py
+@@ -10,10 +10,10 @@
+ 
+ log = logging.getLogger("infusion")
+ 
+-MIN_RATE_ML_H = Decimal("3")
+-MAX_RATE_ML_H = Decimal("3000")
++MIN_RATE_ML_MIN = Decimal("0.05")
++MAX_RATE_ML_MIN = Decimal("50")
+ MAX_VOLUME_ML = Decimal("1000")
+-RATE_QUANTUM = Decimal("0.01")
++RATE_QUANTUM = Decimal("0.001")
+ 
+ 
+ class InfusionError(DoseError):
+@@ -26,7 +26,7 @@
+ 
+     drug_id: str
+     volume_ml: Decimal
+-    rate_ml_h: Decimal
++    rate_ml_min: Decimal
+     duration_min: Decimal
+ 
+     def as_record(self) -> dict:
+@@ -34,27 +34,27 @@
+         return {
+             "drug_id": self.drug_id,
+             "volume_ml": str(round_half_up(self.volume_ml)),
+-            "rate_ml_h": str(round_half_up(self.rate_ml_h, RATE_QUANTUM)),
++            "rate_ml_min": str(round_half_up(self.rate_ml_min, RATE_QUANTUM)),
+             "duration_min": str(round_half_up(self.duration_min)),
+         }
+ 
+ 
+-def check_limits(rate_ml_h: Decimal, volume_ml: Decimal) -> None:
++def check_limits(rate_ml_min: Decimal, volume_ml: Decimal) -> None:
+     """Reject flow or volume outside the pump limits."""
+-    if not (MIN_RATE_ML_H <= rate_ml_h <= MAX_RATE_ML_H):
+-        raise InfusionError(f"rate {rate_ml_h} mL/h outside pump limits")
++    if not (MIN_RATE_ML_MIN <= rate_ml_min <= MAX_RATE_ML_MIN):
++        raise InfusionError(f"rate {rate_ml_min} mL/min outside pump limits")
+     if volume_ml <= 0 or volume_ml > MAX_VOLUME_ML:
+         raise InfusionError(f"volume {volume_ml} mL outside pump limits")
+ 
+ 
+-def start_infusion(drug_id: str, rate_ml_h, volume_ml) -> InfusionProgram:
+-    """Build an infusion program from the pump flow in mL/h."""
+-    rate = to_decimal(rate_ml_h)
++def start_infusion(drug_id: str, rate, volume_ml) -> InfusionProgram:
++    """Build an infusion program. Rate is the pump flow in mL/min."""
++    flow = to_decimal(rate)
+     volume = to_decimal(volume_ml)
+-    check_limits(rate, volume)
+-    duration = volume * Decimal(60) / rate
+-    log.info("infusion %s: %s mL at %s mL/h", drug_id, volume, rate)
+-    return InfusionProgram(drug_id, volume, rate, duration)
++    check_limits(flow, volume)
++    duration = volume / flow
++    log.info("infusion %s: %s mL at %s mL/min", drug_id, volume, flow)
++    return InfusionProgram(drug_id, volume, flow, duration)
+ 
+ 
+ def total_volume(programs: list[InfusionProgram]) -> Decimal:
+@@ -63,3 +63,11 @@
+     for program in programs:
+         total += program.volume_ml
+     return total
++
++
++def program_summary(program: InfusionProgram) -> str:
++    """One-line text for the operator confirmation dialog."""
++    return (
++        f"{program.drug_id}: {round_half_up(program.volume_ml)} mL "
++        f"over {round_half_up(program.duration_min)} min"
++    )
+--- a/api.py
++++ b/api.py
+@@ -3,12 +3,13 @@
+ from __future__ import annotations
+ 
+ import logging
++from decimal import Decimal
+ from pathlib import Path
+ 
+ from dose_calc import DoseError, DoseLimitError, display_dose, to_decimal
+-from infusion import start_infusion
++from infusion import program_summary, start_infusion
+ from library import DrugLibrary, LibraryError
+-from plan_export import ExportError, export_document
++from plan_export import ExportError, export_batch, export_document
+ 
+ log = logging.getLogger("api")
+ 
+@@ -52,14 +53,48 @@
+     return {"status": 200, "export": record}
+ 
+ 
++def batch_export_handler(body: dict) -> dict:
++    """Monitor-unit export for several plans; rejected items are reported."""
++    plans = body.get("plans")
++    if not isinstance(plans, list) or not plans:
++        return _error(400, "plans must be a non-empty list")
++    try:
++        concentration = body["concentration"]
++        library = _library()
++    except KeyError as exc:
++        return _error(400, f"missing field {exc}")
++    except LibraryError as exc:
++        return _error(500, str(exc))
++    return {"status": 200, "results": export_batch(plans, library, concentration)}
++
++
+ def restart_infusion_handler(body: dict) -> dict:
+     """Restart an infusion from the flow shown on the pump screen in mL/h."""
+     try:
++        rate_ml_min = to_decimal(body["rate_ml_h"]) / Decimal(60)
++        program = start_infusion(body["drug_id"], rate_ml_min, body["volume_ml"])
++    except KeyError as exc:
++        return _error(400, f"missing field {exc}")
++    except DoseError as exc:
++        return _error(422, str(exc))
++    return {"status": 200, "program": program.as_record()}
++
++
++def start_infusion_handler(body: dict) -> dict:
++    """Start an infusion from the flow entered in mL/h."""
++    try:
+         program = start_infusion(
+-            body["drug_id"], to_decimal(body["rate_ml_h"]), body["volume_ml"]
++            body["drug_id"],
++            to_decimal(body["rate_ml_h"]),
++            body["volume_ml"],
+         )
+     except KeyError as exc:
+         return _error(400, f"missing field {exc}")
+     except DoseError as exc:
+         return _error(422, str(exc))
+-    return {"status": 200, "program": program.as_record()}
++    log.info("infusion started for %s", body["drug_id"])
++    return {
++        "status": 200,
++        "summary": program_summary(program),
++        "program": program.as_record(),
++    }

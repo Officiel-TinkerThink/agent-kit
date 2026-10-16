@@ -1,0 +1,85 @@
+{
+  "axis": "design",
+  "case": "design-h7",
+  "difficulty": "hard",
+  "sources": [
+    "Exception chaining: raise ... from exc keeps the original cause (Python language reference)",
+    "Idempotency keys: reuse one key across retries of the same payment request",
+    "Global lock ordering: acquire shared resource locks in one sorted order to prevent deadlock",
+    "Bounded queue back-pressure: queue.Queue(maxsize) with a put timeout and a Full-to-domain error",
+    "Fail-closed authorization: a failed policy or quota check denies the action"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/gateway.py",
+      "line": 61,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Broad except Exception on a non-transient provider error logs with exc_info and re-raises GatewayError from exc, so the cause is kept (R1). Verified: ValueError('card declined') is __cause__ of the GatewayError."
+    },
+    {
+      "file": "code/gateway.py",
+      "line": 75,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Broad except in _quota_allows returns False, so any quota error denies the capture (R3, fail closed). Verified: quota RuntimeError leads to GatewayError and an empty provider call log."
+    },
+    {
+      "file": "code/gateway.py",
+      "line": 43,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The idempotency key is taken from the caller and placed in the payload once, outside the retry loop, so every attempt sends the same key (R2). Verified: keys ['K3', 'K3', 'K3'] after two transient errors."
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 63,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The rollback in the except clause undoes the already-inserted debit row when the credit row fails, so no half posting remains (R4). Verified: forced failure on the revenue row leaves no rows for that entry_ref."
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 32,
+      "kind": "safe-looking",
+      "why_not_a_defect": "sorted(set(accounts)) gives one global acquisition order whatever the argument order, so two postings cannot wait on each other in a cycle (R5). Verified: 4 threads x 10 postings finish with no error and balanced totals (0, 80)."
+    },
+    {
+      "file": "code/queue_worker.py",
+      "line": 41,
+      "kind": "safe-looking",
+      "why_not_a_defect": "A put with a timeout on queue.Queue(maxsize) is the bounded back-pressure pattern; queue.Full is mapped to QueueFull after QUEUE_PUT_TIMEOUT_S (R6). Verified: full queue raises QueueFull after 1.52 s."
+    },
+    {
+      "file": "code/queue_worker.py",
+      "line": 78,
+      "kind": "safe-looking",
+      "why_not_a_defect": "task_done in finally runs after a failed job too, so unfinished_tasks returns to 0 while the failed job is kept in failed_jobs (R8 path). Verified: unfinished_tasks == 0 after a GatewayError."
+    },
+    {
+      "file": "code/settings.py",
+      "line": 49,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line, not in this change: the bare except in load_overrides catches every exception and falls back to the constant. Input MAX_RETRIES='three' logs a warning and yields 3 instead of raising ConfigError as R7 requires. Verified: load_overrides({'MAX_RETRIES': 'three'})['MAX_RETRIES'] == 3. Diff-mode review must not report it."
+    }
+  ],
+  "accepted_extras": [
+    {
+      "file": "code/settings.py",
+      "line": 49,
+      "description": "bare except on override conversion (pre-existing, R7)."
+    },
+    {
+      "file": "code/gateway.py",
+      "line": 21,
+      "description": "overrides from settings.load_overrides reach constructors only if the composition root passes them; defaults use module constants (judgement)."
+    },
+    {
+      "file": "code/ledger.py",
+      "line": 24,
+      "description": "_locks dict never pruned: one lock per order account (minor, audit-confirmed 50001 entries after 50000 orders)."
+    },
+    {
+      "file": "code/settings.py",
+      "line": 61,
+      "description": "float inf accepted for timeouts (no upper bound), low."
+    }
+  ]
+}

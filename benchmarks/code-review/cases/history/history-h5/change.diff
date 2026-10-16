@@ -1,0 +1,132 @@
+--- a/config.py
++++ b/config.py
+@@ -9,6 +9,7 @@
+ 
+ DEFAULT_BACKUP_ROOT = Path(os.environ.get("LIMS_BACKUP_ROOT", "/var/lib/lims-bridge/backups"))
+ DEFAULT_RETENTION_COUNT = 30
++DEFAULT_RESTORE_ATTEMPTS = 3
+ SUPPORTED_CHECKSUMS = ("sha256", "sha512")
+ SNAPSHOT_PREFIX = "inventory"
+ 
+@@ -23,9 +24,10 @@
+ 
+     backup_root: Path = DEFAULT_BACKUP_ROOT
+     retention_count: int = DEFAULT_RETENTION_COUNT
+-    verify_restore: bool = True
++    verify_restore: bool = False
+     snapshot_prefix: str = SNAPSHOT_PREFIX
+     checksum_algorithm: str = "sha256"
++    restore_attempts: int = DEFAULT_RESTORE_ATTEMPTS
+ 
+     def validate(self) -> None:
+         """Raise ValueError when a setting cannot be honoured."""
+@@ -37,6 +39,8 @@
+             raise ValueError("snapshot_prefix must be a valid identifier")
+         if not isinstance(self.verify_restore, bool):
+             raise ValueError("verify_restore must be a boolean")
++        if self.restore_attempts < 1:
++            raise ValueError("restore_attempts must be at least 1")
+ 
+ 
+ def _coerce_bool(value) -> bool:
+@@ -58,9 +62,10 @@
+     settings = BackupSettings(**values)
+     settings.validate()
+     log.info(
+-        "settings loaded root=%s retention=%d verify_restore=%s",
++        "settings loaded root=%s retention=%d verify_restore=%s attempts=%d",
+         settings.backup_root,
+         settings.retention_count,
+         settings.verify_restore,
++        settings.restore_attempts,
+     )
+     return settings
+--- a/backup_store.py
++++ b/backup_store.py
+@@ -4,6 +4,7 @@
+ import logging
+ import os
+ import tempfile
++import time
+ from pathlib import Path
+ 
+ from config import BackupSettings
+@@ -24,7 +25,7 @@
+     return digest.hexdigest()
+ 
+ 
+-def _fsync_directory(directory: Path) -> None:
++def _sync_directory(directory: Path) -> None:
+     """Flush directory metadata so a completed rename survives a crash."""
+     fd = os.open(str(directory), os.O_RDONLY)
+     try:
+@@ -46,7 +47,7 @@
+             tmp.flush()
+             os.fsync(tmp.fileno())
+         os.replace(tmp.name, target)
+-        _fsync_directory(settings.backup_root)
++        _sync_directory(settings.backup_root)
+         digest = _checksum(target, settings.checksum_algorithm)
+         sidecar = target.with_name(target.name + ".sha256")
+         sidecar.write_text(digest, encoding="utf-8")
+@@ -55,6 +56,21 @@
+         raise BackupWriteError(f"cannot write snapshot {target.name}") from exc
+     log.info("snapshot written target=%s digest=%s", target.name, digest[:12])
+     return target
++
++
++def snapshot_inventory(settings: BackupSettings, payload: bytes, label: str) -> bool:
++    """Write an inventory snapshot for the nightly report without interrupting the run.
++
++    Returns True once the nightly run has recorded its snapshot step.
++    """
++    started = time.monotonic()
++    try:
++        write_backup(settings, payload, label)
++    except Exception as exc:
++        log.warning("inventory snapshot skipped label=%s error=%s", label, exc)
++    elapsed = time.monotonic() - started
++    log.info("inventory snapshot step done label=%s elapsed=%.3f", label, elapsed)
++    return True
+ 
+ 
+ def list_snapshots(settings: BackupSettings) -> list[Path]:
+--- a/restore.py
++++ b/restore.py
+@@ -2,12 +2,15 @@
+ 
+ import logging
+ import tarfile
++import time
+ from pathlib import Path
+ 
+ from backup_store import _checksum, list_snapshots
+ from config import BackupSettings
+ 
+ log = logging.getLogger("lims_bridge.restore")
++
++RESTORE_RETRY_DELAY_SECONDS = 2.0
+ 
+ 
+ class RestoreError(RuntimeError):
+@@ -67,3 +70,20 @@
+         raise RestoreError(f"cannot extract {archive.name}") from exc
+     log.info("restore complete archive=%s target=%s", archive.name, target_dir)
+     return target_dir
++
++
++def restore_with_retry(settings: BackupSettings, archive: Path, target_dir: Path) -> Path:
++    """Retry restore_snapshot on RestoreError and re-raise the last error after the final attempt."""
++    attempts = settings.restore_attempts
++    if attempts < 1:
++        raise ValueError("restore_attempts must be at least 1")
++    last_error = None
++    for attempt in range(1, attempts + 1):
++        try:
++            return restore_snapshot(settings, archive, target_dir)
++        except RestoreError as exc:
++            last_error = exc
++            log.warning("restore attempt failed attempt=%d of=%d error=%s", attempt, attempts, exc)
++            if attempt < attempts:
++                time.sleep(RESTORE_RETRY_DELAY_SECONDS)
++    raise last_error

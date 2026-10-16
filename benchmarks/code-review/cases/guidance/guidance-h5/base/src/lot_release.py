@@ -1,0 +1,46 @@
+"""Lot disposition helpers for QC-approved batch lots."""
+
+import logging
+from dataclasses import dataclass, field
+
+log = logging.getLogger(__name__)
+
+RELEASABLE_STATUSES = ("QC_APPROVED",)
+TERMINAL_STATUSES = ("RELEASED", "REJECTED")
+
+
+class ReleaseError(Exception):
+    """Raised when a lot cannot be released in its current state."""
+
+
+@dataclass
+class Lot:
+    lot_id: str
+    product_code: str
+    status: str = "QUARANTINE"
+    released_by: str = ""
+    history: list = field(default_factory=list)
+
+
+def is_releasable(lot):
+    """Return True when the lot has passed QC and has not been released."""
+    return lot.status in RELEASABLE_STATUSES and not lot.released_by
+
+
+def describe_lot(lot):
+    """Return a one-line summary of the lot for operator screens."""
+    owner = lot.released_by or "-"
+    return f"{lot.lot_id} [{lot.product_code}] {lot.status} released_by={owner}"
+
+
+def transition_history(lot):
+    """Return the lot's transition history as a list of (event, actor) tuples."""
+    return list(lot.history)
+
+
+def find_lot(lots, lot_id):
+    """Return the lot with the given ID or raise ReleaseError."""
+    lot = lots.get(lot_id)
+    if lot is None:
+        raise ReleaseError(f"unknown lot {lot_id}")
+    return lot

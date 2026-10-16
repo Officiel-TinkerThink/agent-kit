@@ -1,0 +1,27 @@
+{
+  "axis": "guidance",
+  "case": "guidance-01",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/intake.py",
+      "line": 34,
+      "rule": "Never call `datetime.now()` or `datetime.utcnow()` directly. Obtain timestamps from `lab_core.clock.utc_now_iso()`.",
+      "description": "datetime.now() is called directly to stamp expired_at; rule requires lab_core.clock.utc_now_iso()."
+    },
+    {
+      "id": "D2",
+      "file": "code/intake.py",
+      "line": 36,
+      "rule": "Domain validation failures raise `DomainError` from `lab_core.errors`. Never raise `ValueError` or `TypeError` in domain code.",
+      "description": "ValueError is raised for domain validation of expiry_hours; rule requires DomainError."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/conc_import.py",
+      "line": 7,
+      "why_not_a_defect": "float() on a concentration string violates rule 5, but the line carries the inline marker `# rule-5-exempt: legacy importer, ticket LAB-88`, which the rule explicitly permits."
+    }
+  ]
+}

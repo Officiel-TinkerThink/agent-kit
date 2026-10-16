@@ -1,0 +1,31 @@
+--- a/code/report_export.py
++++ b/code/report_export.py
+@@ -30,16 +30,16 @@
+     def export(self, records: list, fmt: str):
+         if fmt not in SUPPORTED_FORMATS:
+             raise ValueError(f"unsupported format: {fmt}")
+-        if not records:
+-            logger.info("no records to export")
+-            return None
+         rows = build_rows(records)
+         return self._dispatch(rows, fmt)
+ 
+     def _dispatch(self, rows, fmt):
++        if not rows:
++            logger.info("no records to export")
++            return None
+         if fmt == "csv":
+             return self.write_csv_rows(rows)
+-        return self._write_json(rows)
++        return self.write_json_rows(rows)
+ 
+     def write_csv_rows(self, rows):
+         buffer = io.StringIO()
+@@ -48,6 +48,6 @@
+         writer.writerows(rows)
+         return self._sink.write("report.csv", buffer.getvalue())
+ 
+-    def _write_json(self, rows):
++    def write_json_rows(self, rows):
+         payload = json.dumps(rows, indent=2, sort_keys=True)
+         return self._sink.write("report.json", payload)

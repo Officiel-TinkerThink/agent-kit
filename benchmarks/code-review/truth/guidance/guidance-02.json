@@ -1,0 +1,27 @@
+{
+  "axis": "guidance",
+  "case": "guidance-02",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/export.py",
+      "line": 16,
+      "rule": "NOTE: callers rely on ascending sample_id order; do not change the sort",
+      "description": "sorted() uses reverse=True, producing descending sample_id order; the in-code NOTE states callers rely on ascending order and forbids changing the sort."
+    },
+    {
+      "id": "D2",
+      "file": "code/export.py",
+      "line": 37,
+      "rule": "Use the `logging` module, never `print()`, in `code/`.",
+      "description": "print(row) is used in the export module; rule requires the logging module."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/export.py",
+      "line": 27,
+      "why_not_a_defect": "Plain TODO about future pagination. It is a backlog note, not guidance, and the code it sits on does not violate any rule."
+    }
+  ]
+}

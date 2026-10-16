@@ -1,0 +1,20 @@
+{
+  "axis": "history",
+  "case": "history-02",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/sync_batch.py",
+      "line": 9,
+      "history_ref": "9b3d2f6 fix: lower sync batch size after gateway timeouts (#533)",
+      "description": "Restores BATCH_SIZE 1000, which 9b3d2f6 lowered to 200 after gateway timeouts. The reviewer comment on PR #533 bars raising it without a gateway load test, and the change carries no load-test evidence. This reintroduces the timeout regression."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/sync_batch.py",
+      "line": 12,
+      "why_not_a_defect": "The retry backoff cap change from 30 to 20 is the follow-up named in the subject of 6d2c9b8. RETRY_BACKOFF_CAP_S is read only by _backoff_delay, so no other path changes."
+    }
+  ]
+}

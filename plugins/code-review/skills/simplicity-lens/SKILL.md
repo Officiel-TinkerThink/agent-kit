@@ -38,7 +38,7 @@ def is_expired(item, today):
 Good:
 ```python
 def is_expired(item, today):
-    return item.expiry_date < today
+    return item.expiry_date < today    # identical only when the comparison returns a bool
 ```
 Not a defect when: `cond` can be a non-bool value that the function must turn into True or False (then `return bool(cond)`), or the function must return the original truthy value, or the two branches differ in a side effect.
 
@@ -57,7 +57,7 @@ for v in volumes:
 ```
 Good:
 ```python
-total = sum(volumes)
+total = sum(volumes)  # not identical for None items or float sums (see Not a defect)
 largest = max(volumes, default=None)
 ```
 Not a defect when: the loop has an early exit, logs or counts per item, mutates something, or iterates a generator that a second pass would exhaust. The built-in form must also keep the same result for the empty input, and for floats `sum()` can differ from `+=` (compensated summation in Python 3.12+); `max` raises TypeError on None items where a guarded loop skips them.
@@ -102,7 +102,7 @@ count = int(len(lines)) if len(lines) > 0 else 0
 ```
 Good:
 ```python
-count = len(lines)
+count = len(lines)  # identical: len() already returns an exact int
 ```
 Not a defect when: `== True` or `not not x` (they change the value or type), `list(v)` (breaks aliasing), the cast changes the type (a float turned into text before `Decimal(...)` keeps `2.675` exact), the guard prevents a division by zero or an exception, or the copy is defensive because the callee mutates it.
 
@@ -119,7 +119,7 @@ def line_total(unit_price, quantity):
 Good:
 ```python
 def line_total(unit_price, quantity):
-    return to_money(unit_price * quantity)
+    return to_money(unit_price * quantity)      # identical only if quantity is never None; else TypeError, not InvalidQuantityError
 ```
 Not a defect when: the function is public and can be called from outside the material you were given (say so under UNCLEAR), or the guard is the only check on that path.
 
@@ -138,7 +138,7 @@ def build(fmt):
 ```
 Good:
 ```python
-def write_csv_rows(rows, stream):
+def write_csv_rows(rows, stream):  # a shape only: the signature and the callers change
     ...
 ```
 Not a defect when: a second implementation exists in the material you were given (a test double does not count unless it is in the code), the base class defines a contract that other code type-checks against, or the registry is filled from configuration, or the project standard requires an interface (SOLID, testability).
@@ -154,7 +154,7 @@ def export(self, rows, include_header=True):
 ```
 Good:
 ```python
-def export(self, rows):
+def export(self, rows):  # removes a keyword: any caller that still passes include_header breaks
     writer.writerow(HEADER)
 ```
 Not a defect when: a caller outside the material you were given may pass the other value, or the function is a documented public API.
@@ -183,7 +183,7 @@ def validate_weight_c(record):
 ```
 Good:
 ```python
-def validate_weight(record, label):
+def validate_weight(record, label):  # callers must now pass label; a one-argument call breaks
     ...   # one shared body; the three modules pass their label
 ```
 Not a defect when: the copies differ in a comparison operator, a limit, a message or an error type. Name the differing line. A boundary that is `<` in one copy and `<=` in the other may be required by the intent; do not merge it.
@@ -203,7 +203,7 @@ else:
 ```
 Good:
 ```python
-return LABELS.get(code, "Unknown")
+return LABELS.get(code, "Unknown")  # identical for hashable codes only
 ```
 Not a defect when: the branches differ in side effects, raise, compute a value, or the chain has fewer than four branches. An unhashable input that the original maps to the default and a dict would raise on only matters if the function can receive one.
 
@@ -239,7 +239,7 @@ class TaxMemo:
 ```
 Good:
 ```python
-tax = tax_on(amount, region)
+tax = tax_on(amount, region)  # a shape only: needs tax_on() and the cache removed
 ```
 Not a defect when: the function reads a file, a database or the network, is expensive, or has a documented invalidation path that code in the material actually calls.
 
@@ -253,7 +253,7 @@ def export_csv_file(path, rows):      # no caller in the code
 ```
 Good:
 ```python
-# removed
+# removed  # a deletion, not a rewrite: any importer breaks; grep first
 ```
 Not a defect when: it is a public API of a library, an entry point named in a config or a decorator registry, a hook called by name, or a test helper used by tests you were not given. When in doubt put it under UNCLEAR.
 

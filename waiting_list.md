@@ -12,12 +12,13 @@ Open decisions and follow-ups that are parked on purpose. Add new items at the t
 - Options to weigh when this is picked up: (a) always list CONFIRMED simplicity findings under `## Simplicity`, whatever their severity; (b) keep Notes but add a count line ("3 simplifications in Notes"); (c) leave as is.
 - Not started: no code or text was changed for this item.
 
-### Benchmark numbers are single-run and the latest lens edits are not re-benchmarked
+### Benchmark numbers are single-run; round 2 re-run done, trap-hit regression open
 - Added: 2026-10-16. Source: side-agent caveat, parked by the user for later.
-- Situation: `benchmarks/code-review/README.md` reports round-1 and round-2 results from one run per case, with no variance estimate. The "31 of 31" stage and "69 of 70" figures could shift on a rerun. Round-2 cases were written by Haiku and audited by other agents; "clean" only means no known seeded defect. The round-1 denominator (70) does not reconcile with `truth/` (33 defects), and the round-1 and round-2 score outputs are not kept under `results/`.
-- The latest simplicity-lens edits were never re-benchmarked; the re-run was blocked by the organisation spend limit (resets 12:40am Asia/Jakarta).
-- Decision needed later: when the limit resets, re-run round 2 once (`python -I benchmarks/code-review/harness.py run --arm skills --cases round2 --tag=-r2after`), score it with independent semantic scorers, compare against the before-run, and add repeat runs for variance before quoting any number as a decision basis.
-- Not started.
+- Done 2026-10-16: round 2 re-run on the current lens (24 of 24 reports), scored by one independent scorer per case. Results are in `benchmarks/code-review/README.md`: 53 of 60 seeded defects, 4 trap hits (up from 0), 5 false positives (up from 4).
+- Open: the trap-hit regression (simplicity-h1 `label_text`, simplicity-h4 `average_cents`, design-h4 duplicated retry rule, design-h7 rollback path). Decide whether to tighten the lens or the design agent, then re-run.
+- Open: each number is one run with no variance estimate; repeat runs are needed before a number is used as a decision basis.
+- Open: the round-1 score totals (69 of 70, 66 of 70) are one run each; the scorer output for round 1 is not kept under `results/`.
+- Not started: repeat runs and the trap-hit fix.
 
 ## Done
 

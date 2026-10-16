@@ -225,7 +225,7 @@ def get_price(sku: str) -> Decimal:
     return price
 ```
 - Good: `return _repo.price_of(sku)`; history is written by the command that changes the price.
-- Not a defect when: the spec asks for the write, or it is a cache fill that does not change the result.
+- Not a defect when: the spec asks for the write, or it is a cache fill that does not change the result. A new validation (rejecting duplicates, storing an extra field) that the spec is silent on is not scope creep unless it breaks an allowed input or a stated requirement.
 
 ### State transition not guarded
 - Tell: an assignment to a status or state field with no check of the current state, where the spec lists the allowed prior states.

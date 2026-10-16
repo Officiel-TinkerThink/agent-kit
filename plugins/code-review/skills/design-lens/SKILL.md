@@ -373,7 +373,7 @@ def net(total):
 
 - `SELECT ... FOR UPDATE` inside a transaction before a write: the lock makes the read-then-write safe.
 - `UPDATE t SET n = n + ?`: a single atomic statement; not a lost update.
-- A rollback or cleanup that logs its own failure and re-raises the original exception: the original error is not swallowed.
+- A rollback or cleanup that logs its own failure and re-raises the original exception: the original error is not swallowed. A compensating rollback that undoes the only half-written state (the debit row when the credit row fails) leaves no half posting: check the state it leaves, not whether the rollback itself could raise.
 - `queue.put(x, timeout=1)` with `except queue.Full`: bounded and handled.
 - `with open(...)` or `try/finally` around the handle: released on the error path.
 - `except Exception as exc: raise DomainError(...) from exc`: wraps and propagates; nothing is swallowed.

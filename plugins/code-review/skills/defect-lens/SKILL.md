@@ -20,13 +20,13 @@ Work from the failure sequence: every finding names the state left behind and th
 6. Check what the change REMOVED (lock, timeout, finally, version check, dedupe key, limit, retry cap) and what it did NOT touch but depends on (callee retry policy, queue delivery, cache TTL, config default). Trace one concrete failing input through the path without the guard and write the outcome; drop the candidate if the trace cannot reach it.
 
 ## Catalog
-
+Each Tell is a shape to look for, not a finding. Many Tells also match correct code. Before you write a finding from a Tell, name the guarantee the code breaks (a stated requirement, a documented contract, or an observable wrong result) and check the "Not a defect when" clause against the code you read. If the guard that makes the code correct sits outside the function you read, search for it; if you cannot find it, report UNCLEAR, not a finding.
 ### Dual write without outbox
 - Tell: a DB commit followed by a broker, HTTP or file write, with no shared transaction and no outbox row; or a publish inside the transaction block, before the commit (consumers then act on a row that may roll back).
 - Fails when: save() commits, then publish() raises or the process dies. The order exists, the event never leaves, and downstream never sees it.
 - Bad:
 ```python
-def place_order(db, broker, order):
+def save_then_notify(db, broker, record):
     db.save(order)                             # committed
     broker.publish("order.placed", order.id)   # lost if this raises
 ```
@@ -34,36 +34,36 @@ def place_order(db, broker, order):
 - Not a defect when: the event is a best-effort hint the spec says may be lost, or the path already writes to an outbox table.
 ### Non-idempotent consumer under at-least-once delivery
 - Tell: a message handler that adds, appends or sends, with no processed-id check or unique key.
-- Fails when: the broker redelivers after a slow ack; the handler credits the same amount twice.
+- Fails when: the broker redelivers after a slow ack; the handler applies its effect a second time.
 - Bad:
 ```python
 def handle(msg, repo):
     acct = repo.get(msg.account_id)
-    acct.balance += msg.amount     # runs again on redelivery
+    row.total += msg.value     # runs again on redelivery
     repo.save(acct)
 ```
 - Good: in the same transaction as the balance change, `INSERT INTO processed_msg(msg_id) VALUES (%s) ON CONFLICT DO NOTHING`; rowcount 0 means skip. Do not SELECT the id first and INSERT after: concurrent redeliveries both pass a SELECT (check-then-act).
 - Not a defect when: the handler writes an absolute value (balance = msg.new_balance) or a keyed upsert whose repeat is a no-op.
 ### Retry amplification
 - Tell: a retry at more than one layer, a fixed sleep, no jitter, or no overall deadline or budget.
-- Fails when: the inventory service is slow for 60 s; each order makes 5 client attempts times 5 handler attempts at a fixed 2 s interval, so load multiplies when the service is weakest.
+- Fails when: nested retry layers multiply attempts (outer x inner), so load multiplies when the downstream service is weakest; bound the total with one deadline shared by all attempts, and add jitter.
 - Bad:
 ```python
-@retry(attempts=5, sleep=2)   # client layer; the caller in the order handler adds retry(attempts=5) too: up to 25 attempts
+@retry(attempts=N, sleep=S)   # client layer; the caller in the handler adds retry(attempts=N) too: up to N x N attempts
 def call_inventory(body): return http.post(INV_URL, json=body, timeout=5)
 ```
 - Good: retry at one layer only, with exponential backoff, full jitter and a total deadline shared by all attempts. Retry a POST only with an idempotency key (`Idempotency-Key` header, same value on every attempt); a non-idempotent POST without a key is not retried at all.
 - Not a defect when: the layers retry different error classes (one retries connection errors, the other only 503 after a deadline check), or the total attempts are bounded and jittered.
 ### Check-then-act on shared state
 - Tell: SELECT or read, then a comparison, then a separate UPDATE or write, with no lock, unique constraint or conditional UPDATE.
-- Fails when: two requests read stock = 1 and both pass the check; both write stock = 0; two orders are accepted for one item.
+- Fails when: two requests read remaining = 1 and both pass the check; both write remaining = 0; two callers can both pass a read-then-check when no lock or conditional write guards the update.
 - Bad:
 ```python
-row = db.execute("SELECT stock FROM sku WHERE id=%s", (sku,)).fetchone()
-if row.stock >= qty:
-    db.execute("UPDATE sku SET stock=%s WHERE id=%s", (row.stock - qty, sku))
+row = db.execute("SELECT remaining FROM quota WHERE id=%s", (quota_id,)).fetchone()
+if row.remaining >= qty:
+    db.execute("UPDATE quota SET remaining=%s WHERE id=%s", (row.remaining - qty, quota_id))
 ```
-- Good: `UPDATE sku SET stock = stock - %s WHERE id = %s AND stock >= %s` and treat rowcount != 1 as a refusal.
+- Good: `UPDATE quota SET remaining = remaining - %s WHERE id = %s AND remaining >= %s` and treat rowcount != 1 as a refusal.
 - Not a defect when: the read and write sit in one transaction with SELECT ... FOR UPDATE, or a single-writer worker with a documented guarantee is the only caller.
 ### Lost update
 - Tell: a value read into Python, changed in Python, and saved back as an absolute value.
@@ -91,14 +91,14 @@ if db.scalar("SELECT count(*) FROM doctors WHERE on_call") > 1:
 - Fails when: a GC pause or slow step passes the TTL; a second worker takes the lock and writes; the first worker resumes and overwrites the result.
 - Bad:
 ```python
-if redis.set("job:lock", worker_id, nx=True, ex=30):
-    slow_step()        # can exceed 30 s
+if redis.set("job:lock", worker_id, nx=True, ex=LOCK_TTL):
+    slow_step()        # can outlive the lock's expiry
     write_result()     # stale holder writes after expiry
 ```
 - Good: take a monotonically increasing fencing token with the lock and have the storage reject any write carrying an older token.
 - Not a defect when: the lock guards a read-only cache refresh, or the write is conditional on a version column that the stale holder cannot match.
 ### Missing timeout on outbound call
-- Tell: a `requests`, `urllib`, raw socket, or DB/queue client call with no timeout argument and no timeout set on the client or session (these libraries have no default timeout). Skip httpx (default 5 s) unless the diff sets `timeout=None`. Also not a defect: a fixed third-party URL constant that is identical in every environment (hardcoded hosts are covered by the architecture lens).
+- Tell: a `requests`, `urllib`, raw socket, or DB/queue client call with no timeout argument and no timeout set on the client or session (these libraries have no default timeout). Skip httpx (default 5 s) unless the diff sets `timeout=None`. A hardcoded host is an architecture concern and is reported under the architecture lens; this lens reports the missing timeout on the call whatever the URL is.
 - Fails when: the peer accepts the TCP connection and never answers; the worker blocks forever and the pool drains to zero.
 - Bad:
 ```python
@@ -142,19 +142,19 @@ def track(client_ip):
 - Good: a bounded structure with eviction: `cachetools.LRUCache(maxsize=N)`, or an OrderedDict with explicit eviction (set `d[k] = v`, call `d.move_to_end(k)`, then while `len(d) > N` call `d.popitem(last=False)`); a store with TTL; or `queue.Queue(maxsize=N)` for queues.
 - Not a defect when: the keys come from a fixed enumeration (for example the twelve month names), or the dict is built per request and discarded.
 ### Partial failure with no compensation
-- Tell: a sequence of external side effects (charge, reserve, send) with no compensating action for a failure after the first one.
-- Fails when: reserve() raises out of stock after charge() captured the money; the customer is charged and no order exists.
+- Tell: a sequence of external side effects with no compensating action for a failure after the first one.
+- Fails when: a later step raises after an earlier external side effect has completed; the earlier effect stands and no compensating action runs.
 - Bad:
 ```python
-payments.charge(cart.user, cart.total)     # money captured
-inventory.reserve(cart.items)              # raises: no stock
-orders.create(cart)
+step_a(cart)     # money captured
+step_b(cart)              # raises
+step_c(cart)
 ```
-- Good: reserve first, charge second, and release the reservation when the charge fails; or record a saga step with a durable compensation.
-- Not a defect when: the charge is an authorisation that a void runs on every later exception (check the handler), or the steps are already reserve, charge, create with compensation in place.
+- Good: every step that has a compensation runs it on every later failure, or records a saga step with a durable compensation.
+- Not a defect when: the charge is an authorisation that a void runs on every later exception (check the handler), or every step that has a compensation is already covered on every failure path.
 ### Swallowed exception feeding a normal path
 - Tell: a broad except that returns a default value, and the default is a legal value for the caller.
-- Fails when: the config store times out; the function returns 0; downstream reads 0 as "no limit", so one timeout removes the limit for every user.
+- Fails when: the config store times out; the function returns 0; downstream reads 0 as a legal setting (for example "no limit"), so a dependency failure turns into an unrestricted state; return a sentinel only where every caller checks it.
 - Bad:
 ```python
 def load_limit(key):
@@ -179,27 +179,27 @@ def query(sql):
 - Good: pass the tenant as an argument, or store it in a `contextvars.ContextVar` set per request.
 - Not a defect when: the global is loaded once at import and never reassigned, or it is a ContextVar.
 ### Temporal coupling
-- Tell: a method reads state that only another method sets (self._rows set in load()), with no guard or error for the wrong call order.
-- Fails when: export() runs before load(); the caller gets an AttributeError with no domain message, or stale data when load() ran earlier.
+- Tell: a method reads state that only another method sets (self._state set in prepare()), with no guard or error for the wrong call order.
+- Fails when: the second method runs before prepare(); the caller gets an AttributeError with no domain message, or stale data when another method ran earlier.
 - Bad:
 ```python
 class Report:
-    def load(self): self._rows = fetch()
+    def prepare(self): self._state = source()
     def export(self):
-        return to_csv(self._rows)    # AttributeError if load() not called
+        return to_csv(self._state)    # AttributeError if prepare() not called
 ```
-- Good: pass the rows to the constructor, load inside export(), or raise a domain error when the object is not loaded.
-- Not a defect when: a factory always calls load() and every caller in the repo goes through that factory (check the callers).
+- Good: pass the state to the constructor, prepare inside export(), or raise a domain error when the object is not loaded.
+- Not a defect when: a factory always calls prepare() and every caller in the repo goes through that factory (check the callers).
 ### Ignored parameter
-- Tell: a parameter in the signature (dry_run, force, timeout) that the body never reads.
-- Fails when: the caller passes dry_run=True to preview; the rows are deleted anyway.
+- Tell: a parameter in the signature (a flag, a mode switch, a timeout) that the body never reads.
+- Fails when: a caller sets an option that changes nothing; the writes run anyway.
 - Bad:
 ```python
-def purge(ids, dry_run=False):
+def remove(ids, flag=False):
     for i in ids:
-        store.delete(i)      # dry_run is never read
+        store.delete(i)      # flag is never read
 ```
-- Good: `if dry_run: return len(ids)` before the loop, or remove the parameter if it is not part of the contract.
+- Good: `if option: return count` before the loop, or remove the parameter if it is not part of the contract.
 - Not a defect when: the signature is fixed by a framework hook or an interface the change cannot alter, and the docstring says it is unused.
 ### Clock skew across hosts
 - Tell: a timestamp written by one host and compared with time.time() or datetime.now() on another host for expiry or ordering.
@@ -241,9 +241,9 @@ if redis.set("job:lock", worker_id, nx=True, ex=30):
 - Fails when: the default object is created once at definition time; a later call without the argument receives the items added by earlier calls, so one request sees another request's data.
 - Bad:
 ```python
-def add_tag(item, tags=[]):
-    tags.append(item)     # shared list across calls
-    return tags
+def add_item(item, bucket=[]):
+    bucket.append(item)     # shared list across calls
+    return bucket
 ```
 - Good: `def add_tag(item, tags=None):` then `tags = [] if tags is None else tags`.
 - Not a defect when: the default is an immutable value (tuple, frozenset, None) or the body never mutates it.
@@ -270,27 +270,27 @@ with open(state_path, "w") as f:
 ```
 - Good: write to a temp file in the same directory, `flush()` and `os.fsync()`, then `os.replace(tmp_path, state_path)`.
 - Not a defect when: the file is a scratch file rebuilt on every start, or the write is already the atomic rename above.
-### Float used for money or dose rounding
-- Tell: `round(x, 2)`, `int(x * 1000)` or a float product feeding a limit, a label or a total where the intent names a rounding mode or an exact unit.
-- Fails when: `round(0.125, 2)` gives 0.12 (the exact tie rounds to even) where half-up needs 0.13; `int(1.001 * 1000)` gives 1000; two paths round at different steps so a label total and an API total differ by more than the stated tolerance.
+### Float used for an exact quantity
+- Tell: rounding or truncation applied to a float product that is stored or compared, where the code or spec requires exact decimal results or a stated rounding mode.
+- Fails when: a float cannot represent a decimal tie or product exactly, so rounding or truncation picks the wrong neighbour; a total computed from a rounded intermediate can differ from the total computed from source values; round only the final value and compare within a stated tolerance.
 - Bad:
 ```python
-price = round(unit_price * qty, 2)     # float: ties round to even
+result = round(base * factor, 2)     # float: ties round to even
 ```
 - Good: `Decimal(str(unit_price)) * qty` then `.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)`.
 - Not a defect when: the code uses `Decimal` with `quantize` and an explicit rounding mode, or the value is an integer count.
 ### Wall-clock arithmetic across DST or for a duration
 - Tell: `aware_local + timedelta(hours=24)`, naive `datetime.now()` compared with aware stamps, or `time.time()` differences used as elapsed time.
-- Fails when: a daily 02:00 local job moves to 03:00 after a DST change; a naive and an aware value meet and the `TypeError` is caught and treated as "not expired".
+- Fails when: a fixed-duration step on an aware instant drifts the local wall-clock time across a DST change; an exception caught around a comparison that raises must not be read as a pass.
 - Not a defect when: both sides are aware UTC, or the code converts to local time only for display.
 ### Offset pagination over a non-total order
-- Tell: `ORDER BY created_at` (or a sort key with ties) plus `OFFSET`/slicing, or a loop that stops on `len(page) < size` before writing that page.
-- Fails when: rows with equal timestamps swap places between pages, an insert repeats a row and a delete skips one; the last partial page is dropped.
+- Tell: `ORDER BY` on a sort key that can tie, plus `OFFSET`/slicing, or a loop exit test that runs before the final batch is written.
+- Fails when: offset windows over a sort key that can tie can repeat or skip rows when data changes between pages; the walk needs a unique tie-breaker or keyset, and the final partial batch must be written before exit.
 - Bad:
 ```python
-page = db.execute("SELECT id, created_at FROM events ORDER BY created_at LIMIT %s OFFSET %s", (size, offset))   # ties on created_at
+page = db.execute("SELECT id, sort_key FROM items ORDER BY sort_key LIMIT %s OFFSET %s", (size, offset))   # sort key may tie
 ```
-- Good: order by `(created_at, id)` and walk with a keyset condition on that pair.
+- Good: order by `(sort_key, id)` and walk with a keyset condition on that pair.
 - Not a defect when: the key ends in a unique id, or the walk is keyset-based on the full key.
 ### Late-binding closure in a loop
 - Tell: `lambda: f(name)` or a nested function appended inside `for name in ...` that reads the loop variable later.
@@ -304,16 +304,16 @@ for name in names:
 - Good: `handlers.append(lambda name=name: run(name))` or `functools.partial(run, name)`.
 - Not a defect when: the value is bound as a default argument (`lambda n=name: f(n)`) or with `functools.partial`.
 ### Number parsing that guesses the separator
-- Tell: `float(s.replace(",", "."))`, locale-dependent `float()`, or a regex that accepts any digit run.
-- Fails when: `"1,234"` becomes 1.234 instead of 1234, `"1,234.5"` raises, or a value with a different grouping is accepted silently.
-- Not a defect when: the format is fixed and validated first, or `Decimal(text)` rejects everything but the stated format.
+- Tell: a separator rewrite, a locale-dependent parse, or a pattern that accepts any digit run.
+- Fails when: a separator rewrite done before the format is validated can change a value's magnitude or accept a forbidden format; validate the full format with a pattern before any conversion.
+- Not a defect when: the format is fixed and validated first, or the text is checked against the full pattern before `Decimal(text)` runs (`Decimal` also accepts `NaN`, `Infinity` and exponent forms).
 ### Counter or id masked to a fixed width
-- Tell: `n & 0xFF`, `n % 256`, `{n:02X}` or a fixed-width suffix on a counter that can exceed the width.
-- Fails when: the 257th item gets the same id as the first, and the duplicate is not detected.
+- Tell: a counter reduced by a bit mask or modulo, or a fixed-width suffix, on a counter that can exceed the width.
+- Fails when: once the counter passes the width of the mask, a later id repeats an earlier one and no check detects the duplicate.
 - Not a defect when: the code raises at the limit or the width covers every value the caller can produce.
 ### Non-finite number accepted by validation
 - Tell: `if x < 0: raise` or `if x > MAX: raise` on a float that can be NaN or infinity.
-- Fails when: `nan < 0` and `nan > MAX` are both False, so NaN passes and reaches a label or a total; an ordering comparison on `Decimal("NaN")` raises `InvalidOperation` instead of the documented error.
+- Fails when: ordering comparisons are False for NaN, so NaN passes validation and reaches the output; check finiteness before any range comparison.
 - Bad:
 ```python
 if amount < 0 or amount > MAX:      # NaN passes both tests
@@ -326,13 +326,13 @@ if amount < 0 or amount > MAX:      # NaN passes both tests
 - Fails when: a boundary input (zero, empty, equal to the limit, missing key) reaches the return the caller misreads; the caller computes a wrong total or raises on the normal path.
 - Bad:
 ```python
-def discount_rate(total):
+def rate_for(total):
     if total > 100:
         return 0.1
     # total <= 100 falls through and returns None
 
 def net(total):
-    return total * (1 - discount_rate(total))   # TypeError for total <= 100
+    return total * (1 - rate_for(total))   # TypeError for total <= 100
 ```
 - Good: an explicit `return 0.0` on the fall-through path, matching what the caller expects.
 - Not a defect when: the caller checks for None before use, or the expected value for that input is not stated by the intent or by any caller (record it under UNCLEAR, with the input and the caller line).
@@ -341,10 +341,10 @@ def net(total):
 - Fails when: a charge of exactly the limit is refused, or the last element of a list is never processed; the input at the boundary is a normal value, not an edge case.
 - Bad:
 ```python
-def within_limit(amount, limit):
-    return amount < limit      # limit itself is refused
+def below_cap(value, cap):
+    return value < cap      # cap itself is refused
 ```
-- Good: state the intended inclusion in the name and the code (`amount <= limit`) and test the boundary value.
+- Good: state the intended inclusion in the name and the code (`value <= cap`) and test the boundary value.
 - Not a defect when: the intent or the spec says exclusive, or the boundary value cannot reach the code (a validator above rejects it).
 ### None or empty value on a reachable path
 - Tell: an attribute access, index, `[0]`, `first()`, `max()` or `min()` on a value that can be None or empty on a path the caller takes.
@@ -358,12 +358,12 @@ return row.name           # None for an unknown id
 - Not a defect when: a guard above the line already excludes the empty case (cite it), or the value is non-optional by the schema and the schema is enforced at this boundary.
 ### Unit or type confusion
 - Tell: two values of different units or types combined without conversion (seconds with milliseconds, cents with units, a string from a request used as an int, a naive datetime compared with an aware one, local time with UTC).
-- Fails when: a timeout in seconds is passed where milliseconds are expected, so the wait is 1000 times shorter; a string `"10" + 5` path raises or concatenates.
+- Fails when: a value in one unit is passed where another unit is expected, so the wait or limit is off by the unit factor; a string `"10" + 5` path raises or concatenates.
 - Bad:
 ```python
-time_limit_ms = settings.timeout_seconds    # seconds stored, ms expected
+limit_ms = settings.delay    # stored unit differs from the name
 ```
-- Good: convert at the boundary and name the unit in the variable (`timeout_ms = settings.timeout_seconds * 1000`), or parse request values to the typed field before use.
+- Good: convert at the boundary and name the unit in the variable (`limit_ms = settings.delay * 1000`), or parse request values to the typed field before use.
 - Not a defect when: both operands already share the unit and type (check the producer), or the conversion is applied in the same expression.
 ### zip over sequences of unequal length
 - Tell: `zip(a, b)` where the lengths are not guaranteed equal and the code does not check or pass `strict=True`.
@@ -374,15 +374,15 @@ total = sum(p * q for p, q in zip(prices, quantities))   # silent truncation
 ```
 - Good: `zip(prices, quantities, strict=True)` (Python 3.10 or later; raises ValueError on mismatch) or an explicit length check that raises a domain error.
 - Not a defect when: both sequences are built from the same source in one comprehension, or the lengths are equal by construction (check the producer).
-## Traps
+## Known safe patterns
 
 - `SELECT ... FOR UPDATE` inside a transaction before a write: the lock makes the read-then-write safe.
 - `UPDATE t SET n = n + ?`: a single atomic statement; not a lost update.
-- A rollback or cleanup that logs its own failure and re-raises the original exception: the original error is not swallowed. A compensating rollback that undoes the only half-written state (the debit row when the credit row fails) leaves no half posting: check the state it leaves, not whether the rollback itself could raise.
+- A rollback or cleanup that logs its own failure and re-raises the original exception: the original error is not swallowed. A rollback that undoes every partial write of a multi-write unit leaves no partial state: judge the state it leaves, not whether the rollback itself could raise.
 - `queue.put(x, timeout=1)` with `except queue.Full`: bounded and handled.
 - `with open(...)` or `try/finally` around the handle: released on the error path.
-- `except Exception as exc: raise DomainError(...) from exc`: wraps and propagates; nothing is swallowed.
-- Lease takeover done as one atomic conditional write (`UPDATE leases SET holder=%s, token=token+1 WHERE name=%s AND (expires_at < now() OR holder IS NULL)`, success when rowcount == 1, or a single Lua compare-and-set in Redis): a correct compare-and-set. A separate SELECT of the token followed by a write is not a trap; report it under Check-then-act on shared state.
+- `except Exception as exc: raise SomeDomainError(...) from exc`: wraps and propagates; nothing is swallowed.
+- A single conditional write whose success is confirmed by the affected row count or a returned token, or a single compare-and-set in the store: a correct compare-and-set. A read followed by a separate write is check-then-act and is reported as such.
 ## Do not report
 
 - Formatting, import order, naming taste.

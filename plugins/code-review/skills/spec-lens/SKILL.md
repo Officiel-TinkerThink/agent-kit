@@ -19,14 +19,14 @@ Every limit, rule and side effect the spec states is in scope; what the spec lea
 5. Removed-line check: list what the change removed (clamp, check, audit call, alias, factor). Confirm each requirement still holds.
 6. Dependency check: read the untouched helpers, constants, tables and queries the changed code relies on.
 7. Scope pass: list the observable side effects of each changed function (writes, calls, notifications, transformed results). Each must trace to a requirement.
-8. Follow each changed call into the unchanged function it reaches (a parser, a validator, a limit check). If that function breaks a requirement for the values the changed path passes it, report it as newly exposed; do not park it under UNCLEAR for being in an unchanged file.
+8. Follow each changed call into the unchanged function it reaches (a parser, a validator, a limit check). If that function breaks a requirement for the values the changed path passes it, report it as newly exposed; a defect reached through a changed call is in scope whichever file holds it, and is reported with its evidence.
 8. Walk each candidate with one concrete input. Write each step and the final output. Drop it if the walk does not reach a wrong outcome.
 
 ## Catalog
 
 ### Rounding mode
 - Tell: `quantize(` or `round(` where the spec names a rounding mode.
-- Fails when: spec says half up; `Decimal("0.125").quantize(Decimal("0.01"))` uses the context rounding, which is ROUND_HALF_EVEN in a default context and gives 0.12, not 0.13.
+- Fails when: the spec names a rounding mode and the code relies on the context default; for an exact tie value the default rounds to the even neighbour, not the spec's mode.
 - Bad:
 ```python
 def fee(amount: Decimal) -> Decimal:
@@ -37,10 +37,10 @@ def fee(amount: Decimal) -> Decimal:
 
 ### Inclusive versus exclusive window end
 - Tell: `<` used as the upper bound where the spec says "through", "inclusive" or "to and including"; or `<=` used as the upper bound where the spec says "before" or "until".
-- Fails when: spec includes the end day; `day = 2026-01-31` with end `2026-01-31` gives False.
+- Fails when: the spec includes the end day and the code uses a strict upper comparison; a value on the final day evaluates False.
 - Bad:
 ```python
-def in_report(day: date, start: date, end: date) -> bool:
+def within_window(day: date, start: date, end: date) -> bool:
     return start <= day < end  # spec: end day included
 ```
 - Good: `start <= day <= end` for dates.
@@ -59,37 +59,37 @@ def created_at(epoch_s: float) -> datetime:
 
 ### Off-by-one paging
 - Tell: `page * size` or `(page - 1) * size` that does not match the spec's page base.
-- Fails when: pages are 1-based and page=1, size=20 gives offset 20; the first 20 rows are skipped.
+- Fails when: pages are 1-based and the first page computes a non-zero offset, so the leading rows are skipped.
 - Bad:
 ```python
 def offset_for(page: int, size: int) -> int:
     return page * size  # spec: pages are 1-based
 ```
-- Good: `(page - 1) * size` after `if page < 1: raise ValueError`.
+- Good: `start = (page - 1) * size` after a guard that rejects page values below 1.
 - Not a defect when: the spec says pages are 0-based and `page * size` is correct.
 
 ### Clamp in only one of two entry points
 - Tell: a limit (max size, range) applied in one public function and absent from a sibling that takes the same parameter.
-- Fails when: `export_orders(size=5000)` runs unbounded; the spec sets max 100 for every entry point.
+- Fails when: a second entry point that reaches the same query with a caller-supplied size runs unbounded; a limit the spec states for the API covers every entry point that reaches the query.
 - Bad:
 ```python
-def list_orders(size: int):
+def entry_a(size: int):
     return _query(limit=min(size, 100))
-def export_orders(size: int):
+def entry_b(size: int):
     return _query(limit=size)  # spec: max 100 on every entry point
 ```
 - Good: clamp inside `_query`, or call one shared bounds helper from both.
-- Not a defect when: the spec limits only `list_orders`, or the shared `_query` already clamps.
+- Not a defect when: the spec limits only one entry point, or the shared query helper already clamps.
 
 ### ORDER BY without tie-breaker
 - Tell: `ORDER BY` on a non-unique column combined with LIMIT and OFFSET, where the spec requires stable paging.
-- Fails when: two rows share `created_at` across a page boundary; one row appears on two pages and another on none.
+- Fails when: two rows share a sort value across a page boundary; one row appears on two pages and another on none.
 - Bad:
 ```python
-sql = "SELECT id FROM orders ORDER BY created_at DESC LIMIT %s OFFSET %s"
+sql = "SELECT id FROM items ORDER BY sort_key DESC LIMIT %s OFFSET %s"
 ```
-- Good: `ORDER BY created_at DESC, id DESC` when `id` is the primary key (unique).
-- Not a defect when: the spec does not require stable paging, or `created_at` is unique by constraint.
+- Good: append a unique column, such as the primary key, as the final sort key so the order is total.
+- Not a defect when: the spec does not require stable paging, or the sort column is unique by constraint.
 
 ### Falsy zero treated as missing
 - Tell: `x or default`, or `if not x:`, on a field where 0, "" or [] is a valid value.
@@ -104,25 +104,25 @@ def set_quantity(payload: dict) -> int:
 
 ### Unit conversion factor
 - Tell: a numeric factor (1000, 60, 1024) in one branch of a unit switch, or a conversion in some branches only.
-- Fails when: spec says g to ug is 1,000,000; `to_ug(2, "g")` returns 2000.
+- Fails when: a unit branch uses a factor that does not match the spec's conversion table for that unit.
 - Bad:
 ```python
-def to_ug(value: float, unit: str) -> float:
-    if unit == "mg": return value * 1000
-    if unit == "g": return value * 1000  # g to ug is 1,000,000
+def convert(value: float, unit: str) -> float:
+    if unit == "x": return value * 3
+    if unit == "y": return value * 7  # the spec table gives a different factor here
     return value
 ```
-- Good: `_TO_UG = {"ug": 1, "mg": 1_000, "g": 1_000_000}`, then reject unknown units explicitly.
-- Not a defect when: the branch factor matches the spec table (mg to ug is 1000).
+- Good: one factor table keyed by unit, with the base unit mapped to 1, then reject unknown units explicitly.
+- Not a defect when: the branch factor matches the spec table.
 
 ### Retired code still accepted
 - Tell: a lookup table, alias map or allowlist that still contains a key the spec retires.
-- Fails when: spec retires `ST-OLD`; `resolve("ST-OLD")` returns `ST-NEW` and the record is accepted.
+- Fails when: the spec retires a key; resolving the retired key returns its live successor and the record is accepted.
 - Bad:
 ```python
-_ALIASES = {"ST-OLD": "ST-NEW", "ST-NEW": "ST-NEW"}
+_ALIASES = {"OLD_KEY": "NEW_KEY", "NEW_KEY": "NEW_KEY"}
 def resolve(code: str) -> str:
-    return _ALIASES.get(code, code)  # ST-OLD still resolves
+    return _ALIASES.get(code, code)  # retired key still resolves
 ```
 - Good: check a `_RETIRED` set first and raise `UnknownCodeError`.
 - Not a defect when: the spec keeps the alias for backward compatibility.
@@ -155,7 +155,7 @@ def report(start: date, end: date) -> list:
 
 ### Version strings compared as text
 - Tell: `<`, `>=` or `sorted()` applied to version strings.
-- Fails when: `"2.10.0" >= "2.9.0"` is False (the character "1" sorts before "9"); the spec expects True.
+- Fails when: a text comparison orders version parts lexically, so a higher version compares as lower; the spec expects the numeric order.
 - Bad:
 ```python
 def supports_v2(version: str) -> bool:
@@ -181,7 +181,7 @@ def total(prices: list[float]) -> float:
 - Bad:
 ```python
 def approve(order) -> None:
-    audit.record("approved", order.id)  # also written on replay
+    log_event("approved", order.id)  # also written on replay
     if order.status == "approved":
         return
     order.status = "approved"
@@ -196,7 +196,7 @@ def approve(order) -> None:
 ```python
 def set_status(order, new, user) -> None:
     order.status = new
-    audit.record(order.id, to=new)  # spec: user, from, to, time
+    log_event(order.id, to=new)  # spec: user, from, to, time
 ```
 - Good: capture `old = order.status` first, then `record(order.id, user=user, frm=old, to=new, at=utc_now())`.
 - Not a defect when: a database trigger on this table writes the full audit row (verify it covers the column).
@@ -220,11 +220,11 @@ mid = (lo + hi) // 2  # the sum wraps to a negative value
 - Bad:
 ```python
 def get_price(sku: str) -> Decimal:
-    price = _repo.price_of(sku)
+    price = _repo.fetch_price(sku)
     _repo.append_history(sku, price)  # write not in spec
     return price
 ```
-- Good: `return _repo.price_of(sku)`; history is written by the command that changes the price.
+- Good: `return _repo.fetch_price(sku)`; history is written by the command that changes the price.
 - Not a defect when: the spec asks for the write, or it is a cache fill that does not change the result. A new validation (rejecting duplicates, storing an extra field) that the spec is silent on is not scope creep unless it breaks an allowed input or a stated requirement.
 
 ### State transition not guarded
@@ -252,14 +252,12 @@ def export(path: str) -> list:
 - Good: `except OSError as exc: raise ExportError(path) from exc`.
 - Not a defect when: the spec allows the default, or the caller checks for the error on every path.
 
-## Traps
+## Known safe patterns
 
-- `Decimal(str(x))` on a float is only a formatting step. It does not repair a float amount computed earlier (`str(0.1 + 0.2)` is `'0.30000000000000004'`); when the float reaches this line after arithmetic, report it under Money as float.
-- `tuple(int(p) ...) >= (2, 9, 0)` is a correct numeric order only when every part is digits; a pre-release such as `2.9.0rc1` raises ValueError, which is a finding when the spec accepts such versions.
-- `SELECT COUNT(*)` without LIMIT is correct when the spec asks for a total, not a page.
+- A string-based conversion of a float is only a formatting step. It does not repair a float amount computed earlier (`str(0.1 + 0.2)` is `'0.30000000000000004'`); when the float reaches this line after arithmetic, report it under Money as float.
+- A numeric tuple comparison of version parts is correct only when every part is digits; a part with a suffix raises, which is a finding when the spec accepts suffixed versions.
+- An aggregate over all matching rows is correct when the spec asks for a total, not a page.
 - An early return before side effects is correct idempotency when the replay path writes nothing.
-- `min(size or 25, 100)` is correct when the spec says 0 or missing means 25 and the maximum is 100.
-- `ROUND_HALF_UP` in one function and default rounding in another is correct when each spec names its own mode.
 - `(lo + hi) // 2` on Python int cannot overflow; Python ints are unbounded.
 - A guard that cannot fire because an earlier check already excludes its input is redundant, not a spec miss.
 - An `if __name__ == "__main__":` demo block is not behaviour and is not in the spec.

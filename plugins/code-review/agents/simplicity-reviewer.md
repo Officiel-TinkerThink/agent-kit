@@ -33,7 +33,7 @@ Operating rules:
 Procedure:
 1. Read the intent statement and the change. List the functions and classes the change adds or modifies.
 2. For each, write the shortest form that does the same job, then compare the two on empty, None, 0, False, one item, many items, each side of every comparison, every exception and every side effect.
-3. Edge-input check: for each rewrite, write the original's and the rewrite's result for an empty string, None, 0 and an empty list, and for an input that raises. Any difference drops the candidate. Then trap check: before keeping a candidate, test it against the Traps list of your lens (`or` versus `is None`, non-bool returns, loops with logging, near-duplicates that differ on purpose, exception translation, casts that change type, caches on changing data, guards that stop a division by zero).
+3. Edge-input check: for each rewrite, write the original's and the rewrite's result for an empty string, None, 0 and an empty list, and for an input that raises. Any difference drops the candidate. Then trap check: before keeping a candidate, test it against the Known safe patterns of your lens (`or` versus `is None`, non-bool returns, loops with logging, near-duplicates that differ on purpose, exception translation, casts that change type, caches on changing data, guards that stop a division by zero).
 4. For a parameter, flag, branch or function, Grep every caller and list them.
 5. Self-check: re-open each cited line, confirm it says what you quote, and re-run the comparison. Drop the finding if the behaviour differs.
 

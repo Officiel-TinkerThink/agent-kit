@@ -19,7 +19,7 @@ Every claim is classified PRESERVED, MOVED, EXPLAINED or REGRESSED, with evidenc
 5. For limits and numbers, compare the new value with the ceiling or measurement quoted in the digest or review. Check units against the commit that changed them.
 6. For a revert, or a revert of a revert, find why the value was changed and whether the digest gives a new reason. A plain revert of a fix with no reason in its message is REGRESSED.
 7. For ops dependencies, grep the repo (alerts, dashboards, runbooks, tests) for the removed or changed text.
-8. Read the author's description critically. "No behaviour change" or "within the ceiling" is a claim to check, not evidence.
+8. Read the author's description critically. An author's claim that a value meets a limit or that behaviour is unchanged is a claim to check, not evidence.
 
 ## Catalog
 
@@ -65,16 +65,16 @@ def save_many(recs):
 
 ### Limit re-raised above a measured ceiling
 - Tell: a constant or default is raised, and a review comment or commit message gives a measured ceiling for it.
-- Fails when: 500 items hit the 30 s worker timeout the review measured (PR 412), so 1000 does too.
+- Fails when: a constant raised above a limit that a review or commit measured stays out of range unless a new measurement clears it.
 - Bad:
 ```python
-# digest 9d4e7a0 "perf: raise import batch size to 1000"
-# PR 412 review: "keep at 200; 500 hit the 30 s worker timeout"
-BATCH_SIZE = 1000   # above the measured ceiling
+# digest <hash> "perf: raise batch size"
+# review: "keep at the measured ceiling"
+LIMIT = <value>   # above the measured ceiling
 ```
 - Good:
 ```python
-BATCH_SIZE = 200   # measured: 500 exceeds the 30 s worker timeout (PR 412)
+LIMIT = 400   # measured ceiling; cite the measurement
 ```
 - Not a defect when: a later commit or PR records a new measurement that clears the ceiling (EXPLAINED), or the constant is used only with small test inputs.
 
@@ -95,8 +95,8 @@ VENDOR_TIMEOUT_S = <value kept by 5e6f7a8>   # 9b8c7d6 gives no reason to restor
 - Not a defect when: the digest gives the reason for the second reversal, such as a fixed vendor, or the value is set through another path with its own measured limit.
 
 ### Unit confusion after a unit-changing commit
-- Tell: a constant, parameter or config value changes unit (ms, s, bytes, items), or a commit, config key, constant name or author note states a unit, and the value after the change does not match it. A `*_MS` constant holding a value that a note gives in seconds is this case.
-- Fails when: `wait(timeout=5000)` now waits 5000 s (about 83 minutes) because the callee expects seconds. Or `UPLOAD_TIMEOUT_MS = 3` is read in ms, so every upload times out after 3 ms when the author meant 3 s. Grep the consumer and state which unit it reads before reporting.
+- Tell: a constant, parameter or config value changes unit (ms, s, bytes, items), or a commit, config key, constant name or author note states a unit, and the value after the change does not match it. A constant whose name states a unit may hold a value that an author note gives in another unit; check the value against the consumer's unit.
+- Fails when: `wait(timeout=5000)` now waits 5000 s (about 83 minutes) because the callee expects seconds. Or a value in one unit is read by a consumer in another, so every call is mis-timed; grep the consumer and state the unit it reads. Grep the consumer and state which unit it reads before reporting.
 - Bad:
 ```python
 # digest 2c4d6e8 "wait(): timeout is now seconds (was ms)"
@@ -110,12 +110,12 @@ wait(timeout=5.0)   # seconds since 2c4d6e8; caller updated
 ```
 - Bad, constant in the wrong unit (second pair):
 ```python
-# digest 4b7e1d2 "config: UPLOAD_TIMEOUT_MS is in milliseconds"; author note: "3 s"
-UPLOAD_TIMEOUT_MS = 3       # changed value; consumer reads ms
+# digest <hash> "config: <KEY> is in <unit>"; author note: "<unit>"
+<KEY> = <value>   # changed value; consumer reads <unit>
 ```
 - Good:
 ```python
-UPLOAD_TIMEOUT_MS = 3000    # 3 s as the note says; unit matches the name
+<KEY> = <value rescaled to consumer unit>   # unit matches the name
 ```
 - Not a defect when: the caller was updated in the same or a later commit, or the callee takes a typed value such as `timedelta`. For the constant case: the name, config key or commit was updated to the new unit in the same or a later commit, or the consumer takes a typed value.
 
@@ -156,35 +156,35 @@ def write_records(f, records):
 ```
 - Not a defect when: the thread was resolved with a written reason (such as a new durability requirement), or the commit body (not the subject) gives a reason, or the per-record call sits on a path the comment excluded.
 
-### Retry cap raised, authorised by a later commit (EXPLAINED)
-- Tell: a retry or attempt cap is raised, and a later digest entry authorises the new value with a ticket or incident.
-- Fails when: a reviewer reports REGRESSED and ignores the later entry that authorises 8 retries for INC-2231.
+### Attempt cap raised, authorised by a later decision (EXPLAINED)
+- Tell: a limit on attempts is raised, and a later digest entry authorises the new value with a ticket or incident reference.
+- Fails when: the raised value is reported as REGRESSED although a later digest entry authorises it with a ticket or incident reference.
 - Bad:
 ```python
-# digest 6d2f8b0 "raise MAX_RETRIES 3 -> 8"
-# digest 0c9e4d7 "retries: 8 allowed, INC-2231 needs outage tolerance"
-MAX_RETRIES = 8   # reviewer error: reported as REGRESSED without reading 0c9e4d7
+# digest <hash> "raise attempt limit 3 -> 8"
+# digest <hash> "attempts: 8 allowed, ticket reference in the commit"
+ATTEMPT_LIMIT = 8   # wrong finding: REGRESSED, but the later commit authorises this value
 ```
 - Good:
 ```python
-MAX_RETRIES = 8   # EXPLAINED by 0c9e4d7 (INC-2231); the write path is checked separately
+ATTEMPT_LIMIT = 8   # EXPLAINED by the later commit (ticket reference); the write path is checked separately
 ```
-- Not a defect when: always, as EXPLAINED. Only if the authorising entry covers just the read path is the write path a finding.
+- Not a defect when: a later digest entry explains the raised value on every path the value reaches. If the entry covers only some paths, the uncovered paths are a finding.
 
 ### Guard removed, replaced by a stronger common check (EXPLAINED)
 - Tell: a guard is removed in one commit, and a later commit adds a check at a shared point (schema, constraint, decorator) that covers every path.
 - Fails when: the replacement covers only some paths, so an unguarded path still accepts a negative quantity.
 - Bad:
 ```python
-# digest 5a7c3e1 "drop qty check in reserve(); DB constraint replaces it"
-# digest 8f1d2b6 "migration 0042: CHECK (qty >= 0) on stock.qty"
-def reserve(stock, qty):
-    stock.qty -= qty   # reviewer error: flagged as unguarded without reading 8f1d2b6
+# digest <hash> "drop input check; the database constraint replaces it"
+# digest <hash> "migration: CHECK constraint on the count column"
+def adjust(item, amount):
+    item.count -= amount   # wrong finding: flagged as unguarded, but the later constraint covers this path
 ```
 - Good:
 ```python
-def reserve(stock, qty):
-    stock.qty -= qty   # negative result rejected at flush by CHECK (qty >= 0), 8f1d2b6
+def adjust(item, amount):
+    item.count -= amount   # negative result rejected at flush by the CHECK constraint, <hash>
 ```
 - Not a defect when: the later check covers every writer of the column. Confirm with a grep for other writers before classifying.
 
@@ -216,13 +216,13 @@ def fetch(url, verify=True):
 ```
 - Not a defect when: a later entry or the commit body gives a reason, or every caller passes `verify` explicitly and the default is never used.
 
-## Traps
+## Known safe patterns
 
 - A guard moved to a caller that validates the same input on every path: enumerate the callers before calling it lost.
 - A limit raised above a comment's ceiling when the same PR adds a new measurement: EXPLAINED by the new measurement.
 - A function body deleted and re-added in another module with all branches reaching the sink: a pure move (MOVED, not a finding).
 - A rename back to an earlier name: grep for callers that imported the intermediate name before classifying.
-- Fewer retry attempts with a longer backoff and the same total wait, stated as intent in the digest: not a cap regression.
+- An attempt cap traded for a longer backoff with the same total wait, stated as intent in the digest: judge the total wait the digest protects, not the attempt count.
 - A log text changed while the old text still exists in a second location that alerting matches: the dependency is preserved.
 
 ## Do not report

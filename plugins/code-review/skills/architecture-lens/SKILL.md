@@ -25,8 +25,8 @@ Finds code whose dependencies point the wrong way, or whose structure forces a n
 - Fails when: the rule says domain code must not depend on infrastructure, and the change adds one more such edge; a second adapter for the same port then cannot be added without editing the domain module.
 - Bad:
 ```python
-# domain/orders.py
-from infra.db import session    # outer layer imported by the inner layer
+# domain/<module>.py
+from infra.<adapter> import <helper>    # outer layer imported by the inner layer
 ```
 - Good: the domain defines a port (an interface or Protocol) and the infrastructure module implements it; the composition root wires them.
 - Not a defect when: the composition root (the module that wires adapters) imports adapters, which is its job, or the rule source does not define layers for this package.
@@ -35,12 +35,12 @@ from infra.db import session    # outer layer imported by the inner layer
 - Fails when: adding a second broker means editing every use case that publishes, because each one names the SDK.
 - Bad:
 ```python
-from kafka import KafkaProducer     # in a use case module
+from broker_sdk import BrokerClient     # in a use case module
 
-def place_order(order):
-    KafkaProducer(...).send("orders", order)
+def handle_command(command):
+    BrokerClient(...).send("topic", payload)
 ```
-- Good: the use case calls an `EventPublisher` port; the Kafka adapter implements it and is injected.
+- Good: the use case calls a publisher port; the broker adapter implements it and is injected.
 - Not a defect when: the module is itself an adapter, or the SDK import is a type-only import under `TYPE_CHECKING` and nothing runs at import.
 ### Framework type crosses a boundary
 - Tell: an inner-layer function takes or returns a framework or transport type (request object, HTTP response, ORM row or model, DataFrame) in its signature.
@@ -81,20 +81,20 @@ class Repo:
 - Fails when: a third caller must copy one of the two rules, and the copies already differ; a change to the rule is made in one place and missed in the other.
 - Bad:
 ```python
-def api_valid(email):
-    return "@" in email
-def form_valid(email):
-    return re.fullmatch(r"[^@]+@[^@]+\.[^@]+", email) is not None
+def api_valid(name):
+    return len(name) > 0
+def form_valid(name):
+    return 1 <= len(name) <= 64
 ```
 - Good: one function in one module, imported by both paths.
-- Not a defect when: the two checks are deliberately staged (a cheap edge pre-filter and the full check before persistence), and both are documented; or the two rules serve different operations that the spec or rules say must differ (for example a public signup check and an admin import check, each documented).
+- Not a defect when: the two checks are deliberately staged (a cheap edge pre-filter and the full check before persistence), and both are documented; or the two rules serve different operations that the spec or rules say must differ (for example two entry points that each document a different rule).
 ### Hardcoded host or port
 - Tell: a literal IP, hostname or port inside the function body rather than in settings.
 - Fails when: a second environment needs a code edit to change the address, so each deployment becomes a separate build.
 - Bad:
 ```python
 def make_client():
-    return Client(host="10.20.0.15", port=8443)   # one environment only
+    return Client(host="192.0.2.10", port=9000)   # one environment only
 ```
 - Good: read host and port from settings with no default for required values, and fail fast at startup when they are missing.
 - Not a defect when: the literal is a loopback default for local development passed through settings, or a fixed public constant such as port 443 for https.
@@ -114,20 +114,20 @@ class Platform:
 - Fails when: a change to either module forces an edit in the other, so the two cannot be changed or tested apart.
 - Bad:
 ```python
-# orders/service.py
-from orders.repo import OrderRepo
-# orders/repo.py
-from orders.service import OrderStatus    # closes the cycle
+# a.py
+from b import Handler
+# b.py
+from a import Token    # closes the cycle
 ```
-- Good: move the shared type (`OrderStatus`) into a third module that both import.
+- Good: move the shared type (`Token`) into a third module that both import.
 - Not a defect when: the cycle exists only under `TYPE_CHECKING`, or it is between a package and its own test code.
 ### Speculative generality
 - Tell: a parameter or option that the function body never reads, or a hook or base class that no caller or subclass uses (state the Grep pattern and the zero-result count). A parameter the body reads is not speculative even when no caller passes it.
 - Fails when: a change that adds a second implementation must edit the signature and every caller for an option that nothing reads.
 - Bad:
 ```python
-def export(report, format="csv", plugin=None):   # plugin never read, no caller passes it
-    return to_csv(report)
+def connect(host, timeout=None):   # timeout never read, no caller passes it
+    return open_socket(host)
 ```
 - Good: remove the unused parameter, or wire it to the behaviour it names.
 - Not a defect when: the signature is fixed by a framework hook or an interface the change cannot alter, or the public API documents the parameter for external callers.
@@ -138,7 +138,7 @@ def export(report, format="csv", plugin=None):   # plugin never read, no caller 
 ```python
 # common/utils.py: imported by many callers for one helper
 from db import session
-from billing import Invoice
+from <domain_pkg> import <Entity>
 from pdf import render
 
 def format_money(value):
@@ -146,7 +146,7 @@ def format_money(value):
 ```
 - Good: split the hub along its reasons to change, so each caller imports only the part it needs.
 - Not a defect when: the hub has no imports from outer layers, or the change does not touch the hub's signature.
-## Traps
+## Known safe patterns
 
 - An import under `TYPE_CHECKING` that names an outer module: a type-only edge, not a runtime dependency.
 - A composition root (the module that builds adapters from settings) importing adapters: its job, not a violation.

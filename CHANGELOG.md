@@ -6,8 +6,12 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Added
+- `code-review:defect-reviewer` preloads a second lens, `defect-lens-python`, a catalogue of common Python behavioural defects (mutation during iteration, consumed iterators, shared mutable class state, control flow in `finally`, unreachable `except` clauses, discarded results). It is loaded for every review, next to `defect-lens`.
+
 ### Changed
 - **Breaking:** the `code-review` plugin splits its `design-reviewer` into two agents with their own lenses. `code-review:defect-reviewer` (lens `defect-lens`) finds behavioural defects on a reachable path: wrong results, boundary and empty-value errors, unit or type confusion, swallowed exceptions, non-idempotent retries, missing transaction boundaries, check-then-act races and resources not released. `code-review:architecture-reviewer` (lens `architecture-lens`) finds structure that breaks a documented dependency rule or forces a named change: layer direction, core code importing adapters, concrete dependencies built inside logic, leaky abstractions, duplicated rules, cycles and speculative generality. The `code-review:finding-validator` and `/code-review:review` flow are unchanged. If you named `code-review:design-reviewer` in your own prompts or settings, use the defect or the architecture agent instead. `benchmarks/code-review/` maps the `bug` axis to the defect agent and the `design` axis to the architecture agent; the design mapping is a hypothesis to measure.
+- `code-review:defect-reviewer` drops a finding whose only defect line is pre-existing code (the line may appear in the evidence, labelled "context, out of scope"), and checks each cited line with a search for the quoted text before it gives the line number. The lens and agent wording of the `code-review` skills was generalised so that no rule is written for one example case; the reviewers' output format is unchanged.
 
 ## [0.2.8] - 2026-10-17
 

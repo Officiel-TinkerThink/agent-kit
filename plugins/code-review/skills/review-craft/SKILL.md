@@ -51,14 +51,18 @@ If you have a line-level nit but have not yet checked the design, your order is 
 - A trace has this shape (illustrative, not a finding), written out in full:
 
   ```
-  input: limit = 0 (passes the earlier "limit is not None" check)
-  1. page_size = limit or 25 at paging.py:18 (0 becomes 25)
-  2. query uses page_size at paging.py:22
-  3. outcome: caller asked for 0 rows and received 25
+  input: value = 0 (passes the earlier presence check)
+  1. size = value or default at module.py:N (0 becomes the default)
+  2. the query uses size at module.py:M
+  3. outcome: the caller asked for 0 and received the default
   ```
 
 - NOT FOUND and UNCLEAR are valid results. Use them instead of a guess.
+- A defect you identify in a note (UNCLEAR, COVERAGE, a scope remark) is a finding or nothing. If the trace holds and the line is in scope, write it as an F line at its confidence; otherwise drop it. Do not leave a traced defect in a note.
 - Never invent a line number. If you cannot cite the exact line, put the point under UNCLEAR instead of citing a nearby line.
+- The `code:` field cites the statement that performs the faulty operation: the one that computes, compares, writes, calls or skips. Do not cite an import, a signature, a comment, a blank line or a setup line unless that line is the defect itself.
+- Verify each cited line: run a search for its quoted text in that file and take the line number from the search result. If the text is not found, correct the number to the one the search gives, or drop the citation.
+- Cite one line per location. Do not cite a range or extra lines that are not part of the trace; each extra line is a claim the reader will check.
 
 ## Diff mode and whole-file mode
 
@@ -70,7 +74,9 @@ Report the mode the brief names (diff or whole-file) on your FILES READ or COVER
 - A removed line is in scope in diff mode, because removing a guard is a change. Trace what now happens without it.
 - A moved line is in scope only if its old and new position differ in behaviour: a different branch, a different caller or a different order.
 - A renamed symbol is in scope when a caller outside the diff still uses the old name or the old signature.
-- A changed default is always newly exposed, even when the function body is untouched.
+- A changed default is always newly exposed in diff mode, because callers that rely on the old value see new behaviour.
+- A rule has a scope: the package, path or file type it says it applies to. Before you report a rule violation, check the cited file against that scope. A file outside the scope is not a violation.
+- Before you report a removed or moved guard, search for its condition across the changed code and the functions it calls. If the same check still runs on the same path after the change, the guard is not removed; drop the point.
 
 ## False positives
 
@@ -121,6 +127,7 @@ Confidence is how sure you are that the trace holds. The finding-validator uses 
 - Before you call a guard absent, search the function, its callers and its callees in the material you were given.
 - If the brief lacks the intent, history, spec or rule text your lens needs, say so once. Do not invent it.
 - A claim that a value is always non-empty, always valid or never null is a claim to verify at the call sites, not a fact to repeat.
+- A "not a defect" condition that depends on a guard outside the function you read (a caller, a wrapper, a config default, a producer) is a claim to verify. Search for the guard; if you find it, the candidate is dropped; if you do not, report UNCLEAR with the search you ran.
 
 ## Common reviewer mistakes
 

@@ -33,7 +33,7 @@ if not full.startswith(BASE): raise ValueError("outside base")
 
 ### os.path.join with an absolute second argument (CWE-22)
 - Tell: `os.path.join(base, value)` where `value` comes from a request and is not a fixed relative name.
-- Fails when: `value` is `/etc/passwd`; `os.path.join` returns it and discards `base`.
+- Fails when: `value` is an absolute path to a system file; `os.path.join` returns it and discards `base`.
 - Bad:
 ```python
 path = os.path.join(UPLOAD_DIR, filename)  # filename from request
@@ -99,7 +99,7 @@ if re.match(r"^[A-Za-z0-9_]{1,32}$", username):
 
 ### Mass assignment (CWE-915)
 - Tell: `Model(**body)` or a `setattr` loop over request keys, where the model has privileged fields.
-- Fails when: an update carrying `is_admin: true` is copied onto the model because no field allowlist exists.
+- Fails when: an update carrying a privileged attribute, such as an administrative flag, is copied onto the model because no field allowlist exists.
 - Bad:
 ```python
 user = User(**request.get_json())
@@ -145,7 +145,7 @@ for row in rows:
 - Fails when: a value containing a quote closes the literal and changes the statement; a sort parameter injects a clause.
 - Bad:
 ```python
-sql = f"SELECT * FROM lot WHERE id IN ({ids})"
+sql = f"SELECT * FROM items WHERE id IN ({ids})"
 cur.execute(sql + f" ORDER BY {sort}")
 ```
 - Good: one placeholder per id with the ids bound as parameters; map `sort` through `{"date": "created_at"}.get(sort, "id")`.
@@ -286,10 +286,10 @@ return resp.json()
 
 ### Missing audit event on a regulated record change (CWE-778)
 - Tell: a function changes a regulated record (batch status, deviation, approval, result, signature) with no audit write in the same transaction.
-- Fails when: a batch moves from HOLD to RELEASED with no entry recording actor, UTC time, and old and new value; the database holds no record of those facts for the change.
+- Fails when: a change to a regulated record is committed with no audit entry recording who made it, when, and the old and new values; the change leaves no trace.
 - Bad:
 ```python
-batch.status = "RELEASED"
+record.state = NEW_STATE
 session.commit()
 ```
 - Good: in the same transaction, add an `AuditEvent` with actor, UTC time, action, old and new value before `commit()`.
@@ -316,12 +316,12 @@ os.system(f"convert {name} out.png")
 - Good: `subprocess.run(["convert", name, "out.png"], check=True)` with `shell` omitted, `name` checked against an allowlist, and `--` before user positional arguments where the program supports it; never `eval` on request data (use a parser, or `ast.literal_eval` for literals).
 - Not a defect when: the command string is a constant, or the value is a validated integer.
 
-## Traps
+## Known safe patterns
 - Parameterised query with `?` or `%s` placeholders and a tuple of values: the driver escapes the values, so the statement text is fixed.
 - Column or sort fragment picked from a constant allowlist dict: only constants reach the SQL text.
 - `subprocess.run([...])` with an argv list and no `shell=True`: no shell parses the arguments.
 - `yaml.safe_load` or `json.loads` on untrusted input: they build only plain data types, never objects.
-- `hashlib.md5(data, usedforsecurity=False)` as a cache key: not a security use, so MD5 is acceptable here.
+- A digest used only as a cache key or checksum carries no security requirement, provided no security property depends on it.
 - Jinja2 with values passed as variables and a fixed template file: the engine never parses user text as template source. This clears SSTI only: with autoescape off, or with `|safe` or `Markup(value)`, user text is written into HTML as markup (see the XSS entry).
 
 ## Do not report
@@ -336,4 +336,4 @@ os.system(f"convert {name} out.png")
 1. Quote the exact line and name the sink it reaches.
 2. Write the untrusted input and the outcome step by step, with the value at each step.
 3. Search the same function, its callers and the sibling route or verb for the control; confirm it is absent or wrong, not merely present.
-4. Confirm the line is in scope (diff-added or modified, or whole-file mode), then check the Traps and Do not report sections. If the path cannot be shown, drop the finding or mark it UNCLEAR. Describe any exploit or secret by class and location only.
+4. Confirm the line is in scope (diff-added or modified, or whole-file mode), then check the Known safe patterns and Do not report sections. If the path cannot be shown, drop the finding or mark it UNCLEAR. Describe any exploit or secret by class and location only.

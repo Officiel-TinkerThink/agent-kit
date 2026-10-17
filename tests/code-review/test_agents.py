@@ -11,11 +11,11 @@ PLUGIN = ROOT / 'plugins' / 'code-review'
 results = []
 REVIEWERS = ['spec-reviewer', 'defect-reviewer', 'architecture-reviewer', 'security-reviewer', 'guidance-reviewer', 'history-reviewer', 'simplicity-reviewer']
 ALL = REVIEWERS + ['finding-validator']
-COMPANION_LENSES = {'defect-reviewer': ['defect-lens-python']}
+COMPANION_LENSES = {}
 LENS_OF = {'spec-reviewer': 'spec-lens', 'defect-reviewer': 'defect-lens', 'architecture-reviewer': 'architecture-lens', 'security-reviewer': 'security-lens',
            'guidance-reviewer': 'guidance-lens', 'history-reviewer': 'history-lens', 'simplicity-reviewer': 'simplicity-lens', 'finding-validator': 'validator-lens'}
-SKILLS = ['review-craft', 'spec-lens', 'defect-lens', 'defect-lens-python', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
-CATALOG_LENSES = ['spec-lens', 'defect-lens', 'defect-lens-python', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
+SKILLS = ['review-craft', 'spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
+CATALOG_LENSES = ['spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
 
 
 def check(name, ok, extra=''):

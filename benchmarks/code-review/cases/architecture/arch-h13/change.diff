@@ -1,0 +1,23 @@
+--- a/billing/models.py
++++ b/billing/models.py
+@@ -3,7 +3,12 @@
+ from __future__ import annotations
+ 
+ from dataclasses import dataclass, field
+-from typing import List
++from typing import TYPE_CHECKING, List, Optional
++
++from .reports import render_total
++
++if TYPE_CHECKING:
++    from .reports import ReportStyle
+ 
+ 
+ @dataclass(frozen=True)
+@@ -28,3 +33,6 @@
+ 
+     def total_cents(self) -> int:
+         return sum(line.amount_cents() for line in self.lines)
++
++    def summary_line(self, style: Optional["ReportStyle"] = None) -> str:
++        return f"{self.invoice_id}: {render_total(self.total_cents(), style)}"

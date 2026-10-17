@@ -1,0 +1,64 @@
+--- a/application/billing.py
++++ b/application/billing.py
+@@ -1,10 +1,19 @@
+ """Billing use cases that coordinate invoices with persistence."""
+ 
+ from datetime import date
++from decimal import Decimal
+ 
+ from domain.invoices import Invoice
++from infrastructure.db import store_late_fee
+ 
+ 
+ def describe_invoice(invoice: Invoice, today: date) -> str:
+     state = "overdue" if invoice.is_overdue(today) else "current"
+     return f"{invoice.invoice_id}: {state}"
++
++
++def apply_late_fee(invoice: Invoice, today: date) -> Decimal:
++    fee = invoice.late_fee(today)
++    if fee > 0:
++        store_late_fee(invoice.invoice_id, fee)
++    return fee
+--- a/domain/invoices.py
++++ b/domain/invoices.py
+@@ -1,7 +1,12 @@
+-"""Invoice aggregate and due-date checks."""
++"""Invoice aggregate, due-date checks and late-fee calculation."""
+ 
+ from dataclasses import dataclass
+ from datetime import date
++from decimal import ROUND_HALF_UP, Decimal
++
++from domain.util_io import load_late_fee_rate
++
++CENT = Decimal("0.01")
+ 
+ 
+ @dataclass
+@@ -22,3 +27,11 @@
+         if today.day < self.due_date.day:
+             months -= 1
+         return max(months, 0)
++
++    def late_fee(self, today: date) -> Decimal:
++        months = self.months_overdue(today)
++        if months == 0:
++            return Decimal("0.00")
++        rate = load_late_fee_rate(self.customer_id)
++        principal = Decimal(self.principal_cents) / Decimal(100)
++        return (principal * rate * months).quantize(CENT, rounding=ROUND_HALF_UP)
+--- /dev/null
++++ b/domain/util_io.py
+@@ -0,0 +1,11 @@
++"""Helper functions for domain calculations that read billing policy values."""
++
++from decimal import Decimal
++
++from infrastructure.db import fetch_late_fee_rate
++
++
++def load_late_fee_rate(customer_id: str) -> Decimal:
++    """Return the monthly late-fee rate for a customer, or zero when none is configured."""
++    rate = fetch_late_fee_rate(customer_id)
++    return rate if rate >= 0 else Decimal("0")

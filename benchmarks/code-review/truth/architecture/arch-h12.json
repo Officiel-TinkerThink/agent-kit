@@ -1,0 +1,38 @@
+{
+  "axis": "architecture",
+  "case": "arch-h12",
+  "difficulty": "hard",
+  "sources": [
+    "Clean architecture dependency rule: the domain holds no environment-specific values and performs no I/O, and receives its collaborators (rules/ARCHITECTURE.md in this case)",
+    "Adapter pattern: external service access goes through an infrastructure adapter, configured from settings in the composition root (concept; rules/ARCHITECTURE.md in this case)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/shop/domain/tax.py",
+      "line": 10,
+      "class": "environment-specific literal in domain: hardcoded internal service URL bypasses the rate-service adapter and configuration",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 10: url = \"https://tax-eu.internal.example.net:8443/v2/rates\". rate_service_url is in the domain and embeds a literal internal host, port and path. rules/ARCHITECTURE.md forbids environment-specific values in the domain and requires external service access through the infrastructure adapter, TaxRateClient, whose host and port come from shop.config via shop/main.py. Triggering input: any call rate_service_url(\"DE\") in any environment, including a test or staging run where TAX_SERVICE_HOST points elsewhere. Wrong result: the returned URL always points to tax-eu.internal.example.net:8443 and cannot be redirected by configuration or replaced in a test without network access. Expected result: the domain holds no host; the URL or rate is built by the configured TaxRateClient in the infrastructure layer. The adapter that already exists in shop/infrastructure/tax_client.py is bypassed, which is why the defect is cross-file.",
+      "quote": "url = \"https://tax-eu.internal.example.net:8443/v2/rates\""
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/shop/domain/tax.py",
+      "line": 15,
+      "kind": "safe-looking",
+      "why_not_a_defect": "def vat_cents(subtotal_cents: int, rate: float = 0.2) -> int. The function takes the rate as a parameter, so the caller chooses the rate source, and it contains no host, port or service URL. The 0.2 default is the business VAT constant that the spec names as the default rate, not an environment-specific value, and the function imports nothing beyond the standard library. It performs no I/O and does not depend on the infrastructure layer.",
+      "quote": "def vat_cents(subtotal_cents: int, rate: float = 0.2) -> int:"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/shop/config/settings.py",
+      "line": 7,
+      "quote": "TAX_SERVICE_HOST: str = os.environ.get(\"TAX_SERVICE_HOST\", \"localhost\")",
+      "why_not_a_defect": "Preexisting settings module in base, outside the hunk this diff adds. config/ is the layer that holds environment-driven settings with defaults, and rules/ARCHITECTURE.md allows a default value for a setting inside config/. The import of shop.config from infrastructure and main is permitted."
+    }
+  ]
+}

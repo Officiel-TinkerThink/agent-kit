@@ -1,0 +1,46 @@
+{
+  "axis": "architecture",
+  "case": "arch-h11",
+  "difficulty": "hard",
+  "sources": [
+    "Clean architecture dependency rule: dependencies point inward; the application layer never imports infrastructure (rules/ARCHITECTURE.md in this case)",
+    "Python relative import semantics: a relative import resolves against the package of the importing module (concept; not web-verified in this run)",
+    "typing.Protocol structural typing: ports are defined by the layer that consumes them (concept; not web-verified in this run)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/shop/application/notify.py",
+      "line": 6,
+      "class": "layer direction violated: application imports infrastructure through a relative import under an alias",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 6: from ..infrastructure.ports import Notifier as MailSink. The module is shop/application/notify.py, so the leading two dots resolve to the package shop and the import reaches shop.infrastructure.ports. The rule in rules/ARCHITECTURE.md forbids the application layer from importing infrastructure, including under an alias. The alias MailSink hides the target name from a quick read of the annotation in notify_order_total. Trigger: any import of shop.application.notify, for example from shop.main or from a test that runs the notification use case, loads shop.infrastructure.ports at import time. Wrong result: the use case cannot be loaded without the infrastructure package, so the application layer is coupled to the delivery layer. Expected result: the notifier port is a typing.Protocol defined in shop/application/ports.py, and notify.py imports it from .ports, with no import of shop.infrastructure. Resolving the target needs the package layout (shop/infrastructure/ports.py), which is why the defect is cross-file.",
+      "quote": "from ..infrastructure.ports import Notifier as MailSink"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/shop/main.py",
+      "line": 8,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from .infrastructure.catalogue import StaticCatalogue. The composition root may import every layer (rules/ARCHITECTURE.md, layer rule for shop/main.py). The adapter is wired only in the __main__ block, and the dependency points from the outermost layer inward. This is an allowed import, not a violation.",
+      "quote": "from .infrastructure.catalogue import StaticCatalogue"
+    },
+    {
+      "file": "code/shop/application/notify.py",
+      "line": 5,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from ..domain.cart import Cart. The application layer may import the domain (rules/ARCHITECTURE.md, layer rule for shop/application/). The import resolves to shop.domain.cart, which is the allowed direction. Only the infrastructure target is forbidden.",
+      "quote": "from ..domain.cart import Cart"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/shop/infrastructure/mailer.py",
+      "line": 7,
+      "quote": "from ..application.ports import CatalogPort",
+      "why_not_a_defect": "Preexisting import in base code outside the hunks this diff adds. Infrastructure may import the application ports (rules/ARCHITECTURE.md), so the import is allowed and not part of the change."
+    }
+  ]
+}

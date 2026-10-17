@@ -1,0 +1,3 @@
+# Cart price lookup: intent
+
+A shopper adds products to a cart before checkout. Each cart line must show the unit price, in cents, of the product it refers to, and the cart total must equal the sum over all lines of quantity multiplied by unit price. Unit prices come from the product catalogue data, and the cart exposes one lookup that returns the unit price of a single SKU it contains. An unknown SKU must fail with an error that names that SKU, so that no line is ever priced at zero. Checkout computes the order total with the same catalogue prices and the same quantity-times-price rule, so the total shown in the cart and the total charged at checkout match.

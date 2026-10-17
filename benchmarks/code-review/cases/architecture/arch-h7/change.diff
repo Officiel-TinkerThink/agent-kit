@@ -1,0 +1,52 @@
+--- a/domain/__init__.py
++++ b/domain/__init__.py
+@@ -3,3 +3,4 @@
+ from __future__ import annotations
+ 
+ from domain.money import Money
++from infrastructure.tax_http import HttpTaxRateClient
+--- a/domain/order.py
++++ b/domain/order.py
+@@ -2,9 +2,10 @@
+ 
+ from __future__ import annotations
+ 
+-from dataclasses import dataclass
++from dataclasses import dataclass, replace
+ from typing import Optional
+ 
++from domain import HttpTaxRateClient
+ from domain.money import Money
+ 
+ 
+@@ -14,3 +15,10 @@
+     subtotal: Money
+     region: str
+     tax: Optional[Money] = None
++
++
++def apply_tax(order: Order, base_url: str) -> Order:
++    """Return the order with tax at the rate published for its region."""
++    rate = HttpTaxRateClient(base_url).rate_for(order.region)
++    tax = Money(round(order.subtotal.cents * rate), order.subtotal.currency)
++    return replace(order, tax=tax)
+--- a/application/checkout.py
++++ b/application/checkout.py
+@@ -2,11 +2,14 @@
+ 
+ from __future__ import annotations
+ 
+-from domain.order import Order
++from domain import Money
++from domain.order import Order, apply_tax
+ 
+ TAX_SERVICE_URL = "https://tax.example.internal"
+ 
+ 
+ def checkout(order: Order) -> Order:
+-    """Return the order as it will be charged."""
+-    return order
++    """Return the order as it will be charged, with tax applied to a non-zero subtotal."""
++    if order.subtotal == Money(0, order.subtotal.currency):
++        return order
++    return apply_tax(order, TAX_SERVICE_URL)

@@ -41,7 +41,7 @@ Checklist (look for each; each tell is a code-level sign, not a verdict): Every 
 - cyclic-dependency: two or more modules that import each other directly or through a chain of imports inside the same layer (cite each edge of the cycle).
 - god-class: one class that must change for several unrelated reasons, with a named change that forces edits to it for an unrelated reason (cite the class and the named change).
 - duplicated-logic: the same business rule implemented in two places that already differ in strictness, order or inputs (state the input where they differ; cite both lines). A repeated expression with no shared rule is not a finding.
-- speculative-generality: a parameter, hook, base class or option that the code never reads, or that has no caller found by Grep over the working directory (cite the search pattern and the zero-result count).
+- speculative-generality: a parameter or option that the function body never reads (cite the signature line and the search showing no read), or a hook or base class that no caller or subclass uses, found by Grep over the working directory (cite the search pattern and the zero-result count). A parameter the body does read is not speculative even when no caller passes it: the default is in use, so do not report it.
 - hub-dependency: a module that everything imports and that imports a large share of the codebase, where a change to it fans out to every caller (cite the fan-in and the fan-out you counted with Grep; state the counts, do not guess a threshold).
 
 Procedure:

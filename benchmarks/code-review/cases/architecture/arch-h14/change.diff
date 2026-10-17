@@ -1,0 +1,62 @@
+--- a/api/orders.py
++++ b/api/orders.py
+@@ -2,11 +2,23 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import Mapping, Sequence
++from typing import List, Mapping, Optional, Sequence
+ 
+-from ..service.orders import export_orders_csv
++from ..service.orders import export_orders_csv, filter_by_status
+ 
+ 
+ def export_orders(orders: Sequence[Mapping[str, object]]) -> str:
+     """Return the partner order export as delimited text."""
+     return export_orders_csv(orders)
++
++
++def list_orders(
++    orders: Sequence[Mapping[str, object]],
++    status: Optional[str] = None,
++    page_size: int = 50,
++) -> List[Mapping[str, object]]:
++    """Return orders filtered by status.
++
++    page_size is part of the partner contract; paging is applied by the gateway.
++    """
++    return filter_by_status(orders, status)
+--- a/service/exporter.py
++++ b/service/exporter.py
+@@ -9,6 +9,7 @@
+     rows: Iterable[Mapping[str, object]],
+     columns: Sequence[str],
+     delimiter: str = ",",
++    strategy: str = "csv",
+ ) -> str:
+     """Serialise rows to delimited text with a header line."""
+     lines: List[str] = [delimiter.join(columns)]
+--- a/service/orders.py
++++ b/service/orders.py
+@@ -2,7 +2,7 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import Mapping, Sequence
++from typing import List, Mapping, Optional, Sequence
+ 
+ from .exporter import export_rows
+ 
+@@ -12,3 +12,12 @@
+ def export_orders_csv(orders: Sequence[Mapping[str, object]]) -> str:
+     """Export orders with the fixed partner column set."""
+     return export_rows(orders, columns=ORDER_COLUMNS)
++
++
++def filter_by_status(
++    orders: Sequence[Mapping[str, object]], status: Optional[str]
++) -> List[Mapping[str, object]]:
++    """Return orders whose status matches; all orders when status is None."""
++    if status is None:
++        return list(orders)
++    return [order for order in orders if order.get("status") == status]

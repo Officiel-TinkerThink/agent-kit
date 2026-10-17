@@ -1,0 +1,39 @@
+{
+  "axis": "architecture",
+  "case": "arch-02",
+  "difficulty": "medium",
+  "sources": [
+    "rules/ARCHITECTURE.md layer rule: the application layer must not import vendor SDKs or adapters; it talks to a port (a Protocol interface); adapters implement ports; the composition root wires everything",
+    "Ports and adapters (hexagonal architecture): the use case depends on the port, the adapter implements it, the composition root injects the adapter"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/application/place_order.py",
+      "line": 8,
+      "class": "core imports vendor SDK",
+      "in_diff": false,
+      "cross_file": false,
+      "description": "Line 8: from kafka import KafkaProducer. The application-layer use case PlaceOrder imports the Kafka vendor SDK directly and, at line 37, constructs KafkaProducer with the hardcoded bootstrap host localhost:9092 and sends the event through it. The EventPublisher port (application/ports.py) exists for this purpose and is injected as self._publisher, but execute() bypasses it. Rule violated: the application layer must not import vendor SDKs or adapters and must reach outbound messaging only through a port. The composition root (main.py) and the adapter (adapters/kafka_publisher.py) are the only files that may name Kafka.",
+      "evidence": "grep -n on code/application/place_order.py: line 8 'from kafka import KafkaProducer'; line 37 'producer = KafkaProducer(bootstrap_servers=\"localhost:9092\")'. Only other kafka import in the case: code/adapters/kafka_publisher.py (permitted).",
+      "quote": "from kafka import KafkaProducer"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/main.py",
+      "line": 5,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Composition root imports the Kafka adapter (from adapters.kafka_publisher import KafkaEventPublisher) and wires it into PlaceOrder. The rule explicitly allows the composition root to wire adapters, so this import is the intended design.",
+      "quote": "from adapters.kafka_publisher import KafkaEventPublisher"
+    },
+    {
+      "file": "code/application/place_order.py",
+      "line": 10,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Imports the port (from application.ports import EventPublisher), not an adapter or vendor SDK. Depending on a Protocol interface is the permitted application-layer dependency, and the constructor takes the port type.",
+      "quote": "from application.ports import EventPublisher"
+    }
+  ],
+  "accepted_extras": []
+}

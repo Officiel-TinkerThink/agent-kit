@@ -1,0 +1,56 @@
+--- a/idempotency.py
++++ b/idempotency.py
+@@ -22,6 +22,19 @@
+         return result
+ 
+ 
++def charge_once(key, amount, charge_fn):
++    """Charge amount once per idempotency key and return the stored result.
++
++    Idempotent: repeated calls with the same key return the first stored result
++    without calling charge_fn again.
++    """
++    if key not in _results:
++        result = charge_fn(amount)
++        _results[key] = result
++    logger.info("charge_once key=%s stored=%d", key, len(_results))
++    return _results[key]
++
++
+ def clear():
+     """Remove all stored results. Intended for test isolation."""
+     with _lock:
+--- a/worker.py
++++ b/worker.py
+@@ -1,11 +1,15 @@
+ """Payment request worker."""
+ 
+ import logging
++from concurrent.futures import ThreadPoolExecutor
+ 
+-from payments import validate_amount
++from idempotency import charge_once
++from payments import charge, validate_amount
+ 
+ logger = logging.getLogger("payments.worker")
+ 
++MAX_WORKERS = 8
++
+ 
+ def validate_request(request):
+     """Return (key, amount_cents) from a request dict after validation."""
+@@ -20,3 +24,14 @@
+     """Return the receipt payload sent back to the client."""
+     logger.info("receipt key=%s reference=%s", key, reference)
+     return {"key": key, "reference": reference}
++
++
++def run_batch(requests):
++    """Charge a batch of requests concurrently; repeated keys are charged once."""
++    validated = [validate_request(request) for request in requests]
++    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
++        futures = [
++            (key, pool.submit(charge_once, key, amount_cents, charge))
++            for key, amount_cents in validated
++        ]
++        return [build_receipt(key, future.result()) for key, future in futures]

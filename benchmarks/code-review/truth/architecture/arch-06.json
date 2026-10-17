@@ -1,0 +1,48 @@
+{
+  "axis": "architecture",
+  "case": "arch-06",
+  "difficulty": "medium",
+  "sources": [
+    "rules/ARCHITECTURE.md layer rule: email validation lives in one module (validation/email.py) imported by every entry point (web, admin)",
+    "rules/ARCHITECTURE.md layer rule: no parameter may exist without a reader or a caller"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/web/signup.py",
+      "line": 30,
+      "class": "duplicated business rule with different strictness",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Quoted line 30: if \"@\" not in form.email: is a copy of the email validation rule that lives in code/validation/email.py (valid_email). The copy checks only for an at sign, while valid_email also enforces local part and domain syntax and the length limit. Failing input: handle_signup(SignupForm('a@b', 'Ann'), store) is accepted and creates an account, while the admin import rejects the same address through valid_email. The web form and the admin import therefore accept different email addresses for the same account rule. Layer rule violated: email validation must live in one module imported by every entry point. The web entry point does not import valid_email.",
+      "quote": "if \"@\" not in form.email:"
+    },
+    {
+      "id": "D2",
+      "file": "code/export/report.py",
+      "line": 11,
+      "class": "speculative generality",
+      "in_diff": false,
+      "cross_file": false,
+      "description": "Quoted line 11: def export_report(rows, format=\"csv\", plugin=None). The parameter plugin is never read in the function body and no caller in the code tree passes it. Layer rule violated: no parameter may exist without a reader or a caller. The format parameter is read at line 13 and is not part of this defect.",
+      "quote": "def export_report(rows: Sequence[Mapping[str, str]], format=\"csv\", plugin=None) -> str:"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/admin/import_.py",
+      "line": 9,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from validation.email import valid_email: the admin import imports the shared validation function, which is the layer rule. The admin entry point has no copy of the rule. Only the web copy at code/web/signup.py line 30 is faulty.",
+      "quote": "from validation.email import valid_email"
+    },
+    {
+      "file": "code/export/report.py",
+      "line": 13,
+      "kind": "safe-looking",
+      "why_not_a_defect": "if format == \"csv\": the format parameter is read and selects the output branch, so it has a reader and is not speculative. Only the plugin parameter on line 11 lacks a reader and a caller.",
+      "quote": "if format == \"csv\":"
+    }
+  ],
+  "accepted_extras": []
+}

@@ -1,0 +1,38 @@
+{
+  "axis": "architecture",
+  "case": "arch-h13",
+  "difficulty": "hard",
+  "sources": [
+    "Python import semantics: a module-load-time import cycle between two modules fails with ImportError when the partially initialised module lacks the name (concept; not web-verified in this run)",
+    "Layered architecture: modules of one layer are peers and must not form a runtime import cycle; TYPE_CHECKING-only imports are not runtime edges (rules/ARCHITECTURE.md in this case)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/billing/models.py",
+      "line": 8,
+      "quote": "from .reports import render_total",
+      "class": "module import cycle: models and reports import each other at module load time",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 8: from .reports import render_total, a top-level runtime import. billing/reports.py imports billing/models.py at top level (from .models import Invoice, LineItem), so the two modules form a runtime cycle. Trigger: any first import of billing.models, billing.reports or billing.service in a fresh interpreter. Importing billing.models runs line 8, which loads billing.reports, which reads Invoice from the partially initialised billing.models and fails with ImportError (cannot import name 'Invoice' from partially initialized module). Importing billing.reports first fails the other way, with ImportError on render_total. Expected: all three modules import cleanly, and Invoice.summary_line() returns the invoice id and the rendered total, for example 'INV-1: EUR 25.00' for one line of 2 x 1250 cents. The rule in rules/ARCHITECTURE.md forbids a load-time cycle between peer modules of one layer. Resolving the cycle needs the reports module of the other file, which is why the defect is cross-file."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/billing/models.py",
+      "line": 11,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from .reports import ReportStyle inside an if TYPE_CHECKING block. rules/ARCHITECTURE.md allows imports under TYPE_CHECKING because they are not runtime edges, and ReportStyle is used only in the string annotation of summary_line. The module never executes this import at load time, so it creates no cycle by itself.",
+      "quote": "from .reports import ReportStyle"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/billing/service.py",
+      "line": 7,
+      "quote": "from .models import Invoice, LineItem",
+      "why_not_a_defect": "Preexisting use-case module outside the hunk this diff adds (base/billing/service.py is unchanged). It imports billing.models and billing.reports, and no module of the billing package imports billing.service, so there is no cycle through service.py."
+    }
+  ]
+}

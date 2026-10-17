@@ -5,14 +5,15 @@ Corpus used to measure the `code-review` agents. 57 small cases over seven axes 
 | Axis | Round-1 cases | Round-1 seeded defects | Round-2 cases | Round-2 seeded defects | Agent measured |
 |---|---|---|---|---|---|
 | `spec` | 7 (spec-01..04, spec-h1..h3) | 18 | spec-h4..h6 | 9 | `code-review:spec-reviewer` |
-| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:architecture-reviewer` (design axis is a hypothesis; its seeds may include defect-type items, measure before trusting) |
+| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:defect-reviewer` (23 of 27 seeded items in these cases are defect-type; the 4 structural items are not scored for it) |
+| `architecture` | - | - | arch-01..06, arch-clean (medium); arch-h7..h10 (hard) | see truth/architecture | `code-review:architecture-reviewer` (layering, adapters, cycles, hardcoded environment values, duplicated rules, unused parameters) |
 | `security` | 7 (sec-01..04, sec-h1..h3) | 18 | security-h4..h5 | 6 | `code-review:security-reviewer` |
 | `guidance` | 6 (guidance-01..03, guidance-h1..h3) | 10 | guidance-h4..h5 | 5 | `code-review:guidance-reviewer` |
 | `history` | 6 (history-01..03, history-h1..h3) | 6 | history-h4..h5 | 4 | `code-review:history-reviewer` |
 | `bug` | - | - | bug-h1..h6 | 15 | `code-review:defect-reviewer` |
 | `simplicity` | - | - | simplicity-h1..h5 | 12 | `code-review:simplicity-reviewer` |
 
-Round 1: 33 cases, 70 seeded defects. Round 2: 24 cases, 60 seeded defects. Clean cases (no seeded defect) are listed in `truth/`: round 2 has bug-h6, simplicity-h5 and design-h7. `tests/code-review/test_corpus.py` checks the 57 cases.
+Round 1: 33 cases, 70 seeded defects. Round 2: 24 cases, 60 seeded defects. Clean cases (no seeded defect) are listed in `truth/`: round 2 has bug-h6, simplicity-h5 and design-h7. `tests/code-review/test_corpus.py` checks every answer key: each cited line exists and the quoted text is on that line; hard cases (name contains `-h`) need a base folder and a non-empty change.diff. Architecture cases use whole-code mode (no change.diff) unless the case folder has one; their `in_diff` is false in that mode.
 
 Layout: `cases/<axis>/<case>/` holds `spec.md` (or the rule files in `rules/`, or `history.txt` and `change.diff`) and `code/`. `truth/<axis>/<case>.json` holds `defects` (file, line, description) and `decoys` (code that looks wrong and is fine). A missing-code defect (no audit call, no owner check) is anchored to the line of the function that should contain it. `tests/code-review/test_corpus.py` checks that every cited line exists, that clean cases have no defects and that no answer key is inside a case folder.
 

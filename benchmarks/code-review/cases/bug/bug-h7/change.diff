@@ -1,0 +1,96 @@
+--- a/store.py
++++ b/store.py
+@@ -2,7 +2,7 @@
+ import logging
+ 
+ from config import IDLE_TIMEOUT, MAX_TOKENS_PER_SUBJECT
+-from tokens import Token, is_idle_expired, naive_utc_now, new_token
++from tokens import Token, is_expired, is_idle_expired, naive_utc_now, new_token
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -13,15 +13,17 @@
+     def __init__(self):
+         self._tokens = {}
+ 
+-    def issue(self, subject: str) -> Token:
++    def issue(self, subject: str, expires_at: str) -> Token:
+         if not subject:
+             raise ValueError("subject must be a non-empty string")
++        if not expires_at:
++            raise ValueError("expires_at must be provided by the identity provider")
+         active = [t for t in self._tokens.values() if t.subject == subject]
+         if len(active) >= MAX_TOKENS_PER_SUBJECT:
+             oldest = min(active, key=lambda t: t.issued_at)
+             del self._tokens[oldest.token_id]
+             logger.info("evicted oldest token subject=%s", subject)
+-        token = new_token(subject)
++        token = new_token(subject, expires_at)
+         self._tokens[token.token_id] = token
+         logger.info("token issued subject=%s", subject)
+         return token
+@@ -30,9 +32,15 @@
+         token = self._tokens.get(token_id)
+         if token is None:
+             return None
+-        if is_idle_expired(token, IDLE_TIMEOUT):
++        try:
++            expired = is_expired(token, naive_utc_now())
++        except ValueError:
++            logger.warning("token has malformed expires_at subject=%s", token.subject)
+             del self._tokens[token_id]
+-            logger.info("token idle-expired subject=%s", token.subject)
++            return None
++        if expired or is_idle_expired(token, IDLE_TIMEOUT):
++            del self._tokens[token_id]
++            logger.info("token expired subject=%s", token.subject)
+             return None
+         token.last_seen = naive_utc_now()
+         return token
+--- a/tokens.py
++++ b/tokens.py
+@@ -15,6 +15,7 @@
+     subject: str
+     issued_at: datetime
+     last_seen: datetime
++    expires_at: str = ""
+ 
+ 
+ def naive_utc_now() -> datetime:
+@@ -22,7 +23,7 @@
+     return datetime.now(timezone.utc).replace(tzinfo=None)
+ 
+ 
+-def new_token(subject: str) -> Token:
++def new_token(subject: str, expires_at: str = "") -> Token:
+     """Create a token for subject, stamped with the current UTC time."""
+     now = naive_utc_now()
+     token = Token(
+@@ -30,6 +31,7 @@
+         subject=subject,
+         issued_at=now,
+         last_seen=now,
++        expires_at=expires_at,
+     )
+     logger.debug("token created subject=%s", subject)
+     return token
+@@ -40,3 +42,19 @@
+     if now is None:
+         now = naive_utc_now()
+     return now - token.last_seen > idle_timeout
++
++
++def is_expired(token: Token, now: datetime) -> bool:
++    """Return True when the identity-provider expiry instant has passed.
++
++    Expiry instants are ISO-8601 timestamps in UTC. now is a naive UTC datetime
++    from naive_utc_now().
++    """
++    expires_at = datetime.fromisoformat(token.expires_at).replace(tzinfo=None)
++    return now >= expires_at
++
++
++def seconds_until(expires_at: datetime, now: datetime) -> int:
++    """Return whole seconds from now until expires_at. Both arguments must be timezone-aware."""
++    delta = expires_at.astimezone(timezone.utc) - now.astimezone(timezone.utc)
++    return int(delta.total_seconds())

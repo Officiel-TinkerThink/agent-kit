@@ -1,0 +1,31 @@
+{
+  "axis": "architecture",
+  "case": "arch-01",
+  "difficulty": "medium",
+  "sources": [
+    "rules/ARCHITECTURE.md (layer table: domain imports nothing outside domain; application imports domain and ports; infrastructure imports domain and application)",
+    "Clean Architecture dependency rule (concept: source-code dependencies point inward, the domain layer depends on no outer layer)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/domain/orders.py",
+      "line": 7,
+      "class": "layer direction violated: domain imports infrastructure",
+      "in_diff": false,
+      "cross_file": false,
+      "description": "Quoted line 7: from infrastructure.db import fetch_discount_rate. The domain module orders.py imports an infrastructure module, which the layer table forbids (domain may import only domain). Order.discount_rate() at line 33 calls fetch_discount_rate, so the domain aggregate depends on a database helper and cannot be loaded or tested without the infrastructure layer. The rule source is rules/ARCHITECTURE.md. Inward dependency is broken at this import; the failing condition is any import-graph check of the domain package.",
+      "quote": "from infrastructure.db import fetch_discount_rate"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/application/pricing.py",
+      "line": 6,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from domain.orders import Order: application imports domain, which the layer table allows (application may import domain and ports). The import direction points inward and matches the rule. No ports module is needed for this import.",
+      "quote": "from domain.orders import Order"
+    }
+  ],
+  "accepted_extras": []
+}

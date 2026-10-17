@@ -122,7 +122,7 @@ from orders.service import OrderStatus    # closes the cycle
 - Good: move the shared type (`OrderStatus`) into a third module that both import.
 - Not a defect when: the cycle exists only under `TYPE_CHECKING`, or it is between a package and its own test code.
 ### Speculative generality
-- Tell: a parameter, hook, base class or option that the code never reads, or that no caller uses (state the Grep pattern and the zero-result count).
+- Tell: a parameter or option that the function body never reads, or a hook or base class that no caller or subclass uses (state the Grep pattern and the zero-result count). A parameter the body reads is not speculative even when no caller passes it.
 - Fails when: a change that adds a second implementation must edit the signature and every caller for an option that nothing reads.
 - Bad:
 ```python

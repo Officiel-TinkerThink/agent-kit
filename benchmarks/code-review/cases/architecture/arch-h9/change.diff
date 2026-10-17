@@ -1,0 +1,17 @@
+--- a/domain/accrual.py
++++ b/domain/accrual.py
+@@ -11,12 +11,13 @@
+ MONEY_QUANTUM = Decimal("0.01")
+
+
+ def resolve_as_of(as_of: date | None, clock: Clock | None) -> date:
+     if as_of is not None:
+         return as_of
+     if clock is not None:
+         return clock.today()
+-    raise ValueError("as_of or clock must be provided")
++    from infrastructure.clock import today_utc
++    return today_utc()
+
+
+ def accrue_interest(

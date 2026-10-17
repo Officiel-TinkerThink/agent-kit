@@ -1,0 +1,38 @@
+{
+  "axis": "architecture",
+  "case": "arch-h14",
+  "difficulty": "hard",
+  "sources": [
+    "Speculative generality: a parameter that the code never reads and that no caller passes must not be added outside api/ (rules/ARCHITECTURE.md in this case)",
+    "Public API contract: function parameters in api/ are kept even when unused because they are part of the partner contract (rules/ARCHITECTURE.md in this case)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/service/exporter.py",
+      "line": 12,
+      "class": "speculative generality: keyword parameter added that is never read and that no caller passes",
+      "in_diff": true,
+      "cross_file": true,
+      "quote": "    strategy: str = \"csv\",",
+      "description": "Quoted line 12: strategy: str = \"csv\", added to export_rows. The body (lines 14-18) never reads strategy, so the parameter has no effect on output. A search of the case for export_rows and strategy found one caller of export_rows, export_orders_csv in service/orders.py line 14, which passes only rows and columns; zero callers pass strategy. The rule in rules/ARCHITECTURE.md forbids adding a parameter that the code never reads and that has no caller outside api/, so the parameter must not be added. Triggering input: any call that passes strategy, for example export_rows(rows, columns, strategy=\"json\"). Wrong result: the call succeeds and returns CSV text while silently ignoring the requested format. Expected result: the parameter is absent, so the same call raises TypeError and the unsupported option is never silently accepted."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/api/orders.py",
+      "line": 18,
+      "kind": "safe-looking",
+      "why_not_a_defect": "page_size: int = 50 is an unused parameter of list_orders in api/. rules/ARCHITECTURE.md states that function parameters in api/ are part of the partner contract and are kept even when unused, so the unread parameter is allowed. The docstring records that paging is applied by the gateway. The speculative-generality rule applies only outside api/.",
+      "quote": "page_size: int = 50,"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/service/exporter.py",
+      "line": 17,
+      "quote": "lines.append(delimiter.join(str(row.get(column, \"\")) for column in columns))",
+      "why_not_a_defect": "Preexisting body line in base code outside the diff hunk (the hunk covers lines 9-15). The delimiter parameter that already exists in the base signature is read here, so it is not an unused parameter and the export behaviour is not part of the change."
+    }
+  ]
+}

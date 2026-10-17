@@ -1,0 +1,38 @@
+{
+  "axis": "architecture",
+  "case": "arch-04",
+  "difficulty": "medium",
+  "sources": [
+    "rules/ARCHITECTURE.md in this case folder (layer rule: services receive collaborators through the constructor; only the composition root builds adapters; environment values come from settings, never literals in logic)",
+    "Dependency inversion (concept: high-level services depend on injected abstractions; object construction is moved to the composition root)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/inventory/sync.py",
+      "line": 32,
+      "class": "hardcoded host built inside logic instead of injected collaborator",
+      "in_diff": false,
+      "cross_file": false,
+      "description": "Quoted line 32: legacy = InventoryClient(base_url=\"http://10.20.0.15:8443\", timeout_s=5.0) sits inside InventorySync._reconcile_legacy. The service builds its own adapter from a literal environment host and port instead of using the InventoryClient injected through __init__(self, client) at line 14. The host cannot be changed per environment without a code change, the service is not testable with a fake client for this path, and the composition root in main.py is bypassed. Layer rule violated: services receive collaborators through the constructor; environment values come from settings, never literals in logic. Failing input: run() on any settings value; the reconcile pass always targets 10.20.0.15:8443 regardless of INVENTORY_URL.",
+      "quote": "legacy = InventoryClient(base_url=\"http://10.20.0.15:8443\", timeout_s=5.0)"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/main.py",
+      "line": 20,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Composition root reads settings through Settings.from_env() and builds the client from settings.inventory_url. This is the rule-compliant place for environment values and adapter construction. Only the composition root builds adapters, so this is not a violation.",
+      "quote": "settings = Settings.from_env()"
+    },
+    {
+      "file": "code/config.py",
+      "line": 8,
+      "kind": "safe-looking",
+      "why_not_a_defect": "DEFAULT_TIMEOUT_S is a named constant in the settings module, not a literal inside service logic. Settings is the permitted home for environment-related values. It holds no host or port.",
+      "quote": "DEFAULT_TIMEOUT_S = 10.0"
+    }
+  ],
+  "accepted_extras": []
+}

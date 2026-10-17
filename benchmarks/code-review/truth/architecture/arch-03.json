@@ -1,0 +1,48 @@
+{
+  "axis": "architecture",
+  "case": "arch-03",
+  "difficulty": "medium",
+  "sources": [
+    "Layered architecture: domain free of ORM and framework types; infrastructure owns ORM models and maps to domain types (rules/ARCHITECTURE.md in the case)",
+    "Dependency rule: dependencies point inward; the domain never imports infrastructure"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/domain/loyalty.py",
+      "line": 34,
+      "class": "framework type crosses boundary: ORM model CustomerRow used as domain function parameter type and read directly",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Quoted line 34: def tier_discount(customer: CustomerRow) -> int. The domain function takes the infrastructure ORM model as its parameter type and reads customer.tier_code from it; line 5 imports CustomerRow into the domain module. Violates rules/ARCHITECTURE.md: the domain uses plain dataclasses only, never ORM types. The domain Customer dataclass (line 18) already carries the same field, and application/summary.py passes the domain Customer, so the parameter annotation and the import are the boundary crossing. Cross-file: the ORM class is defined in code/infrastructure/models.py and the mapper that should be used is code/infrastructure/customers.py to_domain_customer.",
+      "quote": "def tier_discount(customer: CustomerRow) -> int:"
+    },
+    {
+      "id": "D2",
+      "file": "code/domain/loyalty.py",
+      "line": 5,
+      "class": "layer direction: domain module imports an infrastructure ORM model",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Line 5 imports CustomerRow from infrastructure.models into the domain module loyalty.py. Rule in rules/ARCHITECTURE.md: the domain never imports infrastructure. This is the import edge that makes the annotation on line 34 possible; a finding that names only this import also counts as found for this item.",
+      "quote": "from infrastructure.models import CustomerRow"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/infrastructure/customers.py",
+      "line": 4,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Infrastructure importing its own ORM model (CustomerRow) is the intended layering: infrastructure owns the ORM models and maps them to domain types. to_domain_customer and load_customer convert the row to the domain Customer before returning it.",
+      "quote": "from infrastructure.models import CustomerRow"
+    },
+    {
+      "file": "code/domain/loyalty.py",
+      "line": 3,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The domain uses plain dataclasses (Tier, Customer) and the standard-library dataclasses module, which is allowed. A dataclass is not an ORM or framework type.",
+      "quote": "from dataclasses import dataclass"
+    }
+  ],
+  "accepted_extras": []
+}

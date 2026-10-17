@@ -1,0 +1,39 @@
+{
+  "axis": "bug",
+  "case": "bug-h8",
+  "difficulty": "hard",
+  "sources": [
+    "Python language reference: closures and late binding of free variables",
+    "Python functools documentation: functools.partial",
+    "Python language reference: lambda expressions and default argument values"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/followups.py",
+      "line": 22,
+      "class": "late-binding closure captures the loop variable instead of its value",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "Line 25 `followups.append(lambda: notify(order_id))` creates a lambda that reads order_id when it is called, not when it is created. All lambdas share the one loop variable, which holds the last value after the loop. Input: build_followups([\"A1\", \"B2\", \"C3\"], notify), then run each returned callable. Wrong result: notify is called three times with \"C3\"; \"A1\" and \"B2\" are never notified. Expected result: notify is called once with \"A1\", once with \"B2\" and once with \"C3\". The same wrong result occurs through scheduler.run_batch([\"A1\", \"B2\", \"C3\"], notify), which runs these callables after its loop.",
+      "quote": "        followups.append(lambda: notify(order_id))"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/followups.py",
+      "line": 31,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The lambda binds the current loop value as a default argument (oid=order_id), so each callable keeps its own order id. build_retry_followups([\"A1\", \"B2\"], notify) returns callables that notify \"A1\" and \"B2\" in order. Correct, and it uses the same closure-in-loop shape as the defect.",
+      "quote": "        followups.append(lambda oid=order_id: notify(oid))"
+    },
+    {
+      "file": "code/followups.py",
+      "line": 13,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged line in base code. functools.partial(notify, order_id) binds the order id at creation, so build_status_callbacks([\"A1\", \"B2\"], notify) yields callables for \"A1\" and \"B2\". The code is correct, and it lies outside the diff, so it must not be reported in diff mode.",
+      "quote": "        callbacks.append(partial(notify, order_id))"
+    }
+  ],
+  "accepted_extras": []
+}

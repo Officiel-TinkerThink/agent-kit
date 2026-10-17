@@ -1,0 +1,1 @@
+Order totals include a per-customer discount. The payable total of an order is its subtotal minus the discount rate for the customer who placed the order. The rate is kept in the existing discount table keyed by customer id. The pricing use case returns the payable total for an order id.

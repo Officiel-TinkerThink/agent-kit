@@ -1,0 +1,39 @@
+{
+  "axis": "bug",
+  "case": "bug-h9",
+  "difficulty": "hard",
+  "sources": [
+    "https://docs.python.org/3/library/threading.html#lock-objects",
+    "https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor",
+    "Python GIL and check-then-act races on shared mutable state"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/idempotency.py",
+      "line": 31,
+      "class": "check-then-act race: membership check and store separated by the charge call, without a lock",
+      "in_diff": true,
+      "cross_file": true,
+      "quote": "if key not in _results:",
+      "description": "Production entry point: run_batch in code/worker.py submits charge_once to a ThreadPoolExecutor with 8 workers. Trigger: run_batch([{\"key\": \"k1\", \"amount_cents\": 1000}] * 2). Wrong result: two charges for one key, because charge_fn runs twice for k1. Expected result: charge_fn is called once for k1; both receipts carry the same reference. Mechanism: line 31 `if key not in _results:` checks the store, line 32 `result = charge_fn(amount)` runs the gateway charge, and line 33 stores the result. No lock covers the three steps, unlike remember_result. Direct call as a second example: two concurrent calls charge_once('k1', 1000, charge) from two threads; both see 'k1' missing before either stores it, so charge_fn runs twice. The docstring claim of idempotency is not enforced under concurrency. The double charge is an intermittent race: it appears only when the two calls interleave, so a sequential test passes.Detection requires reading worker.py to see that charge_once runs on parallel threads."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/idempotency.py",
+      "line": 34,
+      "kind": "safe-looking",
+      "quote": "logger.info(\"charge_once key=%s stored=%d\", key, len(_results))",
+      "why_not_a_defect": "logger.info reads len(_results) without any check-then-act. It only reports the store size for logging and does not change state or drive a decision. Reading a dict length during concurrent writes returns a valid count and cannot cause a double charge. The race is at lines 31 to 33, not here."
+    },
+    {
+      "file": "code/idempotency.py",
+      "line": 18,
+      "kind": "preexisting",
+      "quote": "if key in _results:",
+      "why_not_a_defect": "Unchanged base line in remember_result. The membership check and the store run inside `with _lock:` (lines 17 to 22), so the check-then-store is correctly serialized. It is outside the diff and must not be reported in diff mode. It is a correct locking pattern that a reviewer may cite, but it does not cover charge_once."
+    }
+  ],
+  "accepted_extras": []
+}

@@ -1,0 +1,45 @@
+{
+  "axis": "architecture",
+  "case": "arch-h10",
+  "difficulty": "hard",
+  "sources": [
+    "Clean architecture dependency rule: dependencies point inward; the domain never imports infrastructure (rules/ARCHITECTURE.md in this case)",
+    "Python relative import semantics: a relative import resolves against the package of the importing module (concept; not web-verified in this run)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/shop/domain/cart.py",
+      "line": 28,
+      "class": "layer direction violated: domain imports infrastructure through a relative import",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 28: from ..infrastructure.repo import SqlRepo. The module is shop/domain/cart.py, so the leading two dots resolve to the package shop and the import reaches shop.infrastructure.repo. The rule in rules/ARCHITECTURE.md forbids the domain from importing infrastructure by absolute or relative import. The line is inside the Cart.price_of method, so the import is local to the method and does not appear at module top, which makes the layer breach easy to miss on a quick read. Resolving the target needs the package layout (shop/infrastructure/repo.py), which is why the defect is cross-file. Price lookup in the domain is coupled to the SQL adapter SqlRepo, so the domain cannot run without the infrastructure layer.",
+      "quote": "from ..infrastructure.repo import SqlRepo"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/shop/application/checkout.py",
+      "line": 7,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from ..domain.cart import Cart. The application layer may import the domain, and the import resolves to shop.domain.cart, which is the allowed direction. Only the infrastructure target is forbidden in shop/domain/.",
+      "quote": "from ..domain.cart import Cart"
+    },
+    {
+      "file": "code/shop/infrastructure/repo.py",
+      "line": 7,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from ..domain.cart import Cart. Infrastructure may import the domain (rules/ARCHITECTURE.md, layer rule for infrastructure). The import resolves to shop.domain.cart, and the dependency points inward. Only the reverse direction, domain importing infrastructure, is a violation.",
+      "quote": "from ..domain.cart import Cart"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/shop/infrastructure/repo.py",
+      "line": 9,
+      "quote": "CATALOGUE_PRICES_CENTS: Dict[str, int] = {\"SKU-1\": 1250, \"SKU-2\": 899}",
+      "why_not_a_defect": "Preexisting module-level catalogue dict outside the hunk this diff adds; not part of the change."
+    }
+  ]
+}

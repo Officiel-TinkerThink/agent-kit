@@ -13,7 +13,8 @@ verification-runner
 changelog-summarizer
 annotator
 spec-reviewer
-design-reviewer
+defect-reviewer
+architecture-reviewer
 security-reviewer
 guidance-reviewer
 history-reviewer

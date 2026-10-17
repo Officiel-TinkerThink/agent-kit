@@ -27,9 +27,9 @@ PLUGIN = ROOT / 'plugins' / 'code-review'
 CASES = BENCH / 'cases'
 TRUTH = BENCH / 'truth'
 RESULTS = BENCH / 'results'
-AGENT_OF = {'spec': 'spec-reviewer', 'design': 'design-reviewer', 'security': 'security-reviewer', 'guidance': 'guidance-reviewer', 'history': 'history-reviewer',
-            'bug': 'design-reviewer', 'simplicity': 'simplicity-reviewer'}
-INTENT_LABEL = {'spec': 'Spec', 'design': 'Intent', 'security': 'Intent', 'guidance': 'Intent', 'history': 'Intent', 'bug': 'Intent', 'simplicity': 'Intent'}
+AGENT_OF = {'spec': 'spec-reviewer', 'design': 'defect-reviewer', 'architecture': 'architecture-reviewer', 'security': 'security-reviewer', 'guidance': 'guidance-reviewer', 'history': 'history-reviewer',
+            'bug': 'defect-reviewer', 'simplicity': 'simplicity-reviewer'}
+INTENT_LABEL = {'spec': 'Spec', 'design': 'Intent', 'security': 'Intent', 'guidance': 'Intent', 'history': 'Intent', 'bug': 'Intent', 'simplicity': 'Intent', 'architecture': 'Intent'}
 
 
 def all_cases():
@@ -55,7 +55,7 @@ def select(spec):
 def brief(axis, case):
     folder = CASES / axis / case
     parts = [f'{INTENT_LABEL[axis]}: {folder / "spec.md"}.']
-    if axis == 'guidance':
+    if axis in ('guidance', 'architecture'):
         parts.append(f'Rule files: everything under {folder / "rules"} (a nested rules file governs only the directory it sits in).')
     if axis == 'history':
         parts.append(f'History digest: {folder / "history.txt"}.')
@@ -133,6 +133,12 @@ def cites(block):
     return [(pathlib.PurePosixPath(m.group(1).replace('\\', '/')).name, int(m.group(2))) for m in re.finditer(r'([\w./\\-]+\.(?:py|toml)):(\d+)', block)]
 
 
+def code_cites(block):
+    # a trap hit counts only when the finding's own code: field names the decoy, not evidence text that mentions it
+    m = re.search(r'code:\s*(.*?)(?:\s\|\s|\n|$)', block)
+    return cites(m.group(1)) if m else []
+
+
 def cmd_score(a):
     tot = {'defects': 0, 'found': 0, 'findings': 0, 'extras': 0, 'trap_hits': 0, 'clean_fp': 0, 'clean': 0, 'clean_ok': 0, 'missing': 0}
     for axis, case in select(a.cases):
@@ -151,7 +157,8 @@ def cmd_score(a):
             used.update(hit)
         accepted = [(pathlib.PurePosixPath(e['file']).name, e['line']) for e in truth.get('accepted_extras', [])]
         traps = [(pathlib.PurePosixPath(d['file']).name, d['line']) for d in truth['decoys'] if d.get('kind') == 'preexisting']
-        trap_hits = [i for i, b in enumerate(blocks) if any(abs(l - tl) <= 2 and f == tf for f, l in cites(b) for tf, tl in traps)]
+        # exact line: a trap is the decoy's own line, so a finding on a neighbouring line of the same file is not a trap hit
+        trap_hits = [i for i, b in enumerate(blocks) if any(l == tl and f == tf for f, l in code_cites(b) for tf, tl in traps)]
         extra_idx = [i for i in range(len(blocks)) if i not in used]
         accepted_idx = [i for i in extra_idx if any(abs(l - al) <= a.window and f == af for f, l in cites(blocks[i]) for af, al in accepted)]
         tot['defects'] += len(truth['defects'])
@@ -179,7 +186,7 @@ def main():
         p.add_argument('--workers', type=int, default=8)
         p.add_argument('--window', type=int, default=10)
         p.add_argument('--tag', default='', help='suffix for the results folder, for example -r2')
-        p.add_argument('--agent-map', default='', help='axis=agent overrides, for example bug=design-reviewer,simplicity=design-reviewer')
+        p.add_argument('--agent-map', default='', help='axis=agent overrides, for example bug=defect-reviewer,simplicity=simplicity-reviewer')
         p.set_defaults(fn=fn)
     a = ap.parse_args()
     a.fn(a)

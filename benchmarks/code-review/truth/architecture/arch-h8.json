@@ -1,0 +1,44 @@
+{
+  "axis": "architecture",
+  "case": "arch-h8",
+  "difficulty": "hard",
+  "sources": [
+    "Clean Architecture dependency rule (Robert C. Martin, Clean Architecture, chapter 'The Dependency Rule'): source code dependencies point only inward, so an inner layer must not depend on an outer layer, directly or through intermediate modules",
+    "code/rules/ARCHITECTURE.md (layer table; domain must not depend on infrastructure directly or through another module; application may import infrastructure)",
+    "spec.md (late-fee calculation for overdue invoices; intent only, no layer requirement)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/domain/util_io.py",
+      "line": 5,
+      "class": "layer direction violation: domain depends on infrastructure, transitive through domain helper module",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 5: from infrastructure.db import fetch_late_fee_rate. The module util_io.py is in layer domain (code/domain/) and imports infrastructure/db.py, which is in layer infrastructure. The rule table lists domain as domain only, and the Rules section forbids a domain dependency on infrastructure directly or through another module. The import line itself names only the infrastructure layer for the import target, but the file is a domain module, so this is a layer direction violation. It is reached from code/domain/invoices.py line 7 (from domain.util_io import load_late_fee_rate) and invoices.py line 35 (load_late_fee_rate call in late_fee), so the Invoice aggregate depends on infrastructure transitively. The violation is introduced by the diff because util_io.py is a new file. Failing outcome: any domain code path that calls Invoice.late_fee performs a database read through the infrastructure adapter, which the rule forbids. Spec intent is not affected, so this is a rule violation only.",
+      "quote": "from infrastructure.db import fetch_late_fee_rate"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/domain/invoices.py",
+      "line": 7,
+      "why_not_a_defect": "Domain-to-domain import: from domain.util_io import load_late_fee_rate names only a domain module, which is allowed by the table row for domain. The violation is at code/domain/util_io.py line 5, where the helper imports infrastructure; this line is only the first hop of the chain and must not be reported as a separate defect.",
+      "quote": "from domain.util_io import load_late_fee_rate"
+    },
+    {
+      "file": "code/application/billing.py",
+      "line": 7,
+      "why_not_a_defect": "Application-to-infrastructure import: from infrastructure.db import store_late_fee. The rules state that application may import infrastructure directly (table row for application and the Application bullet), so this is allowed. The application module is an outer layer and nothing in domain depends on it.",
+      "quote": "from infrastructure.db import store_late_fee"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/infrastructure/db.py",
+      "line": 10,
+      "quote": "_STORED_FEES: Dict[str, Decimal] = {}",
+      "why_not_a_defect": "Module-level mutable fee dict that this diff neither reads nor changes; a preexisting issue outside the change."
+    }
+  ]
+}

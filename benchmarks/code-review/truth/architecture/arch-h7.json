@@ -1,0 +1,38 @@
+{
+  "axis": "architecture",
+  "case": "arch-h7",
+  "difficulty": "hard",
+  "sources": [
+    "Clean Architecture dependency rule: source code dependencies point inward; the domain depends on no infrastructure (Robert C. Martin, Clean Architecture, ch. 22)",
+    "https://docs.python.org/3/reference/import.html (importing a submodule first executes the package __init__.py; names bound there are visible as package attributes)",
+    "https://docs.python.org/3/tutorial/modules.html#packages (the package __init__.py defines the package namespace, so a re-export makes a symbol reachable through the package)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/domain/__init__.py",
+      "line": 6,
+      "class": "layer direction violated through indirect import: domain package re-exports infrastructure adapter",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 6: from infrastructure.tax_http import HttpTaxRateClient. The rules file (rules/ARCHITECTURE.md, Dependency direction) states that the domain package __init__.py must not re-export anything from infrastructure, so this line violates the rule on its own. The symbol is then consumed by the domain module code/domain/order.py line 8: from domain import HttpTaxRateClient. That import line names only the domain package, so the file looks compliant when read alone, but it resolves to the infrastructure adapter through the re-export. Line 22 of the same file calls HttpTaxRateClient(base_url).rate_for(order.region) inside apply_tax, so domain logic performs outbound HTTP through infrastructure. Domain modules may import only the standard library and domain modules, so this violates the rules. The reviewer must check the package __init__.py, not only the import line of the domain module.",
+      "quote": "from infrastructure.tax_http import HttpTaxRateClient"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/application/checkout.py",
+      "line": 5,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Application modules may import the domain package (rules/ARCHITECTURE.md, Dependency direction). The line imports Money from the domain package, which is allowed. The domain package re-exports only Money from domain.money at code/domain/__init__.py line 5 and the adapter at line 6 is the violation under D1. The application layer may depend on domain and infrastructure, so this import creates no violation by itself.",
+      "quote": "from domain import Money"
+    },
+    {
+      "file": "code/infrastructure/tax_http.py",
+      "line": 24,
+      "kind": "preexisting",
+      "why_not_a_defect": "Real flaw on an unchanged line (infrastructure/tax_http.py is identical in base and code and is not in change.diff): the region value is concatenated into the URL path without encoding, so a region such as '../admin' changes the requested path on the tax service. Not part of this change; must not be reported in diff mode, and it is not listed under defects.",
+      "quote": "url = f\"{self._base_url}/rates/{region}\""
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "axis": "architecture",
+  "case": "arch-05",
+  "difficulty": "medium",
+  "sources": [
+    "rules/ARCHITECTURE.md in this case (application layer: sibling packages form an acyclic graph; a shared type lives in a module both sides import)",
+    "Acyclic Dependencies Principle (concept: no cycles among sibling packages; break a cycle by moving the shared type to a module both sides import)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/refunds/repo.py",
+      "line": 5,
+      "class": "cyclic dependency between sibling modules",
+      "in_diff": false,
+      "cross_file": true,
+      "description": "Line 5 is from orders.service import OrderStatus. Together with code/orders/service.py line 7 (from refunds.repo import RefundRepo), the modules orders.service and refunds.repo import each other, forming a cycle inside the application layer. The rule requires the application-layer packages to form an acyclic graph and requires a shared type to live in a module both sides import. OrderStatus is owned by orders.service and read by refunds.repo, so the cycle is created by this change. Import-time failure is possible depending on the entry point, and the two packages cannot be changed or tested independently.",
+      "evidence": "Static check, grep -n over code/: code/orders/service.py:7 'from refunds.repo import RefundRepo'; code/refunds/repo.py:5 'from orders.service import OrderStatus'. Both edges are added lines in change.diff (hunks at orders/service.py and refunds/repo.py). Runtime import order not executed.",
+      "quote": "from orders.service import OrderStatus"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/refunds/service.py",
+      "line": 5,
+      "kind": "safe-looking",
+      "why_not_a_defect": "One-way import from refunds.service to refunds.repo. Nothing in refunds.repo or any sibling imports refunds.service, so no cycle is formed. The edge follows the rule's acyclic graph. Evidence: grep -n over code/ shows refunds/service.py:5 'from refunds.repo import RefundRepo, RefundRow' and no import of refunds.service anywhere under code/.",
+      "quote": "from refunds.repo import RefundRepo, RefundRow"
+    }
+  ],
+  "accepted_extras": []
+}

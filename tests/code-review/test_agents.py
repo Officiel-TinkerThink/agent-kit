@@ -9,12 +9,13 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / 'plugins' / 'code-review'
 results = []
-REVIEWERS = ['spec-reviewer', 'design-reviewer', 'security-reviewer', 'guidance-reviewer', 'history-reviewer', 'simplicity-reviewer']
+REVIEWERS = ['spec-reviewer', 'defect-reviewer', 'architecture-reviewer', 'security-reviewer', 'guidance-reviewer', 'history-reviewer', 'simplicity-reviewer']
 ALL = REVIEWERS + ['finding-validator']
-LENS_OF = {'spec-reviewer': 'spec-lens', 'design-reviewer': 'design-lens', 'security-reviewer': 'security-lens',
+COMPANION_LENSES = {}
+LENS_OF = {'spec-reviewer': 'spec-lens', 'defect-reviewer': 'defect-lens', 'architecture-reviewer': 'architecture-lens', 'security-reviewer': 'security-lens',
            'guidance-reviewer': 'guidance-lens', 'history-reviewer': 'history-lens', 'simplicity-reviewer': 'simplicity-lens', 'finding-validator': 'validator-lens'}
-SKILLS = ['review-craft', 'spec-lens', 'design-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
-CATALOG_LENSES = ['spec-lens', 'design-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
+SKILLS = ['review-craft', 'spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
+CATALOG_LENSES = ['spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
 
 
 def check(name, ok, extra=''):
@@ -54,7 +55,7 @@ def main():
     plugin = json.loads((PLUGIN / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
     check('plugin name is code-review', plugin['name'] == 'code-review')
     found = sorted(p.stem for p in (PLUGIN / 'agents').glob('*.md'))
-    check('the seven agents exist and no others', found == sorted(ALL), str(found))
+    check('the eight agents exist and no others', found == sorted(ALL), str(found))
     rows = budgets()
     for name in ALL:
         raw = (PLUGIN / 'agents' / (name + '.md')).read_text(encoding='utf-8')
@@ -74,7 +75,8 @@ def main():
             check(f'{name}: has the rule "{rule}"', rule in body)
         check(f'{name}: lens example names no real marker', not re.search(r'[a-z]+-(lens|craft) v1', body))
         skills = fm.get('skills')
-        check(f'{name}: preloads review-craft and {LENS_OF[name]}', skills == ['review-craft', LENS_OF[name]], str(skills))
+        expected = ['review-craft', LENS_OF[name]] + COMPANION_LENSES.get(name, [])
+        check(f'{name}: preloads review-craft, {LENS_OF[name]} and its companions', skills == expected, str(skills))
         check(f'{name}: no verdicts on compliance', 'No verdicts' in body or 'never add findings' in body)
         check(f'{name}: ASCII only', all(ord(c) < 128 for c in raw))
     for name in REVIEWERS:
@@ -105,7 +107,7 @@ def main():
             entries = len(re.findall(r'(?m)^### ', raw))
             counts = {k: len(re.findall(r'(?m)^(?:- )?' + k, raw)) for k in ('Tell:', 'Fails when:', 'Not a defect when:')}
             check(f'skill {skill}: every catalog entry has Tell, Fails when and Not a defect when', entries > 0 and all(c == entries for c in counts.values()), f'{entries} {counts}')
-            for h in ('## How to look', '## Catalog', '## Traps', '## Do not report'):
+            for h in ('## How to look', '## Catalog', '## Known safe patterns', '## Do not report'):
                 check(f'skill {skill}: has "{h}"', h in raw)
     skill = (PLUGIN / 'skills' / 'review' / 'SKILL.md').read_text(encoding='utf-8')
     check('review skill has a description', str(frontmatter(skill)[0].get('description', '')) != '')
@@ -114,6 +116,10 @@ def main():
     check('review skill names every agent', set(ALL) <= named, str(set(ALL) - named))
     for needle in ('Step 0', 'waves of at most 8 agents', 'never merge across axes', 'Never drop silently'.lower(), 'evidence only', 'LENS:', 'also-seen', 'Change scope'):
         check(f'review skill: contains "{needle}"', needle.lower() in skill.lower())
+    readme = (ROOT / 'benchmarks' / 'code-review' / 'README.md').read_text(encoding='utf-8')
+    check('benchmark README states the critique, optimise, revise principle', '## Principle: critique, optimise, revise' in readme and 'benchmark-leak-auditor' in readme)
+    auditor = (ROOT / '.claude' / 'agents' / 'benchmark-leak-auditor.md').read_text(encoding='utf-8')
+    check('benchmark-leak-auditor exists and is read-only', 'tools: Read, Grep, Glob' in auditor and 'model: claude-haiku-5-5' in auditor)
     market = json.loads((ROOT / '.claude-plugin' / 'marketplace.json').read_text(encoding='utf-8'))
     entry = [e for e in market['plugins'] if e['name'] == 'code-review']
     check('marketplace lists code-review at the plugin version', len(entry) == 1 and entry[0]['version'] == plugin['version'] and entry[0]['source'] == './plugins/code-review', str(entry))

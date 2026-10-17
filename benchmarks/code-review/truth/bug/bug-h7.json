@@ -1,0 +1,40 @@
+{
+  "axis": "bug",
+  "case": "bug-h7",
+  "difficulty": "hard",
+  "sources": [
+    "Python datetime module: datetime.fromisoformat",
+    "Python datetime module: aware and naive datetime objects",
+    "Python datetime module: datetime.astimezone",
+    "RFC 3339 section 5.6 (date-time offsets)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/tokens.py",
+      "line": 53,
+      "class": "offset of an ISO-8601 expiry string dropped by replace(tzinfo=None) before comparing with naive UTC time",
+      "in_diff": true,
+      "cross_file": false,
+      "quote": "expires_at = datetime.fromisoformat(token.expires_at).replace(tzinfo=None)",
+      "description": "Line 53 `expires_at = datetime.fromisoformat(token.expires_at).replace(tzinfo=None)` keeps the wall-clock time of the identity-provider string and discards its UTC offset. Input: token.expires_at = \"2026-10-17T09:30:00+02:00\" (expiry instant 07:30 UTC) and now = datetime(2026, 10, 17, 8, 0) (naive UTC, 08:00 UTC). Wrong result: is_expired returns False (compares 08:00 with 09:30) and store.get returns the token. Expected result: is_expired returns True because 08:00 UTC is at or after 07:30 UTC. The token stays valid for the offset length (2 hours here) after its real expiry. No exception is raised, so the error is silent."
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/tokens.py",
+      "line": 59,
+      "kind": "safe-looking",
+      "quote": "delta = expires_at.astimezone(timezone.utc) - now.astimezone(timezone.utc)",
+      "why_not_a_defect": "Both arguments are converted with astimezone(timezone.utc) before subtraction, so the difference is computed on the same UTC basis regardless of their offsets. seconds_until(datetime(2026,10,17,9,30,tzinfo=timezone(timedelta(hours=2))), datetime(2026,10,17,8,0,tzinfo=timezone.utc)) = -1800 (09:30+02:00 is 07:30 UTC, which is 30 minutes before 08:00 UTC). It handles the offset correctly, as the intent requires; the docstring states the aware-input contract. seconds_until has no caller in this case; it is a dead helper and is not part of the keyed defect."
+    },
+    {
+      "file": "code/tokens.py",
+      "line": 44,
+      "kind": "preexisting",
+      "quote": "return now - token.last_seen > idle_timeout",
+      "why_not_a_defect": "Unchanged base function is_idle_expired. Both now (default from naive_utc_now()) and token.last_seen (set by new_token() and get() via naive_utc_now()) are naive UTC values created by the same helper, so the subtraction and comparison are consistent. It looks like a naive/aware mix but is correct. It is an unchanged line in base and outside the added code (it appears only as a context line of the hunk), and must not be reported in diff mode."
+    }
+  ],
+  "accepted_extras": []
+}

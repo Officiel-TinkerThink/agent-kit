@@ -1,0 +1,44 @@
+--- a/shop/application/checkout.py
++++ b/shop/application/checkout.py
+@@ -0,0 +1,15 @@
++"""Checkout use case: computes the order total from catalogue prices."""
++
++from __future__ import annotations
++
++from typing import Dict
++
++from ..domain.cart import Cart
++
++
++def order_total_cents(cart: Cart, unit_prices_cents: Dict[str, int]) -> int:
++    """Sum quantity multiplied by unit price over every cart line."""
++    total = 0
++    for sku, quantity in cart.quantities.items():
++        total += unit_prices_cents[sku] * quantity
++    return total
+--- a/shop/domain/cart.py
++++ b/shop/domain/cart.py
+@@ -20,3 +20,11 @@
+ 
+     def line_count(self) -> int:
+         return len(self.quantities)
++
++    def price_of(self, sku: str) -> int:
++        """Return the catalogue unit price in cents for a SKU in this cart."""
++        if sku not in self.quantities:
++            raise KeyError(f"sku {sku} is not in cart {self.cart_id}")
++        from ..infrastructure.repo import SqlRepo
++
++        return SqlRepo().unit_price_cents(sku)
+--- a/shop/infrastructure/repo.py
++++ b/shop/infrastructure/repo.py
+@@ -20,3 +20,9 @@
+ 
+     def load_cart(self, cart_id: str) -> Cart:
+         return self._carts[cart_id]
++
++    def unit_price_cents(self, sku: str) -> int:
++        try:
++            return CATALOGUE_PRICES_CENTS[sku]
++        except KeyError:
++            raise LookupError(f"unknown sku {sku}") from None

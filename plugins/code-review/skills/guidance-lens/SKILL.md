@@ -15,7 +15,7 @@ Only rules with a checkable condition count. Every finding quotes the rule and t
 1. Collect the rule files: the root rule file and every rule file in each directory from the repo root down to each modified file. Number every rule (R1, R2, ...) with its file and scope path. Drop rules with no checkable condition.
 2. Keep only the rules whose scope covers each changed file. A nested rule does not apply outside its directory.
 3. For each hunk, check the rule condition against the lines the hunk adds, modifies or moves. Quote the code line. Find the SIBLING that does the same job: if it obeys the rule and the new code does not, that is evidence. If the rule names a helper, read the helper body.
-4. Look at what the change REMOVED or MOVED (a required call, check, record write, protected line). For each guidance comment ("do not reorder", "must run before"), read the code it describes, even when that code is far away.
+4. Look at what the change REMOVED or MOVED (a required call, check, record write, protected line). For each guidance comment that restricts ordering or sequencing, read the code it describes, even when that code is far away.
 5. Check the second file for process rules: defaults file, template copy, changelog line, test. Search for the new name; it may already exist in the repo.
 6. Trace one concrete input or call through the code, write the outcome next to the rule number, and report only if it breaks the rule.
 
@@ -23,10 +23,10 @@ Only rules with a checkable condition count. Every finding quotes the rule and t
 
 ### Root rule violated in a nested directory
 - Tell: a write, call or branch in a sub-package skips the call the root rule requires.
-- Fails when: the root rule says "every record write calls record_change()". `services/orders/cancel.py` runs `session.add(order)` and never calls it, so a cancelled order has no audit entry.
+- Fails when: the root rule requires every record write to call the change-audit function. A sub-package write that skips it leaves the change unrecorded.
 Bad:
 ```python
-# RULE R3 (root CLAUDE.md): every record write calls record_change(...)
+# RULE (project rules file): every write must satisfy the change-recording requirement its rule file names.
 def cancel_order(session, order):
     order.status = "CANCELLED"
     session.add(order)
@@ -36,25 +36,25 @@ Good:
 def cancel_order(session, order, user):
     order.status = "CANCELLED"
     session.add(order)
-    record_change(session, user, "order", order.id, "status:CANCELLED")
+    change_entry(session, user, "order", order.id, "status:CANCELLED")
 ```
 Not a defect when: the statement only reads data, or the rule's scope excludes this path.
 
 ### Nested rule applied outside its directory
 - Tell: a finding cites a rule file from one directory against code in a sibling directory.
-- Fails when: `services/billing/AGENTS.md` says "amounts use Decimal". A float in `services/orders/pricing.py` is reported. The rule does not reach that path, so the finding is a false positive.
+- Fails when: `services/shipping/AGENTS.md` sets a value-type rule for its subtree. A float in `services/orders/pricing.py` is reported against it. The rule does not reach that path, so the finding is a false positive.
 Bad:
 ```python
-# file: services/billing/discount.py (added by the change)
-# RULE R7 (services/billing/AGENTS.md): amounts use Decimal, never float
-discount = 0.15
+# file: services/shipping/rates.py (added by the change)
+# RULE R7 (services/shipping/AGENTS.md): weights use Decimal, never float
+weight = 0.15
 ```
 Good:
 ```python
 from decimal import Decimal
-discount = Decimal("0.15")
+weight = Decimal("0.15")
 ```
-Not a defect when: the file is outside `services/billing/`. `discount = 0.15` in `services/orders/pricing.py` is not covered by R7; drop that finding and cite R7 only for files under `services/billing/`.
+Not a defect when: the file is outside `services/shipping/`. `weight = 0.15` in `services/orders/pricing.py` is not covered by R7; drop that finding and cite R7 only for files under `services/shipping/`.
 
 ### Rule satisfied through a wrapper whose name does not match the rule wording
 - Tell: the rule names `log_access()`, but the path calls a helper with another name that calls `log_access()` on some branches only.
@@ -86,7 +86,7 @@ order.save()  # R3 exempt
 Good:
 ```python
 order.save()
-record_change(session, user, "order", order.id, "save")  # R3: audited, no exemption needed
+change_entry(session, user, "order", order.id, "save")  # R3: audited, no exemption needed
 ```
 Not a defect when: the comment matches the exemption form the rule file defines (rule ID, change-control ID) and the exempt target is the line it sits on. If the rule file defines no exemption form, no comment silences the rule and the violation stands.
 
@@ -96,55 +96,55 @@ Not a defect when: the comment matches the exemption form the rule file defines 
 Bad:
 ```python
 # RULE R5: public functions validate their arguments
-def _normalise(value):                 # private by name, but see __init__.py
+def _prepare(value):                   # private by name, but see __init__.py
     return value.strip()
 ```
 Good:
 ```python
 def normalise(value):
-    if not isinstance(value, str): raise TypeError("value must be str")
+    if not isinstance(value, str): raise TypeError("argument has the wrong type")
     return value.strip()
 ```
 Not a defect when: the name starts with an underscore and no `__all__` or `__init__.py` export makes it public.
 
 ### Cross-file rule: new config key missing from the defaults file
 - Tell: a new key is read in settings or a loader, and the defaults or example file has no entry for it.
-- Fails when: R9 says every key appears in `config/defaults.toml`. `RETRY_BUDGET_S = int(os.environ["RETRY_BUDGET_S"])` has no default, so a fresh install fails at startup with KeyError. The rule violated is R9, not the crash: an environment fallback in code alone does not satisfy R9.
+- Fails when: The rule says every key appears in the defaults file. `NEW_SETTING = int(os.environ["NEW_SETTING"])` has no default, so a fresh install fails at startup with KeyError. The rule violated is the defaults-file rule, not the crash: an environment fallback in code alone does not satisfy it.
 Bad:
 ```python
 # settings.py (changed)
-RETRY_BUDGET_S = int(os.environ["RETRY_BUDGET_S"])
-# config/defaults.toml: no RETRY_BUDGET_S entry (R9)
+NEW_SETTING = int(os.environ["NEW_SETTING"])
+# <defaults file>: no entry for the new key
 ```
 Good:
 ```python
 # settings.py
-RETRY_BUDGET_S = int(os.environ.get("RETRY_BUDGET_S", "30"))
+NEW_SETTING = int(os.environ.get("NEW_SETTING", "30"))
 # config/defaults.toml (same change)
-RETRY_BUDGET_S = 30
+NEW_SETTING = 30
 ```
 Not a defect when: the key already exists in the defaults file in the repo (check the file, not only the diff), or the rule exempts secrets, which never go in defaults.
 
 ### Wrapper that looks compliant but calls the wrong function
 - Tell: the call sits beside a write, and the helper it uses is the read-audit helper or a sibling, not the one the rule names.
-- Fails when: R2 says changes call `record_change()`. The new line `log_read(session, user, rec)` sits after `rec.dose = dose`. The audit row says READ, and the dose change is never recorded.
+- Fails when: a recording call of a different kind than the one a rule names does not satisfy that rule; check the named call, not only that an audit call exists. The new line `read_entry(session, user, rec)` sits after `rec.dose = dose`, so the audit row says READ and the change is never recorded.
 Bad:
 ```python
 def update_dose(session, user, rec, dose):
     rec.dose = dose
-    log_read(session, user, rec)       # R2 needs record_change
+    read_entry(session, user, rec)       # the rule names the change-recording call
 ```
 Good:
 ```python
 def update_dose(session, user, rec, dose):
     old = rec.dose
     rec.dose = dose
-    record_change(session, user, rec.id, "dose", old, dose)
+    change_entry(session, user, rec.id, "dose", old, dose)
 ```
-Not a defect when: the function only reads the record. Then `log_read()` is the call the rule names.
+Not a defect when: the function only reads the record, so the read-audit call is the one that applies.
 
 ### Guidance comment violated by a change elsewhere in the file
-- Tell: a comment says "order matters", "must run before" or "callers rely on order", and a hunk moves a line the comment protects.
+- Tell: a comment says "order matters", "must run before" or a comment stating that consumers depend on a given sequence, and a hunk moves a line the comment protects.
 - Fails when: the comment sits above `apply_rules(cfg)`. A change moves `fill_defaults(cfg)` above it. With `cfg = {}` and a rule that sets `timeout = 5`, the default `30` overwrites the rule value, and the output is 30.
 Bad:
 ```python
@@ -157,14 +157,14 @@ Good:
 cfg = apply_rules(cfg)
 cfg = fill_defaults(cfg)
 ```
-Not a defect when: the comment explains past behaviour and does not instruct, or the new order still satisfies the instruction. A spec, ticket or PR text that asks for the conflicting change does NOT waive the comment; only a change that edits or deletes the comment itself does. When the change contradicts a live comment, report it as comment-guidance (severity medium), with scenario: "comment requires X; change does Y; stated intent: <quote from the spec>". The owner decides whether the code or the comment changes; do not judge which wins.
+Not a defect when: the comment explains past behaviour and does not instruct, or the new order still satisfies the instruction. A requested change does not cancel a live invariant comment; only a change that edits or deletes the comment itself does. When the change contradicts a live comment, report it as comment-guidance (severity medium), with scenario: "comment requires X; change does Y; stated intent: <quote from the spec>". The owner decides whether the code or the comment changes; do not judge which wins.
 
 ### Process rule on the change itself: changelog line missing
 - Tell: a user-visible change (new flag, new command, new config key) with no hunk in the changelog or the rule's second artifact.
-- Fails when: CONTRIBUTING says each PR adds a changelog line under `## [Unreleased]`. The diff adds `--dry-run` and does not touch `CHANGELOG.md`, so the release notes miss it.
+- Fails when: CONTRIBUTING says each PR adds a changelog line under `## [Unreleased]`. The diff adds `--<new-flag>` and does not touch `CHANGELOG.md`, so the release notes miss it.
 Bad:
 ```python
-# diff adds: parser.add_argument("--dry-run", action="store_true")
+# diff adds: parser.add_argument("--<new-flag>", action="store_true")
 # CHANGELOG.md: no hunk; [Unreleased] unchanged
 ```
 Good: report the missing line with `code: CHANGELOG.md` and `quote: "none"` (no code line exists for an absence), quoting the CONTRIBUTING rule and the added flag; suggest the Added group.
@@ -238,7 +238,7 @@ return db.get(Patient, pid)
 ```
 Not a defect when: the rule's scope no longer covers that path, or a replacement call on the same path satisfies the rule (read the new code to confirm).
 
-## Traps
+## Known safe patterns
 
 - A rule scoped to another directory: code that breaks the root wording is correct there, because the nested rule does not reach it.
 - An explicit exemption that names the rule, a reason and an ID in the form the rule file accepts: the rule is waived on purpose.
@@ -247,7 +247,7 @@ Not a defect when: the rule's scope no longer covers that path, or a replacement
 - A rule that a formatter, linter or CI gate already enforces: the tool reports it, not guidance review.
 - A helper with a different name from the rule wording that calls the required function on every path: the rule is met.
 - A reorder that keeps the sequence the comment requires: the instruction still holds.
-- A spec or ticket that asks for a change a live guidance comment forbids: not a waiver. Report it as comment-guidance and leave the decision to the owner.
+- A requested change does not cancel a live invariant comment; report the conflict for the owner and do not treat the requester's wording as a waiver.
 
 ## Do not report
 

@@ -30,12 +30,12 @@ Each entry: what a real instance looks like (Tell, Bad), when it fails, what con
 - Tell: SQL text built with an f-string, %, or + around a value that comes from a parameter or request.
 - Fails when: a value with a quote character changes the statement structure, so the query returns rows the caller may not see.
 ```python
-def find_user(conn, name):
-    sql = f"SELECT id, email FROM users WHERE name = '{name}'"
+def lookup(conn, key):
+    sql = f"SELECT id, email FROM users WHERE name = '{key}'"
     return conn.execute(sql).fetchall()
 ```
 - Confirmed by: the interpolated value traces to an untrusted source (request, file, message) with no escaping, and the string reaches execute.
-- Refuted by: placeholders (`?`, `%s`, `:name`) with values in the parameter tuple; identifiers taken from a constant allowlist dict only when a miss raises or returns a fixed value (`ALLOWED[key]` or `ALLOWED.get(key, "id")`); an int() cast before the value enters the string. `ALLOWED.get(key, key)` or any fallback to the raw input does not refute.
+- Refuted by: placeholders (`?`, `%s`, `:name`) with values in the parameter tuple; identifiers taken from a constant allowlist dict only when a miss raises or returns a fixed value (`ALLOWLIST[key]` or `ALLOWLIST.get(key, DEFAULT_COLUMN)`); an int() cast before the value enters the string. `ALLOWLIST.get(key, key)` or any fallback to the raw input does not refute.
 - Not a defect when: the f-string only builds placeholders, for example `",".join("?" * len(ids))`, and the values go in a bound tuple.
 
 ### Path traversal
@@ -78,8 +78,8 @@ def delete_order(order_id: int, user=Depends(current_user)):
 - Tell: a write to a regulated table in a function that never calls the audit helper.
 - Fails when: a regulated record changes with no audit row in the same transaction, so the change cannot be attributed or reconstructed.
 ```python
-def set_limit(session, limit_id, value):
-    rec = session.get(DoseLimit, limit_id)
+def set_record(session, record_id, value):
+    rec = session.get(RegulatedRecord, record_id)
     rec.value = value
     session.commit()
 ```
@@ -89,20 +89,20 @@ def set_limit(session, limit_id, value):
 
 ### Race on check-then-act
 - Tell: a value read, compared in Python, then written back with a separate statement and no lock or conditional write.
-- Fails when: two callers read a stock of 5, both pass a check for 5, both write, and two reservations succeed.
+- Fails when: two callers read the same count, both pass a check on it, both write, and the limit is exceeded.
 ```python
-def reserve(conn, sku, qty):
-    left = conn.execute("SELECT qty FROM stock WHERE sku = ?", (sku,)).fetchone()[0]
-    if left >= qty:
-        conn.execute("UPDATE stock SET qty = ? WHERE sku = ?", (left - qty, sku))
+def take(conn, key, amount):
+    left = conn.execute("SELECT n FROM items WHERE key = ?", (key,)).fetchone()[0]
+    if left >= amount:
+        conn.execute("UPDATE items SET n = ? WHERE key = ?", (left - amount, key))
 ```
 - Confirmed by: two concurrent callers reach the function (threads, workers or request handlers; a route handler that serves concurrent requests counts as concurrent without a separate config proof), and no lock, unique constraint or conditional UPDATE covers both the read and the write.
-- Refuted by: `UPDATE stock SET qty = qty - ? WHERE sku = ? AND qty >= ?` with a rowcount check; `SELECT ... FOR UPDATE` inside the transaction; a single writer proven in code or deployment config (if that proof is not in the code given, UNVERIFIABLE).
+- Refuted by: `UPDATE items SET n = n - ? WHERE key = ? AND n >= ?` with a rowcount check; `SELECT ... FOR UPDATE` inside the transaction; a single writer proven in code or deployment config (if that proof is not in the code given, UNVERIFIABLE).
 - Not a defect when: the read feeds a report with no write, or the code runs once at startup.
 
 ### Unsafe retry
 - Tell: a retry loop around a non-idempotent call (POST or any side effect) with no idempotency key.
-- Fails when: a timeout after the server applied the write, followed by a retry, creates a duplicate record.
+- Fails when: a retry after an ambiguous timeout repeats a write the server already applied, and the write has no idempotency key.
 ```python
 for _ in range(5):
     try:
@@ -112,7 +112,7 @@ for _ in range(5):
 ```
 - Confirmed by: a non-idempotent method, no Idempotency-Key or equivalent in the request, and the contract (code or specification) does not deduplicate.
 - Refuted by: retry only for GET or for PUT of full state; an Idempotency-Key header that the server stores and deduplicates. A retry budget, a deadline or a single retry layer does not refute it: they limit duplicates, they do not prevent them.
-- Not a defect when: the call is a read, or the only issue is a fixed sleep with no jitter in one caller (jitter matters only when many callers are shown to synchronise).
+- Not a defect when: the call is a read, or the material shows one retry layer with one caller, so no two retry loops can synchronise (jitter matters only when many callers or nested layers are shown to synchronise).
 
 ### Resource leak on the error path
 - Tell: an open or acquire, then a call that can raise, then the close, with no `with` block or finally.
@@ -130,11 +130,11 @@ def export(path, rows):
 
 ### Rounding mode
 - Tell: `quantize` (or a similar rounding call) with no rounding argument and no local context, where the requirement names a mode.
-- Fails when: the requirement says half up and a product of exactly 0.125 quantized to cents uses the default half-even rule, giving 0.12, not 0.13.
+- Fails when: the requirement names a rounding mode and a tie value is quantized with the default rule, which may round to the other neighbour.
 ```python
 from decimal import Decimal
-def fee(amount: Decimal) -> Decimal:
-    return (amount * Decimal("0.125")).quantize(Decimal("0.01"))
+def compute(value: Decimal) -> Decimal:
+    return (value * factor).quantize(Decimal("0.01"))  # requirement names a mode
 ```
 - Confirmed by: the requirement names the mode, the call passes no rounding argument, and no context in scope sets one.
 - Refuted by: `rounding=ROUND_HALF_UP` on the call; a `localcontext()` with rounding set; the requirement names half-even, or names no mode and the project documents the default.
@@ -144,7 +144,7 @@ def fee(amount: Decimal) -> Decimal:
 - Tell: a half-open comparison (`start <= x < end`) where the end is a date the requirement says is included.
 - Fails when: a record dated on the end day is dropped from a result that the specification says includes that day.
 ```python
-def in_period(day, start, end):
+def within(day, start, end):
     return start <= day < end
 ```
 - Confirmed by: the requirement says the end is inclusive, and the caller passes the end date with no +1 day adjustment (read the caller).
@@ -153,10 +153,10 @@ def in_period(day, start, end):
 
 ### Falsy zero treated as missing
 - Tell: `x or default` or `if not x:` on a value where 0, an empty string or an empty list is a legal input.
-- Fails when: `requested=0` returns the default 25, while the requirement says 0 must be kept or rejected.
+- Fails when: a legal `0` returns the default 25, while the requirement says 0 must be kept or rejected.
 ```python
-def page_size(requested):
-    return requested or 25
+def pick(value):
+    return value or fallback
 ```
 - Confirmed by: the requirement or a test distinguishes 0 from missing, and the code tests truthiness on that value.
 - Refuted by: an `is None` test; 0 rejected by an earlier validator on the same path (trace it); the requirement says 0 means default.
@@ -164,13 +164,13 @@ def page_size(requested):
 
 ### Wrong exception type
 - Tell: a raise of a type that differs from the type the contract or the caller's except clause names.
-- Fails when: an out-of-range value raises TypeError where the contract says ValueError, so `except ValueError` misses it and the request returns 500.
+- Fails when: a value that violates the contract raises an exception class that the caller's except clause does not catch, so the request returns 500.
 ```python
-def parse_qty(raw):
-    if not isinstance(raw, int):
-        raise TypeError("qty must be int")
-    if raw < 0:
-        raise TypeError("qty must be >= 0")
+def parse_index(value):
+    if not isinstance(value, int):
+        raise TypeError("value must be int")
+    if value not in VALID:
+        raise TypeError("value is not a known index")
 ```
 - Confirmed by: the contract (specification or a caller's except clause) names the type, the raise on that path uses another type, and the caller relies on it.
 - Refuted by: a custom exception that subclasses the named type (read the class); the caller catches both; no contract names a type.
@@ -191,15 +191,15 @@ def parse_qty(raw):
 
 ### Simplification that is not identical
 - Tell: a finding with `simpler:` and `same behaviour:` lines that proposes `x or default`, `return cond`, `any(...)`, `next(...)`, a merged duplicate, a removed wrapper or a removed try/except.
-- Fails when: the simpler form differs on one input the original handles: `limit or 50` turns an explicit 0 into 50, `return cond` loses a non-bool value, `next(...)` drops a per-item log call, a merged validator loses a `<` versus `<=` boundary, a removed `except ... from exc` changes the exception type callers catch.
+- Fails when: the simpler form differs on one input the original handles: `value or default` turns a legal 0 into the default, `return cond` loses a non-bool value, `next(...)` drops a per-item log call, a merged validator loses a `<` versus `<=` boundary, a removed `except ... from exc` changes the exception type callers catch.
 Bad:
 ```python
-limit = requested if requested is not None else 50
-limit = requested or 50              # proposed: differs for requested = 0
+limit = value if value is not None else FALLBACK
+limit = value or FALLBACK              # proposed: differs for value = 0
 ```
 Good:
 ```python
-limit = requested if requested is not None else 50
+limit = value if value is not None else FALLBACK
 ```
 Not a defect when: the simpler form matches on every input the code can receive, including exceptions and side effects; then CONFIRMED, at 75 if one differing input cannot occur.
 
@@ -220,18 +220,18 @@ Not a defect when: the simpler form matches on every input the code can receive,
 | `with` or try/finally around the handle | Resource leak | Release happens on every path |
 | `quantize(..., rounding=ROUND_HALF_UP)` | Rounding mode | The same mode on every money path |
 
-## Traps
+## Known safe patterns
 
 - `f"... {placeholders}"` where `placeholders` is only `?` marks: the values are bound, so there is no injection.
 - `os.path.join(BASE, "literal.json")`: no input reaches the name, so there is no traversal.
 - `UPDATE t SET n = n + ?` is one atomic statement, but it is a race when a separate earlier read or check decides whether to run it. Refute only when the decision and the write are one conditional statement (`... AND qty >= ?`) with a rowcount check.
 - `with open(...)` or try/finally: the handle is released even when `serialize` raises.
-- `except Exception as exc: raise DomainError(...) from exc` keeps the cause: it is not a swallowed exception.
+- `except Exception as exc: raise AppError(...) from exc` keeps the cause: it is not a swallowed exception.
 - `requests.get(url, timeout=5)` on a constant URL: no untrusted input, so no SSRF.
-- `Decimal(str(value))` is the shortest decimal that round-trips to the float, not the float's exact binary value; it avoids the long binary expansion that `Decimal(value)` shows.
-- `start <= day < end` is correct when the requirement is half-open.
+- A float converted directly keeps its binary value; a conversion that goes through a string keeps the decimal the source wrote. Judge the code by which of the two it does.
+- A half-open comparison is correct when the requirement states a half-open interval.
 - `raise TypeError` for a wrong Python type is correct when the contract names TypeError.
-- A dict written only at import time is not mutable state shared at runtime.
+- A module-level structure is shared runtime state only if some runtime path writes to it; check the writers before reporting it.
 
 ## Do not
 

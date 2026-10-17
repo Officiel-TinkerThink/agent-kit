@@ -10,7 +10,7 @@ BENCH = ROOT / 'benchmarks' / 'code-review'
 CASES = BENCH / 'cases'
 TRUTH = BENCH / 'truth'
 results = []
-EXPECTED = {'spec': 10, 'design': 11, 'security': 9, 'guidance': 8, 'history': 8, 'bug': 6, 'simplicity': 5}
+EXPECTED = {'spec': 10, 'design': 11, 'security': 9, 'guidance': 8, 'history': 8, 'bug': 10, 'simplicity': 5, 'architecture': 15}
 
 
 def check(name, ok, extra=''):
@@ -37,6 +37,9 @@ def main():
                         lines = f.read_text(encoding='utf-8').splitlines()
                         ok = 1 <= item['line'] <= len(lines)
                     check(f'{case}: {kind[:-1]} {item.get("id", "decoy")} cites an existing line {item["file"]}:{item["line"]}', ok)
+                    if axis == 'architecture' and ok:
+                        quote = item.get('quote', '')
+                        check(f'{case}: {kind[:-1]} {item.get("id", "decoy")} quote is on the cited line', bool(quote) and quote in lines[item['line'] - 1], f'quote={quote!r}')
             if not data['defects']:
                 check(f'{case}: clean case has at least two decoys', len(data['decoys']) >= 2, str(len(data['decoys'])))
             if '-h' in case:

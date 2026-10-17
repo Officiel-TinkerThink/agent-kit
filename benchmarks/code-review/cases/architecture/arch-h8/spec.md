@@ -1,0 +1,3 @@
+# Late-fee calculation for overdue invoices
+
+Billing computes a late fee for each invoice that is overdue on the date of a billing run. An invoice is overdue when it is unpaid and the run date is after its due date. The fee is the invoice principal in currency units, multiplied by the customer's monthly late-fee rate, multiplied by the number of whole months the invoice is overdue, rounded half-up to two decimal places. A customer with no configured rate pays no late fee, and an invoice that is not overdue has a fee of zero. The billing use case records each non-zero fee for the invoice before it returns the amount.

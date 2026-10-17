@@ -1,0 +1,68 @@
+"""Order placement and cancellation for the web checkout.
+
+Stock is reserved per cart line before payment is taken. Cancelling an
+open order returns every line of the order to inventory.
+"""
+
+import logging
+
+from cart import cart_total
+from inventory import OutOfStock
+from orders import Order
+from payments import PaymentDeclined
+
+logger = logging.getLogger("shop.checkout")
+
+
+def cancel_order(order, inventory):
+    """Cancel an open order and release all of its reserved stock."""
+    if order.status != "open":
+        raise ValueError(f"order {order.order_id} is {order.status}, not open")
+    for line in order.lines:
+        inventory.release(line.sku, line.qty)
+    order.status = "cancelled"
+    logger.info("cancel_order order_id=%s lines=%d", order.order_id, len(order.lines))
+    return order
+
+
+def _reserve_lines(lines, inventory):
+    """Reserve stock for every line, or reserve nothing and re-raise OutOfStock."""
+    reserved = []
+    try:
+        for line in lines:
+            inventory.reserve(line.sku, line.qty)
+            reserved.append(line)
+    except OutOfStock:
+        for line in reserved:
+            inventory.release(line.sku, line.qty)
+        raise
+    return reserved
+
+
+def place_order(cart, inventory, payments):
+    """Reserve stock for every cart line, then charge the cart total.
+
+    Returns:
+        The placed Order with status "open", or None when the payment is
+        declined. A declined payment leaves the stock as it was before the call.
+
+    Raises:
+        ValueError: when the cart is empty or a line has qty below 1 or a
+            unit price that is not positive. Nothing is reserved in this case.
+        OutOfStock: when any line cannot be reserved. Nothing is reserved in
+            this case.
+    """
+    if not cart.lines:
+        raise ValueError(f"cart {cart.cart_id} has no lines")
+    if any(line.qty < 1 or line.unit_price <= 0 for line in cart.lines):
+        raise ValueError(f"cart {cart.cart_id} has an invalid line")
+    reserved = _reserve_lines(cart.lines, inventory)
+    total = cart_total(cart)
+    try:
+        payments.charge(total)
+    except PaymentDeclined:
+        logger.exception("payment declined cart_id=%s total=%s", cart.cart_id, total)
+        return None
+    order = Order(order_id=cart.cart_id, lines=reserved, status="open")
+    logger.info("place_order order_id=%s lines=%d total=%s", order.order_id, len(reserved), total)
+    return order

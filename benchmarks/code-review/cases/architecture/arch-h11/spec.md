@@ -1,0 +1,3 @@
+# Order total notification: intent
+
+After a shopper checks out, the shop must notify the shopper of the order total. The total is the sum over all cart lines of quantity multiplied by catalogue unit price, in cents, the same rule the cart and checkout already use. The notification step must send the total to a recipient through any notifier that can deliver a text message, so that the shop can swap the delivery channel without changing the use case. The use case returns the total it sent. An unknown SKU must fail with an error that names that SKU, and no notification is sent with a partial total.

@@ -1,0 +1,39 @@
+{
+  "axis": "bug",
+  "case": "bug-h10",
+  "difficulty": "hard",
+  "sources": [
+    "Python exceptions: try, except and re-raise",
+    "Python logging: Logger.exception",
+    "Compensating action for reserved resources (reserve then release on failure)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/checkout.py",
+      "line": 65,
+      "class": "reserved stock not released when place_order exits after reservation (missing compensation before return or propagation)",
+      "in_diff": true,
+      "cross_file": false,
+      "description": "place_order reserves stock for every line (line 59) and then charges the total (line 62). Nothing releases those reservations on any exit after line 59 except the success path. (a) Declined payment: when payments.charge raises PaymentDeclined, the except branch logs and returns None at line 65 without calling inventory.release for the reserved lines. Input: cart C-1 with two lines, SKU-A qty 2 at 5.00 and SKU-B qty 1 at 12.50, inventory with 10 units of each, and a declined card. Wrong result: place_order returns None and inventory.available gives SKU-A 8 and SKU-B 9, so both lines stay reserved. Expected result: the call returns None and inventory.available gives SKU-A 10 and SKU-B 10. The caller treats None as not placed, so the flow looks handled while the stock is lost. (b) Total rounds to zero: input cart C-2 with one line SKU-A qty 1 at unit price 0.004, inventory with 10 units of SKU-A. The line passes validation because the price is positive, cart_total quantizes the total to 0.00, and payments.charge raises ValueError at line 62, which propagates out of place_order. Wrong result: place_order raises ValueError and inventory.available gives SKU-A 9. Expected result: SKU-A 10. (c) Gateway non-decline exception: input cart C-1 as in (a), inventory with 10 units of each, and a gateway that raises TimeoutError. The exception is not caught at line 63 and propagates out of place_order. Wrong result: place_order raises TimeoutError and inventory.available gives SKU-A 8 and SKU-B 9. Expected result: SKU-A 10 and SKU-B 10. All three paths share one root cause, the missing compensating release, so they are one defect. Verified by running the three scenarios against the code folder.",
+      "quote": "return None"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/checkout.py",
+      "line": 37,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Inside _reserve_lines, the except OutOfStock branch releases the lines reserved so far and then re-raises. A failed reservation therefore leaves no stock reserved from this call, which matches the requirement. It is the same release call as the defect path but is correct because the exception propagates.",
+      "quote": "inventory.release(line.sku, line.qty)"
+    },
+    {
+      "file": "code/checkout.py",
+      "line": 22,
+      "kind": "preexisting",
+      "why_not_a_defect": "Unchanged base code in cancel_order. Every line of the order is released before the status changes to cancelled, so cancelling an open order returns all stock. It is correct and lies outside the diff. It must not be reported as the defect, and it is not a model of place_order's failure path, which has no equivalent release.",
+      "quote": "inventory.release(line.sku, line.qty)"
+    }
+  ],
+  "accepted_extras": []
+}

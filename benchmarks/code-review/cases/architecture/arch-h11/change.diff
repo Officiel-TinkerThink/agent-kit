@@ -1,0 +1,44 @@
+--- a/shop/application/notify.py
++++ b/shop/application/notify.py
+@@ -0,0 +1,16 @@
++"""Notification use case: sends the order total to the shopper."""
++
++from __future__ import annotations
++
++from ..domain.cart import Cart
++from ..infrastructure.ports import Notifier as MailSink
++from .ports import CatalogPort
++
++
++def notify_order_total(cart: Cart, catalogue: CatalogPort, notifier: MailSink, recipient: str) -> int:
++    """Compute the cart total from catalogue prices, send it, and return it in cents."""
++    total = 0
++    for sku, quantity in cart.quantities.items():
++        total += catalogue.unit_price_cents(sku) * quantity
++    notifier.send(recipient, f"order total {total} cents")
++    return total
+--- a/shop/main.py
++++ b/shop/main.py
+@@ -2,14 +2,21 @@
+ 
+ from __future__ import annotations
+ 
++from .application.notify import notify_order_total
+ from .application.ports import CatalogPort
+ from .domain.cart import Cart
++from .infrastructure.catalogue import StaticCatalogue
+ from .infrastructure.mailer import ConsoleMailer
+ 
+ 
+ def main(catalogue: CatalogPort) -> None:
+     cart = Cart(cart_id="c-1", quantities={"SKU-1": 2, "SKU-2": 1})
+     mailer = ConsoleMailer(catalogue)
+-    mailer.receipt("shopper@example.com", cart)
++    total = notify_order_total(cart, catalogue, mailer, "shopper@example.com")
++    print(f"total {total}")
+     for line in mailer.outbox:
+         print(line)
++
++
++if __name__ == "__main__":
++    main(StaticCatalogue())

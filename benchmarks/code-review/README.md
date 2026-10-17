@@ -5,16 +5,27 @@ Corpus used to measure the `code-review` agents. 57 small cases over seven axes 
 | Axis | Round-1 cases | Round-1 seeded defects | Round-2 cases | Round-2 seeded defects | Agent measured |
 |---|---|---|---|---|---|
 | `spec` | 7 (spec-01..04, spec-h1..h3) | 18 | spec-h4..h6 | 9 | `code-review:spec-reviewer` |
-| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:design-reviewer` |
+| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:defect-reviewer` (23 of 27 seeded items in these cases are defect-type; the 4 structural items are not scored for it) |
+| `architecture` | - | - | arch-01..06, arch-clean (medium); arch-h7..h10 (hard) | see truth/architecture | `code-review:architecture-reviewer` (layering, adapters, cycles, hardcoded environment values, duplicated rules, unused parameters) |
 | `security` | 7 (sec-01..04, sec-h1..h3) | 18 | security-h4..h5 | 6 | `code-review:security-reviewer` |
 | `guidance` | 6 (guidance-01..03, guidance-h1..h3) | 10 | guidance-h4..h5 | 5 | `code-review:guidance-reviewer` |
 | `history` | 6 (history-01..03, history-h1..h3) | 6 | history-h4..h5 | 4 | `code-review:history-reviewer` |
-| `bug` | - | - | bug-h1..h6 | 15 | `design-reviewer` (bug focus) |
+| `bug` | - | - | bug-h1..h6 | 15 | `code-review:defect-reviewer` |
 | `simplicity` | - | - | simplicity-h1..h5 | 12 | `code-review:simplicity-reviewer` |
 
-Round 1: 33 cases, 70 seeded defects. Round 2: 24 cases, 60 seeded defects. Clean cases (no seeded defect) are listed in `truth/`: round 2 has bug-h6, simplicity-h5 and design-h7. `tests/code-review/test_corpus.py` checks the 57 cases.
+Round 1: 33 cases, 70 seeded defects. Round 2: 24 cases, 60 seeded defects. Clean cases (no seeded defect) are listed in `truth/`: round 2 has bug-h6, simplicity-h5 and design-h7. `tests/code-review/test_corpus.py` checks every answer key: each cited line exists and the quoted text is on that line; hard cases (name contains `-h`) need a base folder and a non-empty change.diff. Architecture cases use whole-code mode (no change.diff) unless the case folder has one; their `in_diff` is false in that mode.
 
 Layout: `cases/<axis>/<case>/` holds `spec.md` (or the rule files in `rules/`, or `history.txt` and `change.diff`) and `code/`. `truth/<axis>/<case>.json` holds `defects` (file, line, description) and `decoys` (code that looks wrong and is fine). A missing-code defect (no audit call, no owner check) is anchored to the line of the function that should contain it. `tests/code-review/test_corpus.py` checks that every cited line exists, that clean cases have no defects and that no answer key is inside a case folder.
+
+## Principle: critique, optimise, revise, never copy the corpus
+
+Every change to a reviewer agent, lens or skill follows one loop:
+
+1. **Critique.** State the general consideration the reviewer missed, in one sentence with no case detail. Run `benchmark-leak-auditor` (`.claude/agents/benchmark-leak-auditor.md`) on the changed text. A `LEAK` verdict blocks acceptance.
+2. **Optimise.** Change the text only to add or sharpen a consideration that a careful reviewer would apply to any codebase. Remove or generalise any exemption written for one decoy.
+3. **Revise.** Re-run the auditor on the revised text, then the benchmark. Benchmark results are evidence of recall and trap hits; they are never a source of wording.
+
+Case IDs, identifiers taken from answer keys, root-cause phrases and scoring results must not appear in prompts, lenses or skills. When a case fails, ask which general consideration was missing from the text; do not ask which sentence would make that case pass.
 
 ## How a run is scored
 
@@ -81,6 +92,49 @@ Tuned total: 51 of 60 seeded defects, 3 trap hits, 2 false positives. Against th
 The found count varies by about ±3 between runs with identical lens text. The trap hits recur: simplicity-h1 (`label_text` rewrite changes behaviour for None), design-h7 (rollback path), and in one run each simplicity-h4 (`average_cents` guard) and bug-h5 (duplicated inclusive-day rule). The false positives come from spec-h4 and spec-h5. Simplicity recall ranges from 6 to 11 of 12 across runs.
 - Status: the agents are benchmarked on 60 seeded defects with three runs each, but the variance is larger than the gap between the tuned lens versions. The trap hits are not yet eliminated. This is not an optimised end state.
 - LENS check: every reviewer prints the marker names it sees. All 33 no-skills (baseline) reports said `LENS: none`; skills reports list the markers.
+
+### Round 3: current lens text, one run per case, semantic re-score
+
+Run with the lens and agent text in this branch (after the leak-free rewrite). 76 cases, one reviewer per case, one run. Scored by one independent Haiku scorer per case (reads the answer key and the report). The per-case reports and scores are in `results/semantic-r3/` and are not committed (`results/` is gitignored); this table is the record.
+
+Score format is found/total per axis. Easy = the `-01..04` cases; hard = the `-h` cases. Clean cases count as "ok" when the reviewer reports no non-accepted finding.
+
+| Axis | Easy (found/total) | Hard (found/total) | Clean cases |
+|---|---|---|---|
+| spec | 9/9 | 15/18 | spec-04 ok |
+| design | 7/9 | 17/18 | design-04 FP 1, design-h7 FP 2 |
+| architecture | 8/8 | 8/8 | arch-clean ok |
+| security | 9/9 | 15/15 | sec-04 ok |
+| guidance | 4/4 | 11/11 | guidance-03 FP 1, guidance-h3 ok |
+| history | 2/2 | 8/8 | history-03 UNCLEAR 1, history-h3 ok |
+| bug | - | 18/19 | bug-h6 ok (2 accepted extras) |
+| simplicity | - | 9/12 | simplicity-h5 FP 2 |
+| **Total** | **39/41** | **101/109** | 7 of 11 clean with no FP |
+
+Overall: 140 of 150 seeded defects found (semantic). Deterministic matcher on the same reports: 142 of 150 (easy 41/41, hard 101/109), 193 findings, 14 accepted extras, 1 trap hit, 7 clean-case FPs, 0 missing reports.
+
+Trap hits (semantic scorer): 0. Deterministic: 1 (spec-h5, a pre-existing purge path).
+False positives (semantic): 28 total, 22 in defect cases and 6 in clean cases.
+
+Where the two scorers disagree (the reason the semantic number is the reference):
+
+| Case | Deterministic | Semantic | Reason |
+|---|---|---|---|
+| design-02 | 3/3 | 1/3 | not investigated |
+| sec-h2 | 1/3 | 3/3 | not investigated |
+| spec-01 | 0 FP | 2 FP | unexplained; not investigated |
+| arch-03 | 2 found | 1 finding | the 2 credits were not checked against the finding count |
+| bug-h2 | D2 matched | D2 partial | matched through a call-site finding at `expiry.py:51`; a strict same-file reading would call it UNCLEAR |
+
+Caveats: one run per case; the scorer's variance is unmeasured; the semantic scorer is itself a Haiku model, not ground truth. Round-to-round differences of 2 or 3 defects are inside the variance seen in the round-2 runs above.
+
+### Next optimisation focus (ordered)
+
+1. **Measure the scorer before tuning.** Re-score the same 76 report files with a second independent scorer and count disagreements per case. Until that is done, a change of 2 defects is not a signal. Use the semantic score as the primary metric and keep the deterministic matcher as a cross-check only.
+2. **Design axis.** It has the most misses and clean-case false positives: design-02 (only if the re-score confirms the miss), design-h6 (2 of 3 in both scorers), and false positives on design-h7 (2) and design-04 (1). Fix these with general considerations (for example, the duplicated-rule and rollback-path checks), never with case wording.
+3. **Simplicity recall and the clean case.** simplicity-h5 (clean) gets 2 false positives, and simplicity-h1 and simplicity-h3 are the recurring misses (9 of 12 overall).
+4. **Spec.** spec-h4 and spec-h6 each miss one defect, and spec-01 has 2 unexplained false positives. Check whether spec-01 is a scorer error before changing the spec lens.
+5. **Repeat runs.** After 1 to 4, run two more full rounds on the hard cases and report the mean and range, as round 2 did.
 
 ## Limits of these numbers
 

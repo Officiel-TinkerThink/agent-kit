@@ -1,0 +1,50 @@
+{
+  "axis": "architecture",
+  "case": "arch-clean",
+  "difficulty": "clean",
+  "sources": [
+    "rules/ARCHITECTURE.md layer rule: domain imports nothing outside domain; application imports domain and ports; adapters implement ports; only the composition root wires adapters",
+    "https://docs.python.org/3/library/typing.html#typing.Protocol (structural port definition)",
+    "https://docs.python.org/3/library/dataclasses.html (frozen dataclass value object)",
+    "https://www.python-httpx.org/ (httpx.Client with base_url and timeout)"
+  ],
+  "defects": [],
+  "decoys": [
+    {
+      "file": "code/main.py",
+      "line": 6,
+      "kind": "safe-looking",
+      "why_not_a_defect": "The composition root is the only module allowed to import an adapter. Line 6 imports HttpTrackingAdapter and line 20 constructs it, which is the wiring the layer rule assigns to the composition root. The use case in application/track.py receives the adapter only through the TrackingPort parameter and never imports it.",
+      "quote": "from adapters.http_tracking import HttpTrackingAdapter"
+    },
+    {
+      "file": "code/application/ports.py",
+      "line": 7,
+      "kind": "safe-looking",
+      "why_not_a_defect": "TrackingPort is a typing.Protocol defined in the application layer. It is the port the rule requires; application imports domain and ports only, and it imports domain.parcel.Parcel (allowed). The adapter implements the port by method shape, and line 12 of adapters/http_tracking.py subclasses it explicitly, which is the adapter-implements-port direction. A Protocol has no implementation and does not create a dependency on httpx.",
+      "quote": "class TrackingPort(Protocol):"
+    },
+    {
+      "file": "code/domain/parcel.py",
+      "line": 7,
+      "kind": "safe-looking",
+      "why_not_a_defect": "Parcel is a frozen dataclass that crosses from adapters/http_tracking.py through the port into application/track.py. It is a value object of the domain layer, so passing it across the boundary is the intended contract and not a leak of adapter types. The domain module imports only the standard library dataclasses module and nothing from application or adapters, so the domain-imports-nothing-outside-domain rule holds.",
+      "quote": "@dataclass(frozen=True)"
+    },
+    {
+      "id": "DECOY4",
+      "file": "code/main.py",
+      "line": 9,
+      "why_not_a_defect": "Literal default base URL in the composition root; the composition root may hold environment defaults.",
+      "quote": "DEFAULT_BASE_URL = \"https://tracking.example.test\""
+    },
+    {
+      "id": "DECOY5",
+      "file": "code/adapters/http_tracking.py",
+      "line": 9,
+      "why_not_a_defect": "Adapter-level timeout constant matching the spec; adapters may hold their own transport settings.",
+      "quote": "DEFAULT_TIMEOUT_S = 5.0"
+    }
+  ],
+  "accepted_extras": []
+}

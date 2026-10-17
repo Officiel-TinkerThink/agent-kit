@@ -1,0 +1,41 @@
+{
+  "axis": "architecture",
+  "case": "arch-h9",
+  "difficulty": "hard",
+  "sources": [
+    "rules/ARCHITECTURE.md domain layer rule: domain may import only the standard library and other domain modules; an import under TYPE_CHECKING used only for annotations is allowed (type-only)",
+    "rules/ARCHITECTURE.md dependency rule: infrastructure is the only place that reads the system clock; domain receives time as a parameter",
+    "https://docs.python.org/3/library/typing.html#typing.TYPE_CHECKING (TYPE_CHECKING is False at runtime, so a guarded import is not executed)"
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "file": "code/domain/accrual.py",
+      "line": 19,
+      "class": "layer direction violated: domain imports infrastructure at runtime",
+      "in_diff": true,
+      "cross_file": true,
+      "description": "Quoted line 19: from infrastructure.clock import today_utc, inside the body of resolve_as_of. It is a real runtime import (not under TYPE_CHECKING), executed on the fallback path when neither as_of nor clock is given. The domain module depends on the infrastructure layer, which the rule forbids (domain may import only the standard library and domain modules), and the function reads the system clock itself, which the dependency rule reserves for infrastructure. The import sits inside a function body, so a module-level import review does not show it; the defect is visible only in the diff hunk and at the line. Failing input: accrue_interest(Decimal('1000'), Decimal('0.05'), date(2026, 1, 1)) with no as_of and no clock reaches line 19 and imports infrastructure.clock. The base version raised ValueError on this path instead. Rule violated: domain layer import rule and dependency rule. The import at line 8 is type-only and is not part of this defect.",
+      "evidence": "Static reading of code/domain/accrual.py lines 7-8 and 19 and of rules/ARCHITECTURE.md. Line 8 sits under if TYPE_CHECKING: and is used only in annotations; line 19 is a runtime import in a function body.",
+      "quote": "from infrastructure.clock import today_utc"
+    }
+  ],
+  "decoys": [
+    {
+      "file": "code/domain/accrual.py",
+      "line": 8,
+      "kind": "safe-looking",
+      "why_not_a_defect": "from infrastructure.clock import Clock sits under if TYPE_CHECKING: and Clock is used only in annotations (clock: Clock | None, with from __future__ import annotations). TYPE_CHECKING is False at runtime, so the import never executes and creates no runtime dependency. The rule file allows type-only imports under TYPE_CHECKING. Only the runtime import on line 19 is faulty.",
+      "quote": "from infrastructure.clock import Clock"
+    },
+    {
+      "id": "PRE1",
+      "kind": "preexisting",
+      "file": "code/infrastructure/clock.py",
+      "line": 13,
+      "quote": "return datetime.now(timezone.utc).date()",
+      "why_not_a_defect": "Unchanged infrastructure clock; reads the wall clock, which is allowed in infrastructure and outside this diff."
+    }
+  ],
+  "accepted_extras": []
+}

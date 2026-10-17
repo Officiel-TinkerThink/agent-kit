@@ -4,7 +4,7 @@ Focused, read-only Haiku 5.5 code-review agents plus an independent validator, a
 
 ## What a review should focus on
 
-In priority order: (1) correctness against the written spec; (2) vulnerabilities in the changed code; (3) design weaknesses and bugs that cause a concrete failure (design-reviewer covers both; there is no separate bug reviewer); (4) the project's own written rules (CLAUDE.md, CONTRIBUTING, comments that say what must not change); (5) regressions the history reveals. Not worth reporting: style, anything a linter, type checker or compiler catches, pre-existing issues, speculative issues with no failure scenario, test-coverage wishes unless a rule requires them.
+In priority order: (1) correctness against the written spec; (2) vulnerabilities in the changed code; (3) behavioural defects on a reachable path (defect-reviewer) and structure that breaks a documented rule or forces a named change (architecture-reviewer); (4) the project's own written rules (CLAUDE.md, CONTRIBUTING, comments that say what must not change); (5) regressions the history reveals. Not worth reporting: style, anything a linter, type checker or compiler catches, pre-existing issues, speculative issues with no failure scenario, test-coverage wishes unless a rule requires them.
 
 ## Agents
 
@@ -13,7 +13,8 @@ Always call them by the full name.
 | Agent | One focus | Input it needs | Effort |
 |---|---|---|---|
 | `code-review:spec-reviewer` | Code against its spec: missing, partial, wrong, unrequested | spec path, code or diff | high |
-| `code-review:design-reviewer` | Swallowed exceptions, hidden global state, non-idempotent retries, missing transaction boundaries, hardcoded hosts, duplicated rules, ignored parameters | intent line, code or diff | high |
+| `code-review:defect-reviewer` | Wrong results, boundary and empty-value errors, unit confusion, swallowed exceptions, non-idempotent retries, missing transaction boundaries, check-then-act races, resources not released, ignored parameters | intent line, code or diff | high |
+| `code-review:architecture-reviewer` | Layer direction, core importing adapters, framework types crossing boundaries, concrete dependencies built in logic, leaky abstractions, duplicated rules, cycles, god classes, speculative generality | intent line, rule source, code or diff | high |
 | `code-review:security-reviewer` | OWASP Top 10 and CWE checklist, source-to-sink tracing, missing controls (auth, audit trail) | intent line, code or diff | high |
 | `code-review:guidance-reviewer` | CLAUDE.md, CONTRIBUTING, standards, guidance comments in the code | rule file paths, code or diff | high |
 | `code-review:history-reviewer` | Guards, limits and review comments from earlier commits that the change undoes | history digest, change, code | high |

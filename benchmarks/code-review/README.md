@@ -5,11 +5,11 @@ Corpus used to measure the `code-review` agents. 57 small cases over seven axes 
 | Axis | Round-1 cases | Round-1 seeded defects | Round-2 cases | Round-2 seeded defects | Agent measured |
 |---|---|---|---|---|---|
 | `spec` | 7 (spec-01..04, spec-h1..h3) | 18 | spec-h4..h6 | 9 | `code-review:spec-reviewer` |
-| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:design-reviewer` |
+| `design` | 7 (design-01..04, design-h1..h3) | 18 | design-h4..h7 | 9 | `code-review:architecture-reviewer` (design axis is a hypothesis; its seeds may include defect-type items, measure before trusting) |
 | `security` | 7 (sec-01..04, sec-h1..h3) | 18 | security-h4..h5 | 6 | `code-review:security-reviewer` |
 | `guidance` | 6 (guidance-01..03, guidance-h1..h3) | 10 | guidance-h4..h5 | 5 | `code-review:guidance-reviewer` |
 | `history` | 6 (history-01..03, history-h1..h3) | 6 | history-h4..h5 | 4 | `code-review:history-reviewer` |
-| `bug` | - | - | bug-h1..h6 | 15 | `design-reviewer` (bug focus) |
+| `bug` | - | - | bug-h1..h6 | 15 | `code-review:defect-reviewer` |
 | `simplicity` | - | - | simplicity-h1..h5 | 12 | `code-review:simplicity-reviewer` |
 
 Round 1: 33 cases, 70 seeded defects. Round 2: 24 cases, 60 seeded defects. Clean cases (no seeded defect) are listed in `truth/`: round 2 has bug-h6, simplicity-h5 and design-h7. `tests/code-review/test_corpus.py` checks the 57 cases.

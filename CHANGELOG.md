@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Changed
+- **Breaking:** the `code-review` plugin splits its `design-reviewer` into two agents with their own lenses. `code-review:defect-reviewer` (lens `defect-lens`) finds behavioural defects on a reachable path: wrong results, boundary and empty-value errors, unit or type confusion, swallowed exceptions, non-idempotent retries, missing transaction boundaries, check-then-act races and resources not released. `code-review:architecture-reviewer` (lens `architecture-lens`) finds structure that breaks a documented dependency rule or forces a named change: layer direction, core code importing adapters, concrete dependencies built inside logic, leaky abstractions, duplicated rules, cycles and speculative generality. The `code-review:finding-validator` and `/code-review:review` flow are unchanged. If you named `code-review:design-reviewer` in your own prompts or settings, use the defect or the architecture agent instead. `benchmarks/code-review/` maps the `bug` axis to the defect agent and the `design` axis to the architecture agent; the design mapping is a hypothesis to measure.
+
 ## [0.2.8] - 2026-10-17
 
 ### Added

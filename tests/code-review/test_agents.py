@@ -9,12 +9,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / 'plugins' / 'code-review'
 results = []
-REVIEWERS = ['spec-reviewer', 'design-reviewer', 'security-reviewer', 'guidance-reviewer', 'history-reviewer', 'simplicity-reviewer']
+REVIEWERS = ['spec-reviewer', 'defect-reviewer', 'architecture-reviewer', 'security-reviewer', 'guidance-reviewer', 'history-reviewer', 'simplicity-reviewer']
 ALL = REVIEWERS + ['finding-validator']
-LENS_OF = {'spec-reviewer': 'spec-lens', 'design-reviewer': 'design-lens', 'security-reviewer': 'security-lens',
+LENS_OF = {'spec-reviewer': 'spec-lens', 'defect-reviewer': 'defect-lens', 'architecture-reviewer': 'architecture-lens', 'security-reviewer': 'security-lens',
            'guidance-reviewer': 'guidance-lens', 'history-reviewer': 'history-lens', 'simplicity-reviewer': 'simplicity-lens', 'finding-validator': 'validator-lens'}
-SKILLS = ['review-craft', 'spec-lens', 'design-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
-CATALOG_LENSES = ['spec-lens', 'design-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
+SKILLS = ['review-craft', 'spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens', 'validator-lens']
+CATALOG_LENSES = ['spec-lens', 'defect-lens', 'architecture-lens', 'security-lens', 'guidance-lens', 'history-lens', 'simplicity-lens']
 
 
 def check(name, ok, extra=''):
@@ -54,7 +54,7 @@ def main():
     plugin = json.loads((PLUGIN / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
     check('plugin name is code-review', plugin['name'] == 'code-review')
     found = sorted(p.stem for p in (PLUGIN / 'agents').glob('*.md'))
-    check('the seven agents exist and no others', found == sorted(ALL), str(found))
+    check('the eight agents exist and no others', found == sorted(ALL), str(found))
     rows = budgets()
     for name in ALL:
         raw = (PLUGIN / 'agents' / (name + '.md')).read_text(encoding='utf-8')

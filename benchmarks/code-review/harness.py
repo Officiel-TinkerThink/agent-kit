@@ -27,8 +27,8 @@ PLUGIN = ROOT / 'plugins' / 'code-review'
 CASES = BENCH / 'cases'
 TRUTH = BENCH / 'truth'
 RESULTS = BENCH / 'results'
-AGENT_OF = {'spec': 'spec-reviewer', 'design': 'design-reviewer', 'security': 'security-reviewer', 'guidance': 'guidance-reviewer', 'history': 'history-reviewer',
-            'bug': 'design-reviewer', 'simplicity': 'simplicity-reviewer'}
+AGENT_OF = {'spec': 'spec-reviewer', 'design': 'architecture-reviewer', 'security': 'security-reviewer', 'guidance': 'guidance-reviewer', 'history': 'history-reviewer',
+            'bug': 'defect-reviewer', 'simplicity': 'simplicity-reviewer'}
 INTENT_LABEL = {'spec': 'Spec', 'design': 'Intent', 'security': 'Intent', 'guidance': 'Intent', 'history': 'Intent', 'bug': 'Intent', 'simplicity': 'Intent'}
 
 
@@ -179,7 +179,7 @@ def main():
         p.add_argument('--workers', type=int, default=8)
         p.add_argument('--window', type=int, default=10)
         p.add_argument('--tag', default='', help='suffix for the results folder, for example -r2')
-        p.add_argument('--agent-map', default='', help='axis=agent overrides, for example bug=design-reviewer,simplicity=design-reviewer')
+        p.add_argument('--agent-map', default='', help='axis=agent overrides, for example bug=defect-reviewer,simplicity=simplicity-reviewer')
         p.set_defaults(fn=fn)
     a = ap.parse_args()
     a.fn(a)

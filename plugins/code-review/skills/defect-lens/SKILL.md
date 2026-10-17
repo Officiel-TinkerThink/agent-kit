@@ -1,13 +1,13 @@
 ---
-name: design-lens
-description: "Focus-mode lens for design and failure-mode hazards in state changes, retries, concurrency and resources. Preloaded into design-reviewer; not for direct use."
+name: defect-lens
+description: "Focus-mode lens for behavioural defects: wrong results on reachable paths, boundary and empty-value errors, state changes, retries, concurrency and resources that fail when a call fails, a process dies or a second actor runs. Preloaded into defect-reviewer; not for direct use."
 user-invocable: false
 ---
-LENS-MARKER: design-lens v1
+LENS-MARKER: defect-lens v1
 
-# Design Lens
+# Defect Lens
 
-Finds code that is correct on the happy path and wrong when a call fails, a process dies, or a second actor runs.
+Finds code that is correct on the happy path and wrong on a path a real caller can take: a boundary input, a missing value, a call that fails, a process that dies, or a second actor that runs.
 Work from the failure sequence: every finding names the state left behind and the input or interleaving that leaves it.
 
 ## How to look
@@ -22,7 +22,7 @@ Work from the failure sequence: every finding names the state left behind and th
 ## Catalog
 
 ### Dual write without outbox
-- Tell: a DB commit followed by a broker, HTTP or file write, with no shared transaction and no outbox row.
+- Tell: a DB commit followed by a broker, HTTP or file write, with no shared transaction and no outbox row; or a publish inside the transaction block, before the commit (consumers then act on a row that may roll back).
 - Fails when: save() commits, then publish() raises or the process dies. The order exists, the event never leaves, and downstream never sees it.
 - Bad:
 ```python
@@ -98,7 +98,7 @@ if redis.set("job:lock", worker_id, nx=True, ex=30):
 - Good: take a monotonically increasing fencing token with the lock and have the storage reject any write carrying an older token.
 - Not a defect when: the lock guards a read-only cache refresh, or the write is conditional on a version column that the stale holder cannot match.
 ### Missing timeout on outbound call
-- Tell: a `requests`, `urllib`, raw socket, or DB/queue client call with no timeout argument and no timeout set on the client or session (these libraries have no default timeout). Skip httpx (default 5 s) unless the diff sets `timeout=None`. Also not a defect: a fixed third-party URL constant that is identical in every environment (see Hardcoded host or port).
+- Tell: a `requests`, `urllib`, raw socket, or DB/queue client call with no timeout argument and no timeout set on the client or session (these libraries have no default timeout). Skip httpx (default 5 s) unless the diff sets `timeout=None`. Also not a defect: a fixed third-party URL constant that is identical in every environment (hardcoded hosts are covered by the architecture lens).
 - Fails when: the peer accepts the TCP connection and never answers; the worker blocks forever and the pool drains to zero.
 - Bad:
 ```python
@@ -139,7 +139,7 @@ hits = {}
 def track(client_ip):
     hits[client_ip] = hits.get(client_ip, 0) + 1   # never evicted
 ```
-- Good: a bounded structure with eviction: `cachetools.LRUCache(maxsize=N)`, or an OrderedDict with explicit eviction (`d[k] = v; d.move_to_end(k); if len(d) > N: d.popitem(last=False)`); a store with TTL; or `queue.Queue(maxsize=N)` for queues.
+- Good: a bounded structure with eviction: `cachetools.LRUCache(maxsize=N)`, or an OrderedDict with explicit eviction (set `d[k] = v`, call `d.move_to_end(k)`, then while `len(d) > N` call `d.popitem(last=False)`); a store with TTL; or `queue.Queue(maxsize=N)` for queues.
 - Not a defect when: the keys come from a fixed enumeration (for example the twelve month names), or the dict is built per request and discarded.
 ### Partial failure with no compensation
 - Tell: a sequence of external side effects (charge, reserve, send) with no compensating action for a failure after the first one.
@@ -178,18 +178,6 @@ def query(sql):
 ```
 - Good: pass the tenant as an argument, or store it in a `contextvars.ContextVar` set per request.
 - Not a defect when: the global is loaded once at import and never reassigned, or it is a ContextVar.
-### Leaky abstraction
-- Tell: a method returns the internal connection, session, file handle or mutable list that the class relies on.
-- Fails when: a caller commits or closes the shared connection; another method silently loses its transaction and writes nothing.
-- Bad:
-```python
-class Repo:
-    def __init__(self): self._conn = connect()
-    def conn(self):
-        return self._conn      # callers now control transactions
-```
-- Good: expose domain methods only; keep the connection private and scope transactions in a context manager.
-- Not a defect when: the accessor returns a copy or a read-only view, or it is used only inside the same module and documented as such.
 ### Temporal coupling
 - Tell: a method reads state that only another method sets (self._rows set in load()), with no guard or error for the wrong call order.
 - Fails when: export() runs before load(); the caller gets an AttributeError with no domain message, or stale data when load() ran earlier.
@@ -202,18 +190,6 @@ class Report:
 ```
 - Good: pass the rows to the constructor, load inside export(), or raise a domain error when the object is not loaded.
 - Not a defect when: a factory always calls load() and every caller in the repo goes through that factory (check the callers).
-### Duplicated rule with different strictness
-- Tell: the same validation or limit implemented in two places with different conditions.
-- Fails when: the API accepts "a@b" with `"@" in email` while the form rejects it; or the API accepts a value the database constraint rejects, so the user gets a 500.
-- Bad:
-```python
-def api_valid(email):
-    return "@" in email
-def form_valid(email):
-    return re.fullmatch(r"[^@]+@[^@]+\.[^@]+", email) is not None
-```
-- Good: one function in one module, imported by both paths.
-- Not a defect when: the two checks are deliberately staged (a cheap edge pre-filter and the full check before persistence), and both are documented; or the two rules serve different operations that the spec or rules say must differ (refunds retry only on 503, charges retry on connection errors).
 ### Ignored parameter
 - Tell: a parameter in the signature (dry_run, force, timeout) that the body never reads.
 - Fails when: the caller passes dry_run=True to preview; the rows are deleted anyway.
@@ -225,16 +201,6 @@ def purge(ids, dry_run=False):
 ```
 - Good: `if dry_run: return len(ids)` before the loop, or remove the parameter if it is not part of the contract.
 - Not a defect when: the signature is fixed by a framework hook or an interface the change cannot alter, and the docstring says it is unused.
-### Hardcoded host or port
-- Tell: a literal IP, hostname or port inside the function body rather than in settings.
-- Fails when: the code deploys to a second environment and connects to the first environment's address, or to a different service on the same port.
-- Bad:
-```python
-def make_client():
-    return Client(host="10.20.0.15", port=8443)   # one environment only
-```
-- Good: read host and port from settings with no default for required values, and fail fast at startup when they are missing.
-- Not a defect when: the literal is a loopback default for local development passed through settings, or a fixed public constant such as port 443 for https.
 ### Clock skew across hosts
 - Tell: a timestamp written by one host and compared with time.time() or datetime.now() on another host for expiry or ordering.
 - Fails when: the writer's clock is 3 s ahead; a lease looks valid for 3 s after it expired; two workers hold the same lease.
@@ -245,17 +211,6 @@ def lease_valid(expires_at):
 ```
 - Good: take the expiry comparison on one clock (the database `now()` or a lease service), or subtract an explicit, documented skew margin.
 - Not a defect when: both timestamps come from one process, or time.monotonic() measures a local interval.
-### God class forced by the change
-- Tell: the change or a named test must construct a large class whose unrelated collaborators (mail, PDF, billing) are required at construction.
-- Fails when: a change to PDF rendering needs a billing client to construct Platform; the billing test breaks on an unrelated rendering change.
-- Bad:
-```python
-class Platform:
-    def __init__(self, billing, mailer, pdf):   # all required
-        self.billing, self.mailer, self.pdf = billing, mailer, pdf
-```
-- Good: inject only the collaborator the changed code needs, or split the class along the reason it changes.
-- Not a defect when: the class is large but cohesive, or no change and no test in scope needs its unrelated parts.
 ### Multi-step write without transaction
 - Tell: two or more writes in one function, each committed separately, where the second write uses the id of the first.
 - Fails when: insert_order() commits and insert_lines() raises; an order with no lines exists and downstream reads it as complete.
@@ -268,17 +223,6 @@ db.commit()
 ```
 - Good: one transaction (`with db.begin():`) around both writes, so both commit or neither does.
 - Not a defect when: one statement writes both (a CTE), or the second write does not depend on the first.
-### Publish before commit
-- Tell: a broker or HTTP publish inside the transaction block, before the commit.
-- Fails when: publish succeeds and the commit then fails; consumers act on an event for an order that does not exist.
-- Bad:
-```python
-with db.begin():
-    db.save(order)
-    broker.publish("order.placed", order.id)   # sent before commit
-```
-- Good: publish after commit, or through an outbox row in the same transaction as in Dual write without outbox.
-- Not a defect when: the consumer retries until the row is visible and the event is only a hint.
 ### Lock release without owner check
 - Tell: `redis.delete(key)` or DEL in a finally block, without comparing the stored value to this holder's token.
 - Fails when: the lock expires during slow_step; worker B takes it; worker A's finally deletes B's lock; worker C takes it; two holders run.
@@ -328,7 +272,12 @@ with open(state_path, "w") as f:
 - Not a defect when: the file is a scratch file rebuilt on every start, or the write is already the atomic rename above.
 ### Float used for money or dose rounding
 - Tell: `round(x, 2)`, `int(x * 1000)` or a float product feeding a limit, a label or a total where the intent names a rounding mode or an exact unit.
-- Fails when: `round(0.125, 2)` gives 0.12 (ties to even and binary error) where half-up needs 0.13; `int(1.001 * 1000)` gives 1000; two paths round at different steps so a label total and an API total differ by more than the stated tolerance.
+- Fails when: `round(0.125, 2)` gives 0.12 (the exact tie rounds to even) where half-up needs 0.13; `int(1.001 * 1000)` gives 1000; two paths round at different steps so a label total and an API total differ by more than the stated tolerance.
+- Bad:
+```python
+price = round(unit_price * qty, 2)     # float: ties round to even
+```
+- Good: `Decimal(str(unit_price)) * qty` then `.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)`.
 - Not a defect when: the code uses `Decimal` with `quantize` and an explicit rounding mode, or the value is an integer count.
 ### Wall-clock arithmetic across DST or for a duration
 - Tell: `aware_local + timedelta(hours=24)`, naive `datetime.now()` compared with aware stamps, or `time.time()` differences used as elapsed time.
@@ -337,10 +286,22 @@ with open(state_path, "w") as f:
 ### Offset pagination over a non-total order
 - Tell: `ORDER BY created_at` (or a sort key with ties) plus `OFFSET`/slicing, or a loop that stops on `len(page) < size` before writing that page.
 - Fails when: rows with equal timestamps swap places between pages, an insert repeats a row and a delete skips one; the last partial page is dropped.
+- Bad:
+```python
+page = db.execute("SELECT id, created_at FROM events ORDER BY created_at LIMIT %s OFFSET %s", (size, offset))   # ties on created_at
+```
+- Good: order by `(created_at, id)` and walk with a keyset condition on that pair.
 - Not a defect when: the key ends in a unique id, or the walk is keyset-based on the full key.
 ### Late-binding closure in a loop
 - Tell: `lambda: f(name)` or a nested function appended inside `for name in ...` that reads the loop variable later.
 - Fails when: every callback sees the last value of `name`.
+- Bad:
+```python
+handlers = []
+for name in names:
+    handlers.append(lambda: run(name))   # every handler sees the last name
+```
+- Good: `handlers.append(lambda name=name: run(name))` or `functools.partial(run, name)`.
 - Not a defect when: the value is bound as a default argument (`lambda n=name: f(n)`) or with `functools.partial`.
 ### Number parsing that guesses the separator
 - Tell: `float(s.replace(",", "."))`, locale-dependent `float()`, or a regex that accepts any digit run.
@@ -352,7 +313,13 @@ with open(state_path, "w") as f:
 - Not a defect when: the code raises at the limit or the width covers every value the caller can produce.
 ### Non-finite number accepted by validation
 - Tell: `if x < 0: raise` or `if x > MAX: raise` on a float that can be NaN or infinity.
-- Fails when: `nan < 0` and `nan > MAX` are both False, so NaN passes and reaches a label or a total; `Decimal("NaN")` raises `InvalidOperation` instead of the documented error.
+- Fails when: `nan < 0` and `nan > MAX` are both False, so NaN passes and reaches a label or a total; an ordering comparison on `Decimal("NaN")` raises `InvalidOperation` instead of the documented error.
+- Bad:
+```python
+if amount < 0 or amount > MAX:      # NaN passes both tests
+    raise ValueError("amount out of range")
+```
+- Good: `if not math.isfinite(amount) or amount < 0 or amount > MAX: raise ValueError(...)`.
 - Not a defect when: the value comes from an integer parse, or `math.isfinite` is checked first.
 ### Wrong result on a reachable path
 - Tell: a branch, boundary, default or null path that returns a value the caller's use of it contradicts (for example an implicit `None` return that the caller does arithmetic on). Cite the caller line and the returning line; trace one concrete input.
@@ -369,6 +336,44 @@ def net(total):
 ```
 - Good: an explicit `return 0.0` on the fall-through path, matching what the caller expects.
 - Not a defect when: the caller checks for None before use, or the expected value for that input is not stated by the intent or by any caller (record it under UNCLEAR, with the input and the caller line).
+### Off-by-one at a boundary
+- Tell: a comparison or range whose inclusive or exclusive end differs from the intent (`<` where `<=` is meant, `range(n)` for n items plus one, slice ends, `len(x) - 1` used as a count).
+- Fails when: a charge of exactly the limit is refused, or the last element of a list is never processed; the input at the boundary is a normal value, not an edge case.
+- Bad:
+```python
+def within_limit(amount, limit):
+    return amount < limit      # limit itself is refused
+```
+- Good: state the intended inclusion in the name and the code (`amount <= limit`) and test the boundary value.
+- Not a defect when: the intent or the spec says exclusive, or the boundary value cannot reach the code (a validator above rejects it).
+### None or empty value on a reachable path
+- Tell: an attribute access, index, `[0]`, `first()`, `max()` or `min()` on a value that can be None or empty on a path the caller takes.
+- Fails when: `max([])` raises, or `row.name` runs on a `fetchone()` that returned None for an unknown id; the request returns a 500 instead of the domain error.
+- Bad:
+```python
+row = db.execute("SELECT name FROM users WHERE id=%s", (uid,)).fetchone()
+return row.name           # None for an unknown id
+```
+- Good: check for None before use and raise the domain error (`UserNotFound`), or use the value only after the empty case is handled.
+- Not a defect when: a guard above the line already excludes the empty case (cite it), or the value is non-optional by the schema and the schema is enforced at this boundary.
+### Unit or type confusion
+- Tell: two values of different units or types combined without conversion (seconds with milliseconds, cents with units, a string from a request used as an int, a naive datetime compared with an aware one, local time with UTC).
+- Fails when: a timeout in seconds is passed where milliseconds are expected, so the wait is 1000 times shorter; a string `"10" + 5` path raises or concatenates.
+- Bad:
+```python
+time_limit_ms = settings.timeout_seconds    # seconds stored, ms expected
+```
+- Good: convert at the boundary and name the unit in the variable (`timeout_ms = settings.timeout_seconds * 1000`), or parse request values to the typed field before use.
+- Not a defect when: both operands already share the unit and type (check the producer), or the conversion is applied in the same expression.
+### zip over sequences of unequal length
+- Tell: `zip(a, b)` where the lengths are not guaranteed equal and the code does not check or pass `strict=True`.
+- Fails when: the prices list is shorter than the quantities list; the extra quantity is silently dropped from the total.
+- Bad:
+```python
+total = sum(p * q for p, q in zip(prices, quantities))   # silent truncation
+```
+- Good: `zip(prices, quantities, strict=True)` (Python 3.10 or later; raises ValueError on mismatch) or an explicit length check that raises a domain error.
+- Not a defect when: both sequences are built from the same source in one comprehension, or the lengths are equal by construction (check the producer).
 ## Traps
 
 - `SELECT ... FOR UPDATE` inside a transaction before a write: the lock makes the read-then-write safe.

@@ -1,6 +1,6 @@
 ---
 name: finding-validator
-description: "Use proactively after `code-review:spec-reviewer`, `code-review:design-reviewer`, `code-review:security-reviewer`, `code-review:guidance-reviewer` or `code-review:history-reviewer` to independently check ONE candidate finding against the real code and return CONFIRMED, REFUTED or UNVERIFIABLE with the evidence and a 0-100 confidence on a fixed rubric. One finding per call; send one agent per finding in parallel. Give it the finding text (code line, quote, claim, scenario), the file paths to read, and for spec or guidance findings the spec or rules path. It is the false-positive filter; it never adds new findings."
+description: "Use proactively after `code-review:spec-reviewer`, `code-review:defect-reviewer`, `code-review:architecture-reviewer`, `code-review:security-reviewer`, `code-review:guidance-reviewer` or `code-review:history-reviewer` to independently check ONE candidate finding against the real code and return CONFIRMED, REFUTED or UNVERIFIABLE with the evidence and a 0-100 confidence on a fixed rubric. One finding per call; send one agent per finding in parallel. Give it the finding text (code line, quote, claim, scenario), the file paths to read, and for spec or guidance findings the spec or rules path. It is the false-positive filter; it never adds new findings."
 tools: Read, Grep, Glob
 model: claude-haiku-5-5
 effort: high

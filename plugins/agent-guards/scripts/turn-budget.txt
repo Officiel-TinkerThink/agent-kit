@@ -15,7 +15,8 @@ researcher 40
 triage 60
 verification-runner 15
 spec-reviewer 25
-design-reviewer 25
+defect-reviewer 25
+architecture-reviewer 25
 security-reviewer 25
 guidance-reviewer 25
 history-reviewer 25

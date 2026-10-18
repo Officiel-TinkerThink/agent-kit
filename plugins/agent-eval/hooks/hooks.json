@@ -24,7 +24,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start-log\"",
-            "timeout": 10
+            "timeout": 30
           }
         ]
       }
@@ -35,7 +35,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/subagent-usage-log\"",
-            "timeout": 10
+            "timeout": 30
           }
         ]
       }
@@ -46,7 +46,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-annotator\"",
-            "timeout": 10,
+            "timeout": 30,
             "onFailure": "block"
           }
         ],

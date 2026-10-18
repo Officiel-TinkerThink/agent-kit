@@ -8,6 +8,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from capability import capability_variants, summary  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / 'plugins' / 'haiku-delegation'
@@ -25,11 +28,8 @@ def check(name, ok, extra=''):
 
 def runners():
     out = {}
-    if shutil.which('sh'):
-        out['sh'] = lambda args: ['sh', str(SCRIPTS / 'subagents-init.sh')] + args
-    ps = (shutil.which('powershell.exe') or shutil.which('powershell')) if sys.platform == 'win32' else shutil.which('pwsh')   # not the Windows powershell.exe that WSL exposes through interop: it cannot open Linux paths
-    if ps:
-        out['ps1'] = lambda args: [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPTS / 'subagents-init.ps1')] + args
+    for name, cmd in capability_variants(SCRIPTS / 'subagents-init').items():
+        out[name] = lambda args, cmd=cmd: cmd + args
     return out
 
 
@@ -306,5 +306,5 @@ def main():
 
 
 main()
-print(f'{sum(results)}/{len(results)} passed')
+print(summary(results))
 sys.exit(0 if all(results) else 1)

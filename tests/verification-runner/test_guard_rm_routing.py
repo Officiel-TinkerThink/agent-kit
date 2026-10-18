@@ -12,7 +12,6 @@ WIN = _sys.platform == 'win32'
 _KIT = pathlib.Path(_tf.mkdtemp(prefix='kit_')).resolve()   # long (non 8.3) path: the guards refuse '~' names
 # the projects zone: a fixed drive path on Windows, a real temporary POSIX folder elsewhere (zones not starting with / are ignored on POSIX)
 PRJ = "D:/core/projects" if WIN else str(pathlib.Path(_tf.mkdtemp(prefix='prj_')).resolve() / 'projects')
-PSARGS = ["-NoProfile", "-ExecutionPolicy", "Bypass"] if WIN else ["-NoProfile"]
 (_KIT / 'verification-logs').mkdir(parents=True)
 (_KIT / 'verification-fixtures').mkdir()
 (_KIT / 'safe-rm-policy.json').write_text(_json.dumps({

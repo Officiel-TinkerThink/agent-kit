@@ -30,7 +30,7 @@
           {
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-verification-runner\"",
-            "timeout": 15,
+            "timeout": 30,
             "onFailure": "block"
           }
         ],

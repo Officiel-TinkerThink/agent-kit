@@ -8,8 +8,38 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 
 SH = shutil.which('sh')
+POWERSHELL = shutil.which('powershell.exe') if sys.platform == 'win32' else None
+# Implementations this machine cannot run, as 'name: reason'. Filled by capability_variants(), printed by summary().
+NOT_APPLICABLE = []
+
+
+def capability_variants(script):
+    """The runnable implementations of one capability, keyed like the adapter: {'sh': [...], 'ps1': [...]}.
+    script: the capability's path, with or without a .sh or .ps1 suffix. Linux runs only sh (no PowerShell there, by design).
+    A missing implementation is recorded in NOT_APPLICABLE and printed by summary(), never dropped silently."""
+    script = pathlib.Path(script)
+    name = script.with_suffix('')
+    out = {}
+    if SH:
+        out['sh'] = [SH, str(name) + '.sh']
+    else:
+        NOT_APPLICABLE.append('sh: no POSIX sh on this machine')
+    if POWERSHELL:
+        out['ps1'] = [POWERSHELL, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(name) + '.ps1']
+    elif 'ps1: no Windows PowerShell on this machine' not in NOT_APPLICABLE:
+        NOT_APPLICABLE.append('ps1: no Windows PowerShell on this machine')
+    return out
+
+
+def summary(results):
+    """The suite's final line: 'N/M passed', plus 'K not applicable: <reasons>' when a variant could not run here."""
+    line = f'{sum(results)}/{len(results)} passed'
+    if NOT_APPLICABLE:
+        line += f', {len(NOT_APPLICABLE)} not applicable: ' + '; '.join(NOT_APPLICABLE)
+    return line
 
 
 def run_capability(script, *args, **kwargs):

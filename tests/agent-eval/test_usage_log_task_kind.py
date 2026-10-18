@@ -7,6 +7,9 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from capability import capability_variants, summary  # noqa: E402
 import tempfile
 
 SCRIPTS = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'agent-eval' / 'scripts'
@@ -23,13 +26,7 @@ def check(name, ok, extra=''):
 
 
 def tools():
-    out = {}
-    if shutil.which('sh'):
-        out['sh'] = ['sh', str(SCRIPTS / 'subagent-usage-log.sh')]
-    ps = (shutil.which('powershell.exe') or shutil.which('powershell')) if sys.platform == 'win32' else shutil.which('pwsh')   # not the Windows powershell.exe that WSL exposes through interop: it cannot open Linux paths
-    if ps:
-        out['ps1'] = [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPTS / 'subagent-usage-log.ps1')]
-    return out
+    return capability_variants(SCRIPTS / 'subagent-usage-log')
 
 
 def transcript(brief, answer, n):
@@ -109,5 +106,5 @@ def main():
 
 
 main()
-print(f'{sum(results)}/{len(results)} passed')
+print(summary(results))
 sys.exit(0 if all(results) else 1)

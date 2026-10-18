@@ -74,7 +74,8 @@ if [ "$tool" = Monitor ]; then
   [ "$mp1" = "$mp2" ] || mon_block "tail must read the same log"
   case "$mp1" in "$MON_ROOT"/*) ;; *) mon_block "the log must be inside the verification-logs folder" ;; esac
   mname=${mp1#"$MON_ROOT"/}
-  case "$mname" in */*|.|..|"") mon_block "the log must be a file directly inside the folder" ;; esac
+  case "$mname" in ''|.|..|*[!A-Za-z0-9._-]*) mon_block "the log must be a plain file name directly inside the folder" ;; esac
+  [ "${#mname}" -le 100 ] || mon_block "the log must be a plain file name directly inside the folder"
   printf '%s\n' "$mname" | grep -Eq '^[A-Za-z0-9._-]{1,100}$' || mon_block "the log name has characters that are not allowed"
   exit 0
 fi

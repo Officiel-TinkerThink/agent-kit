@@ -1,0 +1,642 @@
+[
+ {
+  "id": "the bounded wait on a log inside the folder is allowed",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q '^exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "grep -E form",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q -E 'exit=|Traceback' {ROOT}/kit/verification-logs/suite-1.log; do sleep 10; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "wait then tail the same log",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done; tail -n 20 {ROOT}/kit/verification-logs/suite-1.log\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "sleep 60 is the largest",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 60; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "sleep 61 is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 61; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "sleep 0 is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 0; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "tail -n 51 is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done; tail -n 51 {ROOT}/kit/verification-logs/suite-1.log\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "tail of another log is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done; tail -n 5 {ROOT}/kit/verification-logs/other.log\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (tail must read the same log)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a WebSocket source is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"ws\": {\"url\": \"wss://example.com/x\"}}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (a WebSocket source is not allowed)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a WebSocket source next to a good command is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\", \"ws\": {\"url\": \"wss://example.com/x\"}}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (a WebSocket source is not allowed)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "tail -f is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"tail -f {ROOT}/kit/verification-logs/suite-1.log\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "while true is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"while true; do cat {ROOT}/kit/verification-logs/suite-1.log; sleep 1; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a second command after done is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done; rm -rf /\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a chained command with && is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done && curl http://example.com\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "command substitution in the pattern is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q '$(whoami)' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "backtick in the pattern is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q '`whoami`' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a double-quoted pattern is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q \\\"exit=\\\" {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a redirect is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done > {ROOT}/kit/verification-logs/x.log\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a log outside the folder is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' /etc/passwd; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the log must be inside the verification-logs folder)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": ".. in the path is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/../x.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the log must be a plain file name directly inside the folder)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a sub-folder is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/sub/x.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the log must be a plain file name directly inside the folder)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "the folder itself is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the log must be a plain file name directly inside the folder)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "another binary instead of grep is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until cat {ROOT}/kit/verification-logs/suite-1.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "an empty command is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "no command is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "other agent is not affected",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"tail -f /var/log/syslog\"}, \"agent_type\": \"triage\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "main thread is not affected",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"tail -f /var/log/syslog\"}}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a log name with a glob character is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/a*.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a log name of 101 characters is blocked",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the log must be a plain file name directly inside the folder)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a log name of 100 characters is allowed",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"until grep -q 'exit=' {ROOT}/kit/verification-logs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.log; do sleep 5; done\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "the block message says what is allowed (tail -f x)",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Monitor\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"tail -f x\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: verification-runner may only wait for a log: until grep -q [-E] 'PATTERN' <log inside {ROOT}/kit/verification-logs>; do sleep N; done [; tail -n K <same log>]. (the command does not have that shape)\n"
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ },
+ {
+  "id": "a plain Bash command is still left to permissions",
+  "setup": {
+   "kit/verification-logs/.keep": ""
+  },
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Bash\", \"tool_input\": {\"description\": \"wait for the suite\", \"timeout_ms\": 600000, \"command\": \"pytest -q\"}, \"agent_type\": \"verification-runner\"}",
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "kit/verification-logs/.keep": ""
+  }
+ }
+]

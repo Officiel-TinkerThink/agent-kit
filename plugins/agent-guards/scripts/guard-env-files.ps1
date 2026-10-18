@@ -34,7 +34,7 @@ try {
         if (-not $looksLikeFile) {
             # directory-wide (or default-path) search: it must exclude env files with a negated glob
             if ($glob -notmatch '^!\*\*/\.env') {
-                [Console]::Error.WriteLine("BLOCKED (intentional guard, not a hook failure): a directory-wide Grep must exclude real env files. Re-run with glob `"!**/.env*`" (or search named files individually).")
+                [Console]::Error.WriteLine('BLOCKED (intentional guard, not a hook failure): a directory-wide Grep must exclude real env files. Re-run with glob `"!**/.env*`" (or search named files individually).')
                 exit 2
             }
         }

@@ -139,7 +139,10 @@ do_draft() {
   printf 'DRAFT %s\nTITLE %s\nFINGERPRINT %s\nHOOK_ERROR_KINDS %s ANNOTATION_KINDS %s\nNOTHING SENT. Show the draft to the user; submit only after they confirm.\n' "$OUT" "$TITLE" "$FP" "$NERR" "$NANN"
 }
 
-pct() { printf '%s' "$1" | od -An -v -tx1 | tr -d '\n' | sed 's/ /%/g'; }
+# pct <text>: percent-encodes every byte except RFC 3986 unreserved characters (A-Z a-z 0-9 - . _ ~), upper-case hex, as the ps1 twin does
+pct() { printf '%s' "$1" | LC_ALL=C od -An -v -tu1 | LC_ALL=C awk '{ for (i = 1; i <= NF; i++) { c = $i + 0
+  if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 45 || c == 46 || c == 95 || c == 126) printf "%c", c
+  else printf "%%%02X", c } }'; }
 
 do_submit() {
   [ -n "$DRAFT" ] || { printf 'REJECTED: -Draft <file> is required\n'; exit 2; }

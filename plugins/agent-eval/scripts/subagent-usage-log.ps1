@@ -136,7 +136,7 @@ function Get-SubagentRecord {
     }
     $cost = [math]::Round($cost, 5)
     $dur = $null; if ($first -and $last) { $dur = [math]::Round(($last - $first).TotalSeconds, 1) }
-    $sha = $null; if ($tp -and (Test-Path -LiteralPath $tp)) { $sha = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash }
+    $sha = $null; if ($tp -and (Test-Path -LiteralPath $tp)) { $sha = (Get-FileHash -LiteralPath $tp -Algorithm SHA256).Hash.ToLowerInvariant() }   # lower case, as sha256sum prints it
     # the first `Task kind: ...` in the transcript is the brief's own line; empty when there is none
     $taskKind = ''
     # only the first lines are read (the brief is the first user message; a transcript can be large); case-sensitive, like the shell version
@@ -176,7 +176,13 @@ try {
     $logFile = $env:AGENT_USAGE_LOG; if (-not $logFile) { $logFile = Join-Path (Get-KitData) 'usage/agent-usage.jsonl' }
     [void](New-Item -ItemType Directory -Force -Path (Split-Path -Parent $logFile))
     $rec = Get-SubagentRecord -In $in
-    [System.IO.File]::AppendAllText($logFile, (($rec | ConvertTo-Json -Depth 6 -Compress) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
+    $json = $rec | ConvertTo-Json -Depth 6 -Compress
+    # ConvertTo-Json writes 2 for 2.0: write the duration with one decimal place, as the sh twin does
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    if ($null -ne $rec.duration_s) { $json = $json -replace '"duration_s":[^,]*', ('"duration_s":' + ([double]$rec.duration_s).ToString('0.0', $inv)) }
+    # the cost is written with five decimal places, as the sh twin prints it
+    $json = $json -replace '"est_cost_usd":[^,]*', ('"est_cost_usd":' + ([double]$rec.est_cost_usd).ToString('0.00000', $inv))
+    [System.IO.File]::AppendAllText($logFile, ($json + "`n"), (New-Object System.Text.UTF8Encoding($false)))
     exit 0
 } catch {
     try { Add-Content -LiteralPath ((Get-KitData) + '/hook-errors.log') -Value ("{0} subagent-usage-log run record not written: {1}" -f (Get-Date).ToString('o'), $_.Exception.Message) -Encoding UTF8 } catch { }

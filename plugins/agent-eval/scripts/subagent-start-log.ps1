@@ -8,7 +8,8 @@ function Get-KitData {
     return ($d -replace '\\', '/').TrimEnd('/')
 }
 try {
-    $in = [Console]::In.ReadToEnd() | ConvertFrom-Json
+    $in = $null
+    try { $in = [Console]::In.ReadToEnd() | ConvertFrom-Json } catch { exit 0 }   # input that is not JSON: nothing to record (the sh twin is silent too)
     $id = [string]$in.agent_id
     if ($id -cnotmatch '^[A-Za-z0-9_-]{1,100}$') { exit 0 }
     $sid = [string]$in.session_id
@@ -18,7 +19,7 @@ try {
     # the subagent's transcript sits next to the session transcript: <folder of the session file>/<session id>/subagents/agent-<id>.jsonl
     if ($tp -and $sid) {
         $dir = [System.IO.Path]::GetDirectoryName($tp)
-        if ($dir) { $tx = [System.IO.Path]::Combine($dir, $sid, 'subagents', "agent-$id.jsonl") }
+        if ($dir) { $tx = ([System.IO.Path]::Combine($dir, $sid, 'subagents', "agent-$id.jsonl")) -replace '\\', '/' }   # forward slashes, as the sh twin writes them
     }
     $log = $env:AGENT_START_LOG
     if (-not $log) { $log = (Get-KitData) + '/usage/agent-starts.jsonl' }
@@ -31,6 +32,6 @@ try {
     [System.IO.File]::AppendAllText($log, (($rec | ConvertTo-Json -Compress) + "`n"), (New-Object System.Text.UTF8Encoding($false)))
     exit 0
 } catch {
-    try { Add-Content -LiteralPath ((Get-KitData) + '/hook-errors.log') -Value ((Get-Date).ToUniversalTime().ToString('o') + " subagent-start-log: start record not written: $($_.Exception.Message)") } catch { }
+    try { Add-Content -LiteralPath ((Get-KitData) + '/hook-errors.log') -Value ((Get-Date).ToUniversalTime().ToString('o') + " subagent-start-log: start record not written: $($_.Exception.Message)") -ErrorAction Stop } catch { }
     exit 0
 }

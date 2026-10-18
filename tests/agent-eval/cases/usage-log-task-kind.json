@@ -1,0 +1,786 @@
+[
+ {
+  "id": "contracts-reader schema: both footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: schema\\nRead db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent1\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent1\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent1\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"},{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"c009427c773ac8c6a740e80b112c92eb39f53a2691bbf1e1421e89f9c65f64f4\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: schema\\nRead db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader schema: footers present",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: schema\\nRead db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\\nReconciliation: expected 4 / listed 4.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent2\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent2\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent2\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":141,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"0500b2c003542d910e4e4a48c2a3c7847cd7f88f2eb9a082df50bfc467747892\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: schema\\nRead db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\\nReconciliation: expected 4 / listed 4.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader api-spec: Reconciliation required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: api-spec\\nRead api/openapi.yaml\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent3\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent3\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent3\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":102,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"d4675b0ad0a5552fba6c95f0685bd130aab2812fa70429f004931d39a1a7078b\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: api-spec\\nRead api/openapi.yaml\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader migrations: no footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: migrations\\nCheck migrations/\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent4\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent4\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent4\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"8ee90ee0a9bc30a4a3dfad50104bee488741fd1aa407fa1383683cf50fb72618\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: migrations\\nCheck migrations/\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader api-match: no footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: api-match\\nCompare routes\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent5\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent5\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent5\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"3c54d8d21978668fbedb06e6478b76d381c31be050e5cc53a3cadd603818c59d\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: api-match\\nCompare routes\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader mixed kinds: schema applies",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: migrations, schema\\nBoth\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent6\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent6\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent6\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"},{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"5ba4c728cac014d76931d44d75677eec909ef5cd2683faa6f0d64e8d024cc781\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: migrations, schema\\nBoth\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "contracts-reader with no kind line: nothing required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Read db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent7\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent7\", \"agent_type\": \"contracts-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent7\",\"agent_type\":\"contracts-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"c7805ee33622aae72ae702bbcb16de04707c98b2e4f50e8bb8e5512b745f24fd\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Read db/0001.sql\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer inventory: Coverage required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent8\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent8\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent8\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"74c3aaf493d45bbe2bd04994cbaf156eacbcce500dab82f1d05a9f3bf105e1c9\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer inventory: Coverage present",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent9\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent9\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent9\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":102,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"27c8162e8f650ef470051ca35498af88c41e66be8577ebef189d259649c9617b\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nCoverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer locate: Coverage required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: locate\\nWhere is X\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent10\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent10\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent10\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"e01bc99266769ffc7db0c4eeb64e16d394b3c30d821a5944a704298d1f0dea7b\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: locate\\nWhere is X\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer map: Coverage required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: map\\nImports of pkg\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent11\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent11\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent11\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"340c445c0fcda30f19e1a4d28eb586fc657b33162f1e5742eda856e740b23ecf\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: map\\nImports of pkg\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer read: no footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: read\\nWhat does the file say\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent12\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent12\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent12\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"ee1201ae837845a24ce2a0586260fdb28e423216fe23918e158cdf26cb4151af\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: read\\nWhat does the file say\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer tests: no footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: tests\\nList tests\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent13\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent13\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent13\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"2222e3efc00defb15d8b548977725ca32e753b83555cec56cc03d25a21b825d1\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: tests\\nList tests\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "code-explorer with no kind line: nothing required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Where is X\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent14\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent14\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent14\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"ecb01e2ad9593d0a0c15a14ee9500cc34e1cf3732a4130bfa3fce6fc2d00c710\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Where is X\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "whole words only: roadmap is not map",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: roadmap\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent15\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent15\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent15\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"abd2adaa4396d63aa7b536859be2fc64f6280f3aa698cc6657e0226d3a13fafc\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: roadmap\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "whole words only: relocate is not locate",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: relocate\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent16\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent16\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent16\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"28f040037570c501b3cd2350badcb0582e8eaa0b62c25a42e3e985e959855b3d\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: relocate\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "kind text running on into the sentence still finds the kind word",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: locate and report back\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent17\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent17\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent17\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"fdbfd8be0e78e0f8ddd6d95183bb09235cb2167e650314716bf9a8430779683c\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: locate and report back\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "capitalised kind is not a kind (case-sensitive, like the guard)",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: Locate\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent18\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent18\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent18\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"d60ecbd8c7ef97f7f9ebae75d319a9e71b5d6f64e0b96ddac8feb8b6cd6282af\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: Locate\\nq\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "infra-reader pipeline-reader: both footers required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: pipeline-reader\\nRead ci.yml\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent19\", \"agent_type\": \"infra-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent19\", \"agent_type\": \"infra-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent19\",\"agent_type\":\"infra-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"},{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"18fe38ae9b489a2819b12c6b758d7821dd7a60cad15d4c01e46eb6ac81ecbf7e\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: pipeline-reader\\nRead ci.yml\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "infra-reader dependency-reader: none required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: dependency-reader\\nRead manifests\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent20\", \"agent_type\": \"infra-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent20\", \"agent_type\": \"infra-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent20\",\"agent_type\":\"infra-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"ca9772f08601d43be0d4d1d39951353b26933c63af3a1b96a000fde43aed04c3\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: dependency-reader\\nRead manifests\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "triage log-triage: none required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: log-triage\\nRead the log\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent21\", \"agent_type\": \"triage\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent21\", \"agent_type\": \"triage\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent21\",\"agent_type\":\"triage\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"6ba01607e7998a5366e7cc58b8f5e8e772e584598846e78d360d9c4113122fca\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: log-triage\\nRead the log\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "compliance-lister mixed kinds: none required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: audit-coverage-lister, citation-verifier\\nBoth\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent22\", \"agent_type\": \"compliance-lister\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent22\", \"agent_type\": \"compliance-lister\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent22\",\"agent_type\":\"compliance-lister\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"14615c9ed235e4385b1697ec086741645d02fff0cc11f118dcb6920bc7ac161b\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: audit-coverage-lister, citation-verifier\\nBoth\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "researcher advisory-collector: Reconciliation required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: advisory-collector\\nrequests@2.30.0\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent23\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent23\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent23\",\"agent_type\":\"researcher\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"dce8d8d462820517af4e7e0226707f8c1e7170e6e79ab00ae2f85d5dd89e10b8\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: advisory-collector\\nrequests@2.30.0\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "researcher advisory-collector: Reconciliation present",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: advisory-collector\\nrequests@2.30.0\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nReconciliation: 2 advisories listed 2.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent24\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent24\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent24\",\"agent_type\":\"researcher\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":118,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"39fc36616c586b42d7da967ad42174e72628d65eca7922ea4b1aaf27b4aa7982\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: advisory-collector\\nrequests@2.30.0\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\\nReconciliation: 2 advisories listed 2.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "researcher release-diff: none required",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: release-diff\\n2.28 to 2.31\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent25\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent25\", \"agent_type\": \"researcher\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent25\",\"agent_type\":\"researcher\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"722610623ff3fafcfa20c15004b677c8fb60351a2935e7d35b199214256c9121\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: release-diff\\n2.28 to 2.31\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "plugin-prefixed agent type works",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent26\", \"agent_type\": \"agent-eval:code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent26\", \"agent_type\": \"agent-eval:code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent26\",\"agent_type\":\"agent-eval:code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"74c3aaf493d45bbe2bd04994cbaf156eacbcce500dab82f1d05a9f3bf105e1c9\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"Task kind: inventory\\nList env vars\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "legacy schema-reader still requires both",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent27\", \"agent_type\": \"schema-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent27\", \"agent_type\": \"schema-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent27\",\"agent_type\":\"schema-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":true,\"flags\":[{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Reconciliation line\"},{\"code\":\"footer_missing\",\"sev\":\"warn\",\"detail\":\"no Coverage line\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"34f8f711d964aea382ec052083dafd93601ecfa070140f1479372010c1ccda69\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "legacy bulk-reader requires none",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-14T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:01.000Z\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-14T10:00:02.000Z\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent28\", \"agent_type\": \"bulk-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent28\", \"agent_type\": \"bulk-reader\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent28\",\"agent_type\":\"bulk-reader\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":4,\"cache_write\":1000,\"cache_read\":2000,\"output\":200},\"est_cost_usd\":0.00025,\"peak_context\":1502,\"output_chars\":79,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"34f8f711d964aea382ec052083dafd93601ecfa070140f1479372010c1ccda69\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"a\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"b\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"A plain answer with enough text to count as an answer, with nothing else in it.\"}}]}}\n"
+  }
+ }
+]

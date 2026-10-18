@@ -1,0 +1,118 @@
+[
+ {
+  "id": "a start record is written with the ids, the agent type and the type start",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/starts.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "{\"session_id\": \"sess-1\", \"transcript_path\": \"{ROOT}/projects/proj/sess-1.jsonl\", \"cwd\": \"{ROOT}\", \"prompt_id\": \"p1\", \"agent_id\": \"a1b2c3d4e5f60718\", \"agent_type\": \"general-purpose\", \"hook_event_name\": \"SubagentStart\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "starts.jsonl": "{\"schema\":\"agent-start/1\",\"type\":\"start\",\"ts\":\"{TS}\",\"session_id\":\"sess-1\",\"agent_id\":\"a1b2c3d4e5f60718\",\"agent_type\":\"general-purpose\",\"cwd\":\"{ROOT}\",\"transcript\":\"{ROOT}/projects/proj/sess-1/subagents/agent-a1b2c3d4e5f60718.jsonl\"}\n"
+  }
+ },
+ {
+  "id": "an agent id that is a path: exit 0, nothing written",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/bad1.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "{\"session_id\": \"sess-1\", \"transcript_path\": \"{ROOT}/projects/proj/sess-1.jsonl\", \"cwd\": \"{ROOT}\", \"prompt_id\": \"p1\", \"agent_id\": \"../../evil\", \"agent_type\": \"general-purpose\", \"hook_event_name\": \"SubagentStart\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "an agent id with a space: exit 0, nothing written",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/bad2.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "{\"session_id\": \"sess-1\", \"transcript_path\": \"{ROOT}/projects/proj/sess-1.jsonl\", \"cwd\": \"{ROOT}\", \"prompt_id\": \"p1\", \"agent_id\": \"a b\", \"agent_type\": \"general-purpose\", \"hook_event_name\": \"SubagentStart\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "no agent id: exit 0, nothing written",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/bad3.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "{\"session_id\": \"sess-1\", \"transcript_path\": \"{ROOT}/projects/proj/sess-1.jsonl\", \"cwd\": \"{ROOT}\", \"prompt_id\": \"p1\", \"agent_type\": \"general-purpose\", \"hook_event_name\": \"SubagentStart\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "input that is not JSON: exit 0, nothing written",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/bad4.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "not json at all",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "empty input: exit 0, nothing written",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/bad5.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "a session id with odd characters is left out of the transcript path",
+  "steps": [
+   {
+    "env": {
+     "AGENT_START_LOG": "{ROOT}/starts.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "stdin": "{\"session_id\": \"bad session!\", \"transcript_path\": \"{ROOT}/projects/proj/sess-1.jsonl\", \"cwd\": \"{ROOT}\", \"prompt_id\": \"p1\", \"agent_id\": \"aaaa1111\", \"agent_type\": \"general-purpose\", \"hook_event_name\": \"SubagentStart\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "starts.jsonl": "{\"schema\":\"agent-start/1\",\"type\":\"start\",\"ts\":\"{TS}\",\"session_id\":\"\",\"agent_id\":\"aaaa1111\",\"agent_type\":\"general-purpose\",\"cwd\":\"{ROOT}\",\"transcript\":\"\"}\n"
+  }
+ }
+]

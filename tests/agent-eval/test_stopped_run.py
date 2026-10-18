@@ -1,5 +1,7 @@
 """Issue #3: a subagent the user stopped never reaches SubagentStop, so it had no usage record and the annotator could not annotate it. The SubagentStart hook
-(subagent-start-log, PowerShell and sh) now writes a start record, and annotate.py accepts a start-only run. Run: python test_stopped_run.py   (temp data folder)"""
+(subagent-start-log, PowerShell and sh) now writes a start record, and annotate.py accepts a start-only run. The hook's behaviour is replayed from
+cases/subagent-start-log.json through each implementation that runs here (see tests/golden.py); annotate.py is checked here directly.
+Run: python test_stopped_run.py   (temp data folder)"""
 import json
 import os
 import pathlib
@@ -8,11 +10,13 @@ import subprocess
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from capability import capability_variants, summary  # noqa: E402
+import golden  # noqa: E402
+from capability import summary  # noqa: E402
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / 'plugins' / 'agent-eval' / 'scripts'
+CASES = Path(__file__).resolve().parent / 'cases'
 TMP = pathlib.Path(tempfile.mkdtemp(prefix='stoppedrun_'))
 results = []
 
@@ -20,19 +24,6 @@ results = []
 def check(name, ok, extra=''):
     results.append(bool(ok))
     print(('PASS' if ok else 'FAIL'), name, '' if ok else extra)
-
-
-def tools():
-    return capability_variants(SCRIPTS / 'subagent-start-log')
-
-
-def start(cmd, payload, log, raw=None):
-    env = dict(os.environ, AGENT_START_LOG=str(log), AGENT_KIT_DATA=str(TMP / 'kit'))
-    return subprocess.run(cmd, input=raw if raw is not None else json.dumps(payload), capture_output=True, text=True, timeout=120, env=env)
-
-
-def lines(log):
-    return [json.loads(x) for x in pathlib.Path(log).read_text(encoding='utf-8').splitlines()] if pathlib.Path(log).exists() else []
 
 
 def annotation(agent_id, tag):
@@ -53,32 +44,8 @@ def annotate(f, log=None):
 
 
 def main():
-    ts = tools()
-    check('at least one start hook can run here', bool(ts))
-    base = {'session_id': 'sess-1', 'transcript_path': str(TMP / 'projects' / 'proj' / 'sess-1.jsonl'), 'cwd': str(TMP), 'prompt_id': 'p1',
-            'agent_id': 'a1b2c3d4e5f60718', 'agent_type': 'general-purpose', 'hook_event_name': 'SubagentStart'}
-    for t, cmd in ts.items():
-        log = TMP / f'starts-{t}.jsonl'
-        p = start(cmd, base, log)
-        check(f'[{t}] the hook exits 0 and prints nothing', p.returncode == 0 and not p.stdout.strip(), f'{p.returncode} {p.stdout[:100]} {p.stderr[:100]}')
-        rec = lines(log)
-        check(f'[{t}] one start record is written', len(rec) == 1, str(rec))
-        if rec:
-            r = rec[0]
-            check(f'[{t}] the record has the ids, the agent type and the type "start"', r.get('type') == 'start' and r.get('agent_id') == base['agent_id'] and r.get('agent_type') == 'general-purpose' and r.get('session_id') == 'sess-1', str(r))
-            tx = r.get('transcript', '').replace('\\', '/')
-            check(f'[{t}] the transcript path points into the session\'s subagents folder', tx.endswith('/sess-1/subagents/agent-a1b2c3d4e5f60718.jsonl'), tx)
-            check(f'[{t}] the record holds no prompt or message text', set(r) == {'schema', 'type', 'ts', 'session_id', 'agent_id', 'agent_type', 'cwd', 'transcript'}, str(sorted(r)))
-        # input the hook must refuse to write (fail open, exit 0, nothing written)
-        for label, payload, raw in (('an agent id that is a path', dict(base, agent_id='../../evil'), None), ('an agent id with a space', dict(base, agent_id='a b'), None),
-                                    ('no agent id', {k: v for k, v in base.items() if k != 'agent_id'}, None), ('input that is not JSON', None, 'not json at all'), ('empty input', None, '')):
-            bad = TMP / f'bad-{t}-{abs(hash(label))}.jsonl'
-            p = start(cmd, payload, bad, raw=raw)
-            check(f'[{t}] {label}: exit 0 and nothing written', p.returncode == 0 and not bad.exists(), f'{p.returncode} {p.stderr[:100]}')
-        log2 = TMP / f'starts2-{t}.jsonl'
-        start(cmd, dict(base, agent_id='aaaa1111', session_id='bad session!'), log2)
-        r2 = lines(log2)
-        check(f'[{t}] a session id with odd characters is left out of the transcript path', len(r2) == 1 and r2[0].get('transcript') == '' and r2[0].get('session_id') == '', str(r2))
+    # the start hook: recorded behaviour, replayed through each implementation here
+    golden.replay(CASES / 'subagent-start-log.json', SCRIPTS / 'subagent-start-log', results, check)
 
     # the annotator side: a start-only run can be annotated; a normal run and unknown ids behave as before
     log = TMP / 'starts-annot.jsonl'

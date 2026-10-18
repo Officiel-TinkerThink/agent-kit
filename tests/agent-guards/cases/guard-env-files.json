@@ -1,0 +1,54 @@
+[
+ {
+  "id": "a directory-wide Grep by a guarded agent is blocked",
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Grep\", \"tool_input\": {\"pattern\": \"x\", \"path\": \"{ROOT}\"}, \"agent_id\": \"sub1\", \"hook_event_name\": \"PreToolUse\", \"agent_type\": \"secret-candidate-lister\"}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): a directory-wide Grep must exclude real env files. Re-run with glob `\"!**/.env*`\" (or search named files individually).\n"
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "a real .env read is blocked",
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"{ROOT}/.env\"}, \"agent_id\": \"sub1\", \"agent_type\": \"secret-candidate-lister\", \"hook_event_name\": \"PreToolUse\"}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): real env files must not be read by this agent ({ROOT}/.env). Example files (.env.example) are allowed.\n"
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "an example env file stays readable",
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"{ROOT}/.env.example\"}, \"agent_id\": \"sub1\", \"agent_type\": \"secret-candidate-lister\", \"hook_event_name\": \"PreToolUse\"}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "an unguarded agent is not affected",
+  "steps": [
+   {
+    "stdin": "{\"tool_name\": \"Grep\", \"tool_input\": {\"pattern\": \"x\", \"path\": \"{ROOT}\"}, \"agent_id\": \"sub1\", \"hook_event_name\": \"PreToolUse\", \"agent_type\": \"triage\"}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ }
+]

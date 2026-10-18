@@ -115,7 +115,9 @@
     "stderr": ""
    }
   ],
-  "files": {}
+  "files": {
+   "turn-budget/g1": "1\n"
+  }
  },
  {
   "id": "SubagentHandback is neither counted nor blocked; the next real call is the N-th",

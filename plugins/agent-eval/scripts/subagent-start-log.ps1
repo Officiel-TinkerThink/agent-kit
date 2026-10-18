@@ -24,7 +24,7 @@ try {
     $log = $env:AGENT_START_LOG
     if (-not $log) { $log = (Get-KitData) + '/usage/agent-starts.jsonl' }
     $rec = [ordered]@{
-        schema = 'agent-start/1'; type = 'start'; ts = (Get-Date).ToUniversalTime().ToString('o'); session_id = $sid; agent_id = $id
+        schema = 'agent-start/1'; type = 'start'; ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture); session_id = $sid; agent_id = $id
         agent_type = [string]$in.agent_type; cwd = [string]$in.cwd; transcript = $tx
     }
     $folder = Split-Path -Parent $log

@@ -1,8 +1,9 @@
 """Sandbox tests for safe-rm.ps1 / safe-rm-lib.ps1 / safe-rm-restore.ps1. Real files, real junctions, a throwaway policy.
 Run: python test_safe_rm.py   (creates and removes a folder under %LOCALAPPDATA%\\Temp; never touches your real policy, quarantine or audit file)."""
 import sys as _sys
-PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json, os, pathlib, random, shutil, subprocess, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from capability import run_capability   # the OS adapter picks the implementation (PowerShell on Windows, sh on Linux)
 
 HOOKS = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'verification-runner' / 'scripts'
 RM = HOOKS / "safe-rm.ps1"
@@ -39,7 +40,7 @@ def make_policy(name="policy.json", **caps_over):
 
 
 def ps(script, *args):
-    r = subprocess.run([PWSH, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), *map(str, args)], capture_output=True, text=True)
+    r = run_capability(script, *args, capture_output=True, text=True)
     return r.returncode, r.stdout, r.stderr
 
 

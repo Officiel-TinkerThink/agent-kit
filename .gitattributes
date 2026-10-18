@@ -1,3 +1,2 @@
 *.sh text eol=lf
-tests/linux/pwsh text eol=lf
 plugins/*/scripts/*.txt text eol=lf

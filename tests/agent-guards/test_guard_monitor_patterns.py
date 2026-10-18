@@ -1,7 +1,7 @@
 """Regression tests for guard-monitor-patterns.ps1. Run: python test_guard_monitor_patterns.py"""
-import sys as _sys
-PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json, pathlib, subprocess, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from capability import run_capability   # the OS adapter picks the implementation (PowerShell on Windows, sh on Linux)
 
 HOOK = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'agent-guards' / 'scripts' / "guard-monitor-patterns.ps1"
 
@@ -34,10 +34,7 @@ CASES = [
 
 
 def run(payload: str) -> int:
-    p = subprocess.run(
-        [PWSH, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(HOOK)],
-        input=payload, capture_output=True, text=True,
-    )
+    p = run_capability(HOOK, input=payload, capture_output=True, text=True)
     return p.returncode
 
 

@@ -1,0 +1,358 @@
+[
+ {
+  "id": "other agent is not checked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind line at all\", \"subagent_type\": \"log-triage\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "plugin-prefixed other agent is not checked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind line\", \"subagent_type\": \"haiku-delegation:doc-researcher\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "code-explorer locate",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: locate\\nWhere is X\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "code-explorer read",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nAnswer\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "code-explorer tests",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: tests\\nList\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "plugin-prefixed code-explorer",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: map\\nImports\", \"subagent_type\": \"haiku-delegation:code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "several kinds, commas",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: locate, inventory\\nBoth\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "leading blank line is fine",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"\\n\\nTask kind: read\\nAnswer\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "contracts-reader schema",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: schema\\nRead db\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "contracts-reader api-spec",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: api-spec\\nRead spec\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "contracts-reader migrations, api-match",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: migrations, api-match\\nBoth\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "triage log-triage",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: log-triage\\nRead the log\", \"subagent_type\": \"triage\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "infra-reader several kinds",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: pipeline-reader, dependency-reader\\nBoth\", \"subagent_type\": \"infra-reader\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "docs-reader doc-drafter",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: doc-drafter\\nDraft\", \"subagent_type\": \"haiku-delegation:docs-reader\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "compliance-lister citation-verifier",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: citation-verifier\\nClaims\", \"subagent_type\": \"compliance-lister\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "triage missing kind is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Read the log\", \"subagent_type\": \"triage\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for triage must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: log-triage, test-run-summarizer, ticket-classifier (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: log-triage'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "a kind of another topic agent is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: schema\\nx\", \"subagent_type\": \"triage\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for triage must start with a first line 'Task kind: <kind>'. 'schema' is not a kind of this agent. Valid kinds: log-triage, test-run-summarizer, ticket-classifier (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: log-triage'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "compliance-lister with an old kind-less brief is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"List secrets in src/\", \"subagent_type\": \"compliance-lister\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for compliance-lister must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: audit-coverage-lister, secret-candidate-lister, citation-verifier (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: audit-coverage-lister'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "researcher release-diff",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: release-diff\\nVersions 2.28.0 to 2.31.0\", \"subagent_type\": \"researcher\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "researcher advisory-collector, plugin-prefixed",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: advisory-collector\\nrequests@2.30.0\", \"subagent_type\": \"haiku-delegation:researcher\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "researcher missing kind is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"What changed in requests 2.31?\", \"subagent_type\": \"researcher\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for researcher must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: doc-researcher, release-diff, advisory-collector (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: doc-researcher'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "researcher with a kind of another agent is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: log-triage\\nx\", \"subagent_type\": \"researcher\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for researcher must start with a first line 'Task kind: <kind>'. 'log-triage' is not a kind of this agent. Valid kinds: doc-researcher, release-diff, advisory-collector (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: doc-researcher'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "Task tool name alias",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Task\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nA\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "missing kind line is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Where is X defined?\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "kind line not first is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Where is X defined?\\nTask kind: locate\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "contracts-reader missing kind is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Read db/0001.sql\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for contracts-reader must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: schema, api-spec, migrations, api-match (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: schema'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "a kind of the other agent is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: schema\\nRead\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. 'schema' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "unknown kind is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: banana\\nRead\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for contracts-reader must start with a first line 'Task kind: <kind>'. 'banana' is not a kind of this agent. Valid kinds: schema, api-spec, migrations, api-match (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: schema'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "one bad kind among good ones is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: locate, banana\\nRead\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. 'banana' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "empty kind is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind:\\nRead\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "empty prompt is blocked",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "TASK_KIND_GUARD=off allows",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind line\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {
+   "TASK_KIND_GUARD": "off"
+  },
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "TASK_KIND_GUARD=OFF (other case) does not disable",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind line\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {
+   "TASK_KIND_GUARD": "OFF"
+  },
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "uppercase TASK KIND is blocked (case-sensitive)",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"TASK KIND: locate\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "lowercase task kind is blocked (case-sensitive)",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"task kind: locate\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "subagent type in other case is not guarded",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind line\", \"subagent_type\": \"Code-Explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "CRLF line endings are fine",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: locate\\r\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "unparseable input fails open",
+  "stdin": "not json at all",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "empty input fails open",
+  "stdin": "",
+  "env": {},
+  "exit": 0,
+  "stdout": "",
+  "stderr": ""
+ },
+ {
+  "id": "word star",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: *\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. '' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "word question mark",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: ?\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. '' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "word bracket",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: [a-z]*\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. 'a-z' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "bad-word long tag",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: <b>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</b>\\nq\", \"subagent_type\": \"code-explorer\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for code-explorer must start with a first line 'Task kind: <kind>'. 'baaaaaaaaaaaaaaaaaaa' is not a kind of this agent. Valid kinds: locate, read, map, inventory, tests (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: locate'. Re-issue the call with that line added; nothing else changes.\n"
+ },
+ {
+  "id": "no kind for contracts-reader",
+  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"no kind\", \"subagent_type\": \"contracts-reader\"}}",
+  "env": {},
+  "exit": 2,
+  "stdout": "",
+  "stderr": "BLOCKED: the brief for contracts-reader must start with a first line 'Task kind: <kind>'. No such line was found. Valid kinds: schema, api-spec, migrations, api-match (several kinds separated by commas when the task mixes them). Example first line: 'Task kind: schema'. Re-issue the call with that line added; nothing else changes.\n"
+ }
+]

@@ -6,6 +6,9 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from capability import capability_variants, summary  # noqa: E402
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -20,13 +23,7 @@ def check(name, ok, extra=''):
 
 
 def tools():
-    out = {}
-    if shutil.which('sh'):
-        out['sh'] = ['sh', str(SCRIPTS / 'subagent-start-log.sh')]
-    ps = (shutil.which('powershell.exe') or shutil.which('powershell')) if sys.platform == 'win32' else shutil.which('pwsh')   # not the Windows powershell.exe that WSL exposes through interop
-    if ps:
-        out['ps1'] = [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPTS / 'subagent-start-log.ps1')]
-    return out
+    return capability_variants(SCRIPTS / 'subagent-start-log')
 
 
 def start(cmd, payload, log, raw=None):
@@ -110,7 +107,7 @@ def main():
     check('hooks.json runs subagent-start-log on SubagentStart through run.sh, next to inject-context', any('subagent-start-log' in c and 'scripts/run.sh' in c for c in cmds) and any('inject-context' in c for c in cmds), str(cmds))
     ann_md = (SCRIPTS.parent / 'agents' / 'annotator.md').read_text(encoding='utf-8')
     check('annotator.md tells the agent to look in agent-starts.jsonl when there is no run record', 'agent-starts.jsonl' in ann_md and 'never finished' in ann_md)
-    print(f'{sum(results)}/{len(results)} passed')
+    print(summary(results))
     shutil.rmtree(TMP, ignore_errors=True) if TMP.name.startswith('stoppedrun_') and TMP.parent == pathlib.Path(tempfile.gettempdir()) else None
     sys.exit(0 if all(results) else 1)
 

@@ -9,6 +9,9 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from capability import capability_variants, summary  # noqa: E402
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -25,13 +28,7 @@ def check(name, ok, extra=''):
 
 
 def tools():
-    out = {}
-    if shutil.which('sh'):
-        out['sh'] = ['sh', str(SCRIPTS / 'issue-report.sh')]
-    ps = (shutil.which('powershell.exe') or shutil.which('powershell')) if WIN else shutil.which('pwsh')   # not the Windows powershell.exe that WSL exposes through interop
-    if ps:
-        out['ps1'] = [ps, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(SCRIPTS / 'issue-report.ps1')]
-    return out
+    return capability_variants(SCRIPTS / 'issue-report')
 
 
 def make_stub(kind):
@@ -222,7 +219,7 @@ def main():
     check('SKILL.md has no shell-language names and never allows a bare gh call', 'powershell' not in skill.lower() and '.ps1' not in skill and 'allowed-tools: Bash(sh ' in skill and 'Bash(gh' not in skill)
     check('SKILL.md asks the user before submit and says nothing is sent before', 'until the user has read the draft' in skill and 'Ask: ' in skill and 'never submit without the user' in skill)
     check('both twins of issue-report exist', (SCRIPTS / 'issue-report.sh').exists() and (SCRIPTS / 'issue-report.ps1').exists())
-    print(f'{sum(results)}/{len(results)} passed')
+    print(summary(results))
     shutil.rmtree(TMP, ignore_errors=True) if TMP.name.startswith('issuereport_') and TMP.parent == pathlib.Path(tempfile.gettempdir()) else None
     sys.exit(0 if all(results) else 1)
 

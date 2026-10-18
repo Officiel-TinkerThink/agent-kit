@@ -13,6 +13,7 @@ docs-reader 50
 infra-reader 30
 researcher 40
 triage 60
+coordinator 30
 verification-runner 15
 spec-reviewer 25
 defect-reviewer 25

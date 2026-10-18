@@ -3,7 +3,8 @@
 # runs on the main model (Sonnet or Opus) unless the call says `model: "haiku"`: about 20 to 40 times the cost of Haiku. Such a call without a Haiku model is blocked
 # with the message that fixes it. The kit agents pin Haiku in their own definition (haiku-pinned.txt) and are never blocked. Only the main agent's calls are checked.
 # POSIX sh port of guard-agent-model.ps1. Convenience guard, not a safety guard: any parse problem allows the call (fail-open).
-# Set AGENT_MODEL_GUARD=off in the environment to disable it (for a task that really needs another model).
+# Main-agent calls of the built-in general-purpose type are routed to haiku-delegation:coordinator instead of being checked (see below).
+# Set AGENT_MODEL_GUARD=off in the environment to disable it (for a task that really needs another model); this also turns the routing off.
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$KIT_SCRIPT_DIR/lib.sh"
 
@@ -13,10 +14,21 @@ _t=$(printf '%s' "$INPUT" | tr -d ' \t\r\n')
 case "$_t" in \{*\}) ;; *) exit 0 ;; esac
 
 AGENT_ID=$(json_get "$INPUT" agent_id)
-case "$AGENT_ID" in ''|false|0|null) ;; *) exit 0 ;; esac
-
 TYPE=$(json_get "$INPUT" tool_input.subagent_type)
 case "$TYPE" in null) TYPE="" ;; esac
+
+# A bare general-purpose call from the main agent is routed to the kit coordinator (haiku-delegation:coordinator, pinned Haiku) by rewriting
+# subagent_type through updatedInput. One hook does the rewrite and the check, so no other hook can block the call first.
+# AGENT_GENERAL_ROUTE=off turns the routing off and leaves the checks below in place.
+case "$AGENT_ID" in ''|false|0|null)
+  if [ "$TYPE" = general-purpose ] && [ "${AGENT_GENERAL_ROUTE:-on}" != off ]; then
+    RAW=$(json_get "$INPUT" tool_input) || exit 0
+    NEW=$(printf '%s' "$RAW" | awk 'BEGIN { RS = "\001" } { if (match($0, /"subagent_type"[ \t\r\n]*:[ \t\r\n]*"general-purpose"/)) $0 = substr($0, 1, RSTART - 1) "\"subagent_type\": \"haiku-delegation:coordinator\"" substr($0, RSTART + RLENGTH); printf "%s", $0 }')
+    printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"general-purpose routed to haiku-delegation:coordinator\",\"updatedInput\":$NEW}}"
+    exit 0
+  fi ;;
+*) exit 0 ;; esac
+
 BASE="${TYPE##*:}"
 if [ -n "$BASE" ] && tr -d '\r' < "$KIT_SCRIPT_DIR/haiku-pinned.txt" 2>/dev/null | awk -v a="$BASE" '$1 !~ /^#/ && $1 == a { f = 1 } END { exit !f }'; then exit 0; fi
 

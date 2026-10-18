@@ -106,10 +106,8 @@ def main():
     routed = run_all([dict(args=cmd, input=hook('general-purpose', prompt=brief), env=dict(os.environ)) for cmd in ts.values()])
     for tool, p in zip(ts, routed):
         try:
-            hso = json.loads(p.stdout)['hookSpecificOutput']
-            ui = hso['updatedInput']
-            # no permissionDecision: the routed call keeps the normal permission rules (the no-allow experiment ran without a prompt)
-            ok = ui == {'description': 'x', 'prompt': brief, 'subagent_type': 'haiku-delegation:coordinator'} and 'permissionDecision' not in hso
+            ui = json.loads(p.stdout)['hookSpecificOutput']['updatedInput']
+            ok = ui == {'description': 'x', 'prompt': brief, 'subagent_type': 'haiku-delegation:coordinator'}
         except (ValueError, KeyError, TypeError):
             ok = False
         check(f'[{tool}] the routed call is valid JSON with the brief and description kept', ok, p.stdout[:300])

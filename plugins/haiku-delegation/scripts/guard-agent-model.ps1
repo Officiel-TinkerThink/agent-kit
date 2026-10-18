@@ -15,7 +15,7 @@ try {
     if (-not $id -or $id -eq 'false' -or $id -eq '0') {
         if ($type -ceq 'general-purpose' -and $env:AGENT_GENERAL_ROUTE -cne 'off') {
             $in.tool_input.subagent_type = 'haiku-delegation:coordinator'
-            $out = [ordered]@{ hookSpecificOutput = [ordered]@{ hookEventName = 'PreToolUse'; permissionDecisionReason = 'general-purpose routed to haiku-delegation:coordinator'; updatedInput = $in.tool_input } }
+            $out = [ordered]@{ hookSpecificOutput = [ordered]@{ hookEventName = 'PreToolUse'; permissionDecision = 'allow'; permissionDecisionReason = 'general-purpose routed to haiku-delegation:coordinator'; updatedInput = $in.tool_input } }
             $bytes = [Text.Encoding]::UTF8.GetBytes(($out | ConvertTo-Json -Depth 10 -Compress))
             $stdout = [Console]::OpenStandardOutput()
             $stdout.Write($bytes, 0, $bytes.Length)

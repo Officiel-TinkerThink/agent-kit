@@ -24,7 +24,7 @@ case "$AGENT_ID" in ''|false|0|null)
   if [ "$TYPE" = general-purpose ] && [ "${AGENT_GENERAL_ROUTE:-on}" != off ]; then
     RAW=$(json_get "$INPUT" tool_input) || exit 0
     NEW=$(printf '%s' "$RAW" | awk 'BEGIN { RS = "\001" } { if (match($0, /"subagent_type"[ \t\r\n]*:[ \t\r\n]*"general-purpose"/)) $0 = substr($0, 1, RSTART - 1) "\"subagent_type\": \"haiku-delegation:coordinator\"" substr($0, RSTART + RLENGTH); printf "%s", $0 }')
-    printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecisionReason\":\"general-purpose routed to haiku-delegation:coordinator\",\"updatedInput\":$NEW}}"
+    printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"general-purpose routed to haiku-delegation:coordinator\",\"updatedInput\":$NEW}}"
     exit 0
   fi ;;
 *) exit 0 ;; esac

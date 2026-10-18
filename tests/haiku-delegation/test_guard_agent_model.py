@@ -1,4 +1,4 @@
-"""guard-agent-model (PreToolUse on the Agent tool): a main-agent call of the built-in general-purpose type is routed to haiku-delegation:coordinator (updatedInput, JSON checked here). Any other
+"""guard-agent-model (PreToolUse on the Agent tool): a main-agent call of the built-in general-purpose type is routed to haiku-delegation:general-purpose (updatedInput, JSON checked here). Any other
 subagent that is not a kit agent (Explore, Plan, no type) must be called with a Haiku model, and its brief must hold one unit of work (fewer than 4 numbered steps, at most 4000 characters). Kit agents
 (haiku-pinned.txt) pin Haiku themselves and are never blocked. Only the main agent's calls are checked, except that a subagent's call of general-purpose is blocked (AGENT_GENERAL_ROUTE=off lifts that); bad input and the off switches (AGENT_MODEL_GUARD=off, AGENT_BRIEF_GUARD=off) allow the call;
 AGENT_GENERAL_ROUTE=off turns the routing off. Runs the PowerShell and the POSIX sh version (whichever exist here) on the same inputs and requires the same exit code
@@ -48,20 +48,21 @@ def steps(n, text='do a thing'):
 MODEL_MSG = 'would run on the main model'
 UNITS_MSG = 'holds several units of work'
 # label, stdin, env, wanted exit code, text the message must contain
-ROUTED = ['haiku-delegation:coordinator', '"updatedInput"']   # sh keeps the input's spacing, ps1 writes compact JSON: the JSON check below compares the structure
+ROUTED = ['haiku-delegation:general-purpose', '"updatedInput"']   # sh keeps the input's spacing, ps1 writes compact JSON: the JSON check below compares the structure
 CASES = [
-    ('general-purpose without a model is routed to the kit coordinator', hook('general-purpose'), {}, 0, ROUTED),
+    ('general-purpose without a model is routed to the kit general-purpose', hook('general-purpose'), {}, 0, ROUTED),
     ('general-purpose on sonnet is routed too (routing does not depend on the model)', hook('general-purpose', model='sonnet'), {}, 0, ROUTED),
     ('general-purpose on opus is routed too', hook('general-purpose', model='opus'), {}, 0, ROUTED),
     ('general-purpose on haiku is routed too', hook('general-purpose', model='haiku'), {}, 0, ROUTED),
-    ('a routed call skips the brief check (the coordinator splits the brief)', hook('general-purpose', prompt=steps(8)), {}, 0, ROUTED),
-    ('no type and no model is blocked (it would be general-purpose)', hook(None), {}, 2, [MODEL_MSG, '(no type)']),
-    ('no type on haiku is allowed', hook(None, model='haiku'), {}, 0, []),
+    ('a routed call skips the brief check (the general-purpose splits the brief)', hook('general-purpose', prompt=steps(8)), {}, 0, ROUTED),
+    ('no type is routed to the kit general-purpose (an omitted type runs as general-purpose)', hook(None), {}, 0, ROUTED),
+    ('no type on haiku is routed too', hook(None, model='haiku'), {}, 0, ROUTED),
+    ('a subagent with no type is blocked (an omitted type runs as general-purpose)', hook(None, agent_id='abc123'), {}, 2, ['may not call the built-in general-purpose']),
     ('Explore without a model is blocked', hook('Explore'), {}, 2, [MODEL_MSG]),
     ('Plan on haiku is allowed', hook('Plan', model='haiku'), {}, 0, []),
     ('a kit agent with its plugin prefix needs no model', hook('haiku-delegation:code-explorer', prompt='Task kind: read\nq'), {}, 0, []),
     ('a kit agent by its bare name needs no model', hook('code-explorer', prompt='Task kind: read\nq'), {}, 0, []),
-    ('the coordinator needs no model (pinned Haiku)', hook('haiku-delegation:coordinator', prompt=steps(8)), {}, 0, []),
+    ('the general-purpose needs no model (pinned Haiku)', hook('haiku-delegation:general-purpose', prompt=steps(8)), {}, 0, []),
     ('verification-runner needs no model', hook('verification-runner:verification-runner'), {}, 0, []),
     ('a kit agent may have a long brief with many numbered claims', hook('haiku-delegation:compliance-lister', prompt='Task kind: citation-verifier\n' + steps(30) + '\n' + 'x' * 5000), {}, 0, []),
     ('3 numbered steps are one brief', hook('Explore', model='haiku', prompt=steps(3)), {}, 0, []),
@@ -105,16 +106,25 @@ def main():
             check(f'[{tool}] {label}', p.returncode == want and all(t in p.stderr + p.stdout for t in texts), f'exit {p.returncode}, want {want}: {p.stderr[:200]} {p.stdout[:200]}')
     if len(ts) == 2:
         check('sh and ps1 return the same exit codes and the same messages', seen['sh'] == seen['ps1'], '\n'.join(f'{a} | {b}' for a, b in zip(seen['sh'], seen['ps1']) if a != b)[:600])
-    # the routed call is one JSON object: the coordinator as subagent_type, the brief and the description kept unchanged
+    # the routed call is one JSON object: the general-purpose as subagent_type, the brief and the description kept unchanged
     brief = 'Find x.\nThen "y" and \\z.'
     routed = run_all([dict(args=cmd, input=hook('general-purpose', prompt=brief), env=dict(os.environ)) for cmd in ts.values()])
     for tool, p in zip(ts, routed):
         try:
             ui = json.loads(p.stdout)['hookSpecificOutput']['updatedInput']
-            ok = ui == {'description': 'x', 'prompt': brief, 'subagent_type': 'haiku-delegation:coordinator'}
+            ok = ui == {'description': 'x', 'prompt': brief, 'subagent_type': 'haiku-delegation:general-purpose'}
         except (ValueError, KeyError, TypeError):
             ok = False
         check(f'[{tool}] the routed call is valid JSON with the brief and description kept', ok, p.stdout[:300])
+    # an omitted type is routed the same way: the general-purpose is added as subagent_type
+    routed_none = run_all([dict(args=cmd, input=hook(None, prompt=brief), env=dict(os.environ)) for cmd in ts.values()])
+    for tool, p in zip(ts, routed_none):
+        try:
+            ui = json.loads(p.stdout)['hookSpecificOutput']['updatedInput']
+            ok = ui == {'description': 'x', 'prompt': brief, 'subagent_type': 'haiku-delegation:general-purpose'}
+        except (ValueError, KeyError, TypeError):
+            ok = False
+        check(f'[{tool}] an omitted type is routed as valid JSON with the brief and description kept', ok, p.stdout[:300])
 
     # haiku-pinned.txt agrees with the agent files
     pinned = [l.strip() for l in (SCRIPTS / 'haiku-pinned.txt').read_text(encoding='utf-8').splitlines() if l.strip() and not l.startswith('#')]

@@ -1,7 +1,7 @@
 # Agents whose own definition pins Haiku (model: claude-haiku-5-5), one name per line. guard-agent-model never blocks these.
 # Every other subagent type needs `model: "haiku"` in the Agent call. tests/haiku-delegation/test_guard_agent_model.py checks this list against the agent files.
 code-explorer
-coordinator
+general-purpose
 contracts-reader
 infra-reader
 docs-reader

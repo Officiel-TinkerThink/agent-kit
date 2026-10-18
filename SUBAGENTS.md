@@ -27,7 +27,7 @@ A topic agent replaces several narrower agents (12 agents in all). Each kind of 
 | `triage` | `log-triage`, `test-run-summarizer`, `ticket-classifier` | low; `effort: medium` for `ticket-classifier` |
 | `compliance-lister` | `audit-coverage-lister`, `secret-candidate-lister`, `citation-verifier` | low; `effort: medium` for `audit-coverage-lister`, `high` for the other two |
 | `researcher` | `doc-researcher`, `release-diff`, `advisory-collector` | low; `effort: medium` for `doc-researcher`, `high` for `release-diff`, `max` for `advisory-collector` |
-| `coordinator` | none: a multi-step worker that delegates to the kit agents; a built-in `general-purpose` call from the main agent is routed to it | medium |
+| `general-purpose` | none: a multi-step worker that delegates to the kit agents in parallel and asynchronously; an Agent call from the main agent with no `subagent_type`, or with `general-purpose`, is routed to it, and a subagent may not call `general-purpose` at all | medium |
 
 The effort of each kind is the one its old agent ran at, listed in `kinds.txt` (a plugin file). The Agent tool's `effort` parameter sets it for one call.
 
@@ -185,7 +185,7 @@ An agent never sees `CLAUDE.md`, this file or the conversation. Each brief is se
 
 - `/agent-guards:kit-doctor` checks that the data folder is writable, the policy files are valid, hook errors, pending blocked hosts, and that the running plugin versions are the installed ones. Run it after an update or when records seem missing.
 - `guard-task-kind` (a hook of `haiku-delegation`) blocks briefs for the topic agents that lack a valid `Task kind:` first line. The user can switch it off for a session by setting `TASK_KIND_GUARD=off`; it never blocks other agents and it fails open if it cannot read its input.
-- `guard-agent-model` (a hook of `haiku-delegation`) blocks a call of a non-kit subagent (general-purpose, Explore, Plan, no type) that lacks `model: "haiku"`, and a brief for such an agent with 4 or more numbered steps or over 4000 characters (several units of work). Kit agents are never blocked. The user can switch the two checks off with `AGENT_MODEL_GUARD=off` and `AGENT_BRIEF_GUARD=off`; it only looks at the main agent's calls and fails open if it cannot read its input.
+- `guard-agent-model` (a hook of `haiku-delegation`) blocks a call of a non-kit subagent (general-purpose, Explore, Plan, no type) that lacks `model: "haiku"`, and a brief for such an agent with 4 or more numbered steps or over 4000 characters (several units of work). Kit agents are never blocked. The user can switch the two checks off with `AGENT_MODEL_GUARD=off` and `AGENT_BRIEF_GUARD=off`. For the main agent, a call with no `subagent_type` or with `general-purpose` is routed to `haiku-delegation:general-purpose`; for a subagent, a call of `general-purpose` or with no type is blocked (`AGENT_GENERAL_ROUTE=off` lifts both). It fails open if it cannot read its input.
 - `/agent-guards:kit-allow` (only the user can start it) records the user's approval of a blocked browser host in `browser-policy.json`, with a reason and file hashes in `audit/policy-changes.jsonl`.
 
 ## Close-out

@@ -31,7 +31,7 @@ Rules for the table:
   - Absolute paths and the repository facts the agent needs.
   - The output you want: terse bullets or a table with `path:line`.
   - Exclusions: real `.env*` files, caches, build output, anything holding secrets.
-- For a non-kit subagent (general-purpose, Explore, Plan) always pass `model: "haiku"`. A hook blocks the call otherwise.
+- An Agent call with no type, or with `general-purpose`, is routed to `haiku-delegation:general-purpose`. For Explore or Plan (no kit agent fits) always pass `model: "haiku"`. A hook blocks the call otherwise.
 - Pass `effort: medium` or `high` on the Agent call only for the kinds that need it (see the policy table).
 
 ## Step 3: keep working while agents run

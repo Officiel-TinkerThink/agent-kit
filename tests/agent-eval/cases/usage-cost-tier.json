@@ -1,0 +1,142 @@
+[
+ {
+  "id": "small calls only",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:01.000Z\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:02.000Z\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 3, \"output_tokens\": 50, \"cache_read_input_tokens\": 2000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-small-calls-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-small-calls-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent-small-calls-\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":5,\"cache_write\":500,\"cache_read\":3000,\"output\":150},\"est_cost_usd\":0.00017,\"peak_context\":2003,\"output_chars\":22,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"5fa636462bed8eb25b071d7cca24cc9fdda8b6dbdd40cf7f0e673894d9c7cfff\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 3, \"output_tokens\": 50, \"cache_read_input_tokens\": 2000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "one call above 100k",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:01.000Z\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:02.000Z\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 10, \"output_tokens\": 300, \"cache_read_input_tokens\": 150000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-one-call-abo\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-one-call-abo\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent-one-call-abo\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":2.0,\"api_calls\":2,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":12,\"cache_write\":500,\"cache_read\":151000,\"output\":400},\"est_cost_usd\":0.00778,\"peak_context\":150010,\"output_chars\":22,\"flagged\":true,\"flags\":[{\"code\":\"context_over_100k\",\"sev\":\"warn\",\"detail\":\"1 of 2 API calls had a prompt above 100000 tokens (peak 150010); input is billed at the higher tier\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"ef978f7e9c7e8ca1e5abdfeb41a2b646bd220c9a2b6b42d3d9a3a7674451d315\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 100, \"cache_read_input_tokens\": 1000, \"cache_creation_input_tokens\": 500}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 10, \"output_tokens\": 300, \"cache_read_input_tokens\": 150000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "a prompt of exactly 100000 is the normal tier",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:01.000Z\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 0, \"output_tokens\": 200, \"cache_read_input_tokens\": 100000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-a-prompt-of-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-a-prompt-of-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent-a-prompt-of-\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":1.0,\"api_calls\":1,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":0,\"cache_write\":0,\"cache_read\":100000,\"output\":200},\"est_cost_usd\":0.00110,\"peak_context\":100000,\"output_chars\":22,\"flagged\":false,\"flags\":[],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"d5672befcdbaf8bc46f0597123e94639e9d23845922eb4e8687daf83b0968967\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 0, \"output_tokens\": 200, \"cache_read_input_tokens\": 100000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "a prompt of 100001 is the higher tier",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:01.000Z\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 1, \"output_tokens\": 200, \"cache_read_input_tokens\": 100000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-a-prompt-of-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-a-prompt-of-\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent-a-prompt-of-\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":1.0,\"api_calls\":1,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":1,\"cache_write\":0,\"cache_read\":100000,\"output\":200},\"est_cost_usd\":0.00510,\"peak_context\":100001,\"output_chars\":22,\"flagged\":true,\"flags\":[{\"code\":\"context_over_100k\",\"sev\":\"warn\",\"detail\":\"1 of 1 API calls had a prompt above 100000 tokens (peak 100001); input is billed at the higher tier\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"f3f1c7a5c48cf69acd70c000abaacd917fed904725dde0babc763c3c0abfe9a5\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 1, \"output_tokens\": 200, \"cache_read_input_tokens\": 100000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n"
+  }
+ },
+ {
+  "id": "two big calls",
+  "setup": {
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00.000Z\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:01.000Z\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 5, \"output_tokens\": 400, \"cache_read_input_tokens\": 120000, \"cache_creation_input_tokens\": 20000}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:02.000Z\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 5, \"output_tokens\": 500, \"cache_read_input_tokens\": 180000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:03.000Z\", \"uuid\": \"u3\", \"message\": {\"id\": \"m3\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 10, \"cache_read_input_tokens\": 900, \"cache_creation_input_tokens\": 100}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n",
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-two-big-call\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_USAGE_LOG": "{ROOT}/log.jsonl",
+     "AGENT_KIT_DATA": "{ROOT}/kit"
+    },
+    "argv": [
+     "-SelfTestInput",
+     "{ROOT}/in.json"
+    ],
+    "timeout": 600,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "in.json": "{\"session_id\": \"s\", \"agent_id\": \"agent-two-big-call\", \"agent_type\": \"code-explorer\", \"effort\": {\"level\": \"low\"}, \"cwd\": \"{ROOT}\", \"agent_transcript_path\": \"{ROOT}/t.jsonl\"}",
+   "log.jsonl": "{\"schema\":\"agent-usage/2\",\"type\":\"run\",\"ts\":\"{TS}\",\"session_id\":\"s\",\"agent_id\":\"agent-two-big-call\",\"agent_type\":\"code-explorer\",\"effort\":\"low\",\"models\":[\"claude-haiku-5-5\"],\"cwd\":\"{ROOT}\",\"duration_s\":3.0,\"api_calls\":3,\"tool_calls\":0,\"tools\":{},\"tokens\":{\"input\":12,\"cache_write\":20100,\"cache_read\":300900,\"output\":910},\"est_cost_usd\":0.02798,\"peak_context\":180005,\"output_chars\":22,\"flagged\":true,\"flags\":[{\"code\":\"context_over_100k\",\"sev\":\"warn\",\"detail\":\"2 of 3 API calls had a prompt above 100000 tokens (peak 180005); input is billed at the higher tier\"}],\"transcript\":\"{ROOT}/t.jsonl\",\"transcript_sha256\":\"863a08e86c5e4cf2b3ea0a3c0841a06337359d0bfef63f14ee6e2c3b1d91cbca\"}\n",
+   "t.jsonl": "{\"type\": \"user\", \"timestamp\": \"{TS}\", \"message\": {\"role\": \"user\", \"content\": \"do the task\"}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u1\", \"message\": {\"id\": \"m1\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 5, \"output_tokens\": 400, \"cache_read_input_tokens\": 120000, \"cache_creation_input_tokens\": 20000}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u2\", \"message\": {\"id\": \"m2\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 5, \"output_tokens\": 500, \"cache_read_input_tokens\": 180000, \"cache_creation_input_tokens\": 0}, \"content\": [{\"type\": \"thinking\", \"thinking\": \"\"}]}}\n{\"type\": \"assistant\", \"timestamp\": \"{TS}\", \"uuid\": \"u3\", \"message\": {\"id\": \"m3\", \"model\": \"claude-haiku-5-5\", \"usage\": {\"input_tokens\": 2, \"output_tokens\": 10, \"cache_read_input_tokens\": 900, \"cache_creation_input_tokens\": 100}, \"content\": [{\"type\": \"tool_use\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Coverage: read 1 file.\"}}]}}\n"
+  }
+ }
+]

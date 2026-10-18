@@ -1,216 +1,346 @@
 [
  {
   "id": "general-purpose without a model is blocked",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "general-purpose on sonnet is blocked",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"sonnet\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"sonnet\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "general-purpose on opus is blocked",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"opus\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"opus\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "general-purpose on haiku is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a full Haiku model id is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"claude-haiku-5-5\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"claude-haiku-5-5\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "HAIKU in capitals is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"HAIKU\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\", \"model\": \"HAIKU\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "no type and no model is blocked (it would be general-purpose)",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent '(no type)' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent '(no type)' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "no type on haiku is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "Explore without a model is blocked",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"Explore\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'Explore' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"Explore\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'Explore' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "Plan on haiku is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"Plan\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"Plan\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a kit agent with its plugin prefix needs no model",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nq\", \"subagent_type\": \"haiku-delegation:code-explorer\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nq\", \"subagent_type\": \"haiku-delegation:code-explorer\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a kit agent by its bare name needs no model",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nq\", \"subagent_type\": \"code-explorer\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: read\\nq\", \"subagent_type\": \"code-explorer\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "verification-runner needs no model",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"verification-runner:verification-runner\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"verification-runner:verification-runner\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a kit agent may have a long brief with many numbered claims",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: citation-verifier\\n1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\\n9. do a thing\\n10. do a thing\\n11. do a thing\\n12. do a thing\\n13. do a thing\\n14. do a thing\\n15. do a thing\\n16. do a thing\\n17. do a thing\\n18. do a thing\\n19. do a thing\\n20. do a thing\\n21. do a thing\\n22. do a thing\\n23. do a thing\\n24. do a thing\\n25. do a thing\\n26. do a thing\\n27. do a thing\\n28. do a thing\\n29. do a thing\\n30. do a thing\\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"haiku-delegation:compliance-lister\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"Task kind: citation-verifier\\n1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\\n9. do a thing\\n10. do a thing\\n11. do a thing\\n12. do a thing\\n13. do a thing\\n14. do a thing\\n15. do a thing\\n16. do a thing\\n17. do a thing\\n18. do a thing\\n19. do a thing\\n20. do a thing\\n21. do a thing\\n22. do a thing\\n23. do a thing\\n24. do a thing\\n25. do a thing\\n26. do a thing\\n27. do a thing\\n28. do a thing\\n29. do a thing\\n30. do a thing\\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"haiku-delegation:compliance-lister\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "3 numbered steps are one brief",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "4 numbered steps are several units",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (4 numbered steps, 55 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (4 numbered steps, 55 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "numbered steps with a bracket and indent count too",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"   1) step\\n   2) step\\n   3) step\\n   4) step\\n   5) step\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (5 numbered steps, 54 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"   1) step\\n   2) step\\n   3) step\\n   4) step\\n   5) step\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (5 numbered steps, 54 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a long single paragraph (4000 characters) is allowed",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a longer brief (4001 characters) is several units",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (0 numbered steps, 4001 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the brief for 'general-purpose' holds several units of work (0 numbered steps, 4001 characters). A unit of work is the smallest piece of work that cannot be split any further, whether the pieces could run in parallel or one after another: one question or one deliverable with one result. Launch one agent per unit (independent units in the same message), each with a short brief: the one question, absolute paths, the output format. Keep the integration and the edits yourself. To allow a long brief on purpose, set AGENT_BRIEF_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "the model is checked before the brief size",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\", \"subagent_type\": \"general-purpose\"}}",
-  "env": {},
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\", \"subagent_type\": \"general-purpose\"}}",
+    "env": {},
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "AGENT_MODEL_GUARD=off allows a call without a model",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}}",
-  "env": {
-   "AGENT_MODEL_GUARD": "off"
-  },
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}}",
+    "env": {
+     "AGENT_MODEL_GUARD": "off"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "AGENT_BRIEF_GUARD=off allows a long brief",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
-  "env": {
-   "AGENT_BRIEF_GUARD": "off"
-  },
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\", \"subagent_type\": \"general-purpose\", \"model\": \"haiku\"}}",
+    "env": {
+     "AGENT_BRIEF_GUARD": "off"
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "AGENT_BRIEF_GUARD=off does not allow a missing model",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\", \"subagent_type\": \"general-purpose\"}}",
-  "env": {
-   "AGENT_BRIEF_GUARD": "off"
-  },
-  "exit": 2,
-  "stdout": "",
-  "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"1. do a thing\\n2. do a thing\\n3. do a thing\\n4. do a thing\\n5. do a thing\\n6. do a thing\\n7. do a thing\\n8. do a thing\", \"subagent_type\": \"general-purpose\"}}",
+    "env": {
+     "AGENT_BRIEF_GUARD": "off"
+    },
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED: the agent 'general-purpose' would run on the main model (Sonnet or Opus), about 20 to 40 times the cost of Haiku. Re-issue the call with the parameter model: \"haiku\", or use a kit agent for the job (for example haiku-delegation:code-explorer for reading). Keep the task atomic: one question and a few files per agent; split anything bigger into several agents launched in one message. To allow another model on purpose, set AGENT_MODEL_GUARD=off.\n"
+   }
+  ],
+  "files": {}
  },
  {
   "id": "a call made by a subagent (agent_id present) is not checked",
-  "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}, \"agent_id\": \"abc123\"}",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Agent\", \"tool_input\": {\"description\": \"x\", \"prompt\": \"read the file and say what it does\", \"subagent_type\": \"general-purpose\"}, \"agent_id\": \"abc123\"}",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "input that is not JSON is allowed (fail-open)",
-  "stdin": "this is not json",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "this is not json",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  },
  {
   "id": "empty input is allowed (fail-open)",
-  "stdin": "",
-  "env": {},
-  "exit": 0,
-  "stdout": "",
-  "stderr": ""
+  "steps": [
+   {
+    "stdin": "",
+    "env": {},
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
  }
 ]

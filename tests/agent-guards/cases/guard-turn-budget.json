@@ -1,0 +1,289 @@
+[
+ {
+  "id": "counts per agent id; the N-th call is blocked once; later calls pass again",
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "write": {
+     "turn-budget/r1": {
+      "text": "12\n"
+     }
+    },
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): turn budget reached (15 tool calls). Stop calling tools and write your final report now. Its first line is PARTIAL, then list what you did not do or did not check. Use another tool only if the report cannot be written without it.\n"
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"r1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "turn-budget/r1": "17\n"
+  }
+ },
+ {
+  "id": "main agent, unknown agent type and agent_id without type are not counted",
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"g1\", \"agent_type\": \"general-purpose\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"g2\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "SubagentHandback is neither counted nor blocked; the next real call is the N-th",
+  "setup": {
+   "turn-budget/h1": "14\n"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"SubagentHandback\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"h1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"h1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): turn budget reached (15 tool calls). Stop calling tools and write your final report now. Its first line is PARTIAL, then list what you did not do or did not check. Use another tool only if the report cannot be written without it.\n"
+   }
+  ],
+  "files": {
+   "turn-budget/h1": "15\n"
+  }
+ },
+ {
+  "id": "another agent is counted on its own",
+  "setup": {
+   "turn-budget/k1": "14\n"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"k2\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   },
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"k1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): turn budget reached (15 tool calls). Stop calling tools and write your final report now. Its first line is PARTIAL, then list what you did not do or did not check. Use another tool only if the report cannot be written without it.\n"
+   }
+  ],
+  "files": {
+   "turn-budget/k1": "15\n",
+   "turn-budget/k2": "1\n"
+  }
+ },
+ {
+  "id": "agent_type without the plugin prefix is matched",
+  "setup": {
+   "turn-budget/p1": "14\n"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"p1\", \"agent_type\": \"verification-runner\"}",
+    "exit": 2,
+    "stdout": "",
+    "stderr": "BLOCKED (intentional guard, not a hook failure): turn budget reached (15 tool calls). Stop calling tools and write your final report now. Its first line is PARTIAL, then list what you did not do or did not check. Use another tool only if the report cannot be written without it.\n"
+   }
+  ],
+  "files": {
+   "turn-budget/p1": "15\n"
+  }
+ },
+ {
+  "id": "a damaged count file is treated as 0",
+  "setup": {
+   "turn-budget/d1": "garbage\n"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"d1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "turn-budget/d1": "1\n"
+  }
+ },
+ {
+  "id": "not JSON: passes and writes nothing",
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "this is not json",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "empty input: passes and writes nothing",
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "agent id with path characters: passes and writes nothing",
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"../evil\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {}
+ },
+ {
+  "id": "a new agent clears count files older than a day, keeps recent ones",
+  "setup": {
+   "turn-budget/old1": {
+    "text": "7\n",
+    "age_days": 3
+   },
+   "turn-budget/fresh1": "3\n"
+  },
+  "steps": [
+   {
+    "env": {
+     "AGENT_KIT_DATA": "{ROOT}"
+    },
+    "stdin": "{\"hook_event_name\": \"PreToolUse\", \"tool_name\": \"Read\", \"tool_input\": {\"file_path\": \"x.txt\"}, \"agent_id\": \"n1\", \"agent_type\": \"verification-runner:verification-runner\"}",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+   }
+  ],
+  "files": {
+   "turn-budget/fresh1": "3\n",
+   "turn-budget/n1": "1\n"
+  }
+ }
+]

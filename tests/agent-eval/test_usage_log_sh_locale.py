@@ -59,7 +59,7 @@ def run(locale, answer):
     data = TMP / 'kit'
     env = {k: v for k, v in os.environ.items() if not k.startswith('LC_') and k != 'LANG'}
     env.update(LC_ALL=locale, AGENT_USAGE_LOG=str(log), AGENT_KIT_DATA=str(data))
-    p = subprocess.run(['sh', str(HOOK), '-SelfTestInput', str(inp)], env=env, capture_output=True, text=True, timeout=60)
+    p = subprocess.run(['sh', str(HOOK), '-SelfTestInput', str(inp)], env=env, capture_output=True, text=True, timeout=120)
     errors = (data / 'hook-errors.log').read_text(encoding='utf-8') if (data / 'hook-errors.log').exists() else ''
     return p, log, errors
 

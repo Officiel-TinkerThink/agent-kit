@@ -71,6 +71,16 @@ function Get-OsName {
     return $o
 }
 function Get-Cell([string]$S) { return ($S -replace '\|', '\|' -replace '`', "'") }
+# Get-Pct: percent-encodes every UTF-8 byte except RFC 3986 unreserved characters (A-Z a-z 0-9 - . _ ~), upper-case hex, as the sh twin does
+function Get-Pct([string]$S) { return Get-PctBytes ($Utf8.GetBytes($S)) }
+function Get-PctBytes([byte[]]$Bytes) {
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($b in $Bytes) {
+        $c = [string][char]$b
+        if ($c -cmatch '^[A-Za-z0-9._~-]$') { [void]$sb.Append($c) } else { [void]$sb.Append('%' + $b.ToString('X2')) }
+    }
+    return $sb.ToString()
+}
 function Get-Fingerprint([string]$S) {
     $b = $Utf8.GetBytes($S)
     $h = [System.Security.Cryptography.SHA256]::Create().ComputeHash($b)
@@ -188,9 +198,15 @@ function Invoke-Submit {
         if ($made.Count -eq 0) { 'FAILED gh issue create returned no URL'; exit 1 }
         "CREATED $($made[$made.Count - 1].Value)"; exit 0
     }
-    $short = if ($body.Length -gt 2200) { $body.Substring(0, 2200) } else { $body }
+    # as the sh twin: the first 2200 bytes, with trailing newlines removed (shell command substitution)
+    $bytes = $Utf8.GetBytes($body)
+    if ($bytes.Length -gt 2200) { $bytes = $bytes[0..2199] }
+    $end = $bytes.Length
+    while ($end -gt 0 -and $bytes[$end - 1] -eq 10) { $end-- }
     "NO_GH gh is missing or not logged in. Open this link in a browser and press `"Submit new issue`":"
-    "https://github.com/$Repo/issues/new?title=$([uri]::EscapeDataString($title))&body=$([uri]::EscapeDataString($short))"
+    $kept = New-Object byte[] $end
+    [Array]::Copy($bytes, $kept, $end)
+    "https://github.com/$Repo/issues/new?title=$(Get-Pct $title)&body=$(Get-PctBytes $kept)"
 }
 
 try {

@@ -18,6 +18,6 @@ def check(name, ok, extra=''):
     print(('PASS' if ok else 'FAIL'), name, '' if ok else extra)
 
 
-golden.replay(RECORD, SCRIPT, 'guard-agent-model', results, check)
+golden.replay(RECORD, SCRIPT, results, check)
 print(summary(results))
 sys.exit(0 if all(results) else 1)

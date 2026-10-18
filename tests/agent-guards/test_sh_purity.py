@@ -8,7 +8,11 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPTS = sorted((ROOT / 'plugins').glob('*/scripts/*.sh'))
-DASH = shutil.which('dash')
+# The adapter files may name PowerShell: run.sh launches powershell.exe on Windows, and guard-shell-os.sh blocks pwsh/powershell calls.
+# Everything else in plugins/*/scripts must be pure POSIX sh (docs/design/shell-adapter.md, items 2 and 8).
+ADAPTER_FILES = {'run.sh', 'guard-shell-os.sh'}
+# dash is Ubuntu's /bin/sh; on Windows the Git Bash sh is used instead (a weaker check, labelled in the summary).
+DASH = shutil.which('dash') or shutil.which('sh')
 results = []
 
 # (pattern, why). Matched per line on code only (comment lines and text inside awk/sed programs may legitimately mention words).
@@ -45,18 +49,16 @@ def main():
             code = line.strip()
             if not code or code.startswith('#'):
                 continue
-            if FORBIDDEN_COMMANDS.search(code):
+            if f.name not in ADAPTER_FILES and FORBIDDEN_COMMANDS.search(code):
                 bad.append(f'{n}: runs a non-sh interpreter: {code[:80]}')
             for rx, why in BASHISMS:
                 if rx.search(code):
                     bad.append(f'{n}: {why}: {code[:80]}')
-        check(f'{rel}: no other interpreter, no bashisms', not bad, '; '.join(bad[:3]))
+        check(f'{rel}: no other interpreter, no bashisms' + (' (adapter: may name powershell)' if f.name in ADAPTER_FILES else ''), not bad, '; '.join(bad[:3]))
         if f.name != 'run.sh' and f.name != 'lib.sh':
             check(f'{rel}: has a PowerShell twin', f.with_suffix('.ps1').exists())
-        if DASH:
-            p = subprocess.run([DASH, '-n', str(f)], capture_output=True, text=True)
-            check(f'{rel}: dash -n syntax', p.returncode == 0, p.stderr[:200])
-    print(f'\n{sum(results)}/{len(results)} passed' + ('' if DASH else '  (dash not installed: syntax check skipped)'))
+        check(f'{rel}: syntax check with {DASH or "no shell"}', DASH is not None and subprocess.run([DASH, '-n', str(f)], capture_output=True, text=True).returncode == 0, 'no sh or dash on PATH' if DASH is None else '')
+    print(f'\n{sum(results)}/{len(results)} passed')
     sys.exit(0 if all(results) else 1)
 
 

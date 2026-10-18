@@ -39,6 +39,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-shell-os\"",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ],
+        "matcher": "PowerShell|Bash"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-env-files\"",
             "timeout": 10
           }

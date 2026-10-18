@@ -1,8 +1,9 @@
 """Tests for how guard-verification-runner.ps1 routes `rm` (validation + rewrite to safe-rm.ps1). Uses a temp policy but only
 nonexistent or clearly refused paths, so nothing on disk changes. Run: python test_guard_rm_routing.py"""
 import sys as _sys
-PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import json, pathlib, subprocess, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from capability import run_capability   # the OS adapter picks the implementation (PowerShell on Windows, sh on Linux)
 
 HOOK = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'verification-runner' / 'scripts' / "guard-verification-runner.ps1"
 
@@ -124,7 +125,7 @@ def run(cmd, agent=AGENT, extra=None):
     d = {"tool_name": "Bash", "tool_input": ti}
     if agent: d["agent_type"] = agent
     d["session_id"] = "11111111-2222-3333-4444-555555555555"
-    p = subprocess.run([PWSH, *PSARGS, "-File", str(HOOK)], input=json.dumps(d), capture_output=True, text=True)
+    p = run_capability(HOOK, input=json.dumps(d), capture_output=True, text=True)
     return p.returncode, p.stdout, p.stderr
 
 
@@ -186,18 +187,19 @@ import os, shutil, tempfile
 tmp = pathlib.Path(tempfile.mkdtemp())
 try:
     shutil.copy(HOOK, tmp / HOOK.name)          # a copy WITHOUT safe-rm-lib / policy next to it -> internal error in the rm branch
-    for sib in (HOOK.with_suffix('.sh'), HOOK.parent / 'lib.sh'):   # Linux runs the .sh version, which needs its helper
+    # the adapter (run.sh) and both twins must travel together: the adapter routes to whichever twin the machine uses
+    for sib in (HOOK.with_suffix('.sh'), HOOK.parent / 'lib.sh', HOOK.parent / 'run.sh'):
         if sib.exists():
             shutil.copy(sib, tmp / sib.name)
-    p = subprocess.run([PWSH, *PSARGS, "-File", str(tmp / HOOK.name)],
+    p = run_capability(tmp / HOOK.name,
                        input=json.dumps({"tool_name": "Bash", "agent_type": AGENT, "tool_input": {"command": f"rm {PRJ}/zz-proj/a/b"}}), capture_output=True, text=True)
     check("runner: internal error fails CLOSED", p.returncode == 2 and "fails closed" in p.stderr, f"{p.returncode} {p.stderr[:160]}")
-    p = subprocess.run([PWSH, *PSARGS, "-File", str(tmp / HOOK.name)],
+    p = run_capability(tmp / HOOK.name,
                        input=json.dumps({"tool_name": "Bash", "agent_type": "repo-scout", "tool_input": {"command": f"rm {PRJ}/zz-proj/a/b"}}), capture_output=True, text=True)
     check("other agent: unaffected by that error", p.returncode == 0, f"{p.returncode}")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
-code, out, err = subprocess.run([PWSH, *PSARGS, "-File", str(HOOK)], input="not json", capture_output=True, text=True).returncode, "", ""
+code, out, err = run_capability(HOOK, input="not json", capture_output=True, text=True).returncode, "", ""
 check("malformed input fails open (agent unknown)", code == 0, str(code))
 
 n = len(results)

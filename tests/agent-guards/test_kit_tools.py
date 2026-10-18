@@ -1,6 +1,4 @@
 """Tests for kit-policy.ps1 (/kit-allow: browser hosts) and kit-doctor.ps1 (/kit-doctor). Run: python test_kit_tools.py"""
-import sys as _sys
-PWSH = 'powershell.exe' if _sys.platform == 'win32' else 'pwsh'
 import hashlib
 import json
 import os
@@ -9,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from capability import run_capability   # the OS adapter picks the implementation (PowerShell on Windows, sh on Linux)
 
 PLUGINS = pathlib.Path(__file__).resolve().parents[2] / 'plugins'
 POLICY = PLUGINS / 'agent-guards' / 'scripts' / 'kit-policy.ps1'
@@ -23,8 +23,7 @@ def kit():
 
 def ps(script, k, *args, stdin=None):
     env = dict(os.environ, AGENT_KIT_DATA=str(k).replace('\\', '/'))
-    p = subprocess.run([PWSH, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script), *args],
-                       input=stdin, capture_output=True, text=True, env=env)
+    p = run_capability(script, *args, input=stdin, capture_output=True, text=True, env=env)
     return p.returncode, p.stdout, p.stderr
 
 

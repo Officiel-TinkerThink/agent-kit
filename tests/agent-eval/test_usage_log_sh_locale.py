@@ -3,7 +3,7 @@
 On Ubuntu the shell has a UTF-8 locale (en_US.UTF-8, C.UTF-8). gawk 5 rejects the byte-range regexes of the
 checks program there ("Invalid collation character"), the checks stage exited 1, and the hook logged
 "run record not written: output checks failed" for every run: no usage log, so the annotator could not find any
-run. Run: python test_usage_log_sh_locale.py   (POSIX only; uses a throwaway log and data folder)"""
+run. Run: python test_usage_log_sh_locale.py   (uses a throwaway log and data folder; runs through the system sh or Git Bash)"""
 import json
 import os
 import pathlib
@@ -12,9 +12,10 @@ import subprocess
 import sys
 import tempfile
 
-if sys.platform == 'win32' or not shutil.which('sh') or not shutil.which('awk'):
-    print('SKIP: needs a POSIX sh and awk')
-    sys.exit(0)
+# Runs on every machine: Linux with the system sh, Windows with Git Bash. A missing sh or awk is a failure, never a skip.
+if not shutil.which('sh') or not shutil.which('awk'):
+    print('FAIL: needs sh and awk on PATH (Git Bash on Windows, system sh on Linux)')
+    sys.exit(1)
 
 HOOK = pathlib.Path(__file__).resolve().parents[2] / 'plugins' / 'agent-eval' / 'scripts' / 'subagent-usage-log.sh'
 TMP = pathlib.Path(tempfile.mkdtemp(prefix='ullocale_'))

@@ -160,7 +160,7 @@ function Get-SubagentRecord {
     if ($over -gt 0) { [void]$flags.Add([ordered]@{ code = 'context_over_100k'; sev = 'warn'; detail = "$over of $($calls.Count) API calls had a prompt above 100000 tokens (peak $peak); input is billed at the higher tier" }) }
     $flagged = [bool](@($flags | Where-Object { $_.sev -ne 'info' }).Count)
     return [ordered]@{
-        schema = 'agent-usage/2'; type = 'run'; ts = (Get-Date).ToUniversalTime().ToString('o')
+        schema = 'agent-usage/2'; type = 'run'; ts = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [Globalization.CultureInfo]::InvariantCulture)
         session_id = [string]$In.session_id; agent_id = [string]$In.agent_id; agent_type = [string]$In.agent_type
         effort = [string]$In.effort.level; models = @($models.Keys); cwd = [string]$In.cwd
         duration_s = $dur; api_calls = $calls.Count; tool_calls = $toolCalls; tools = $tools

@@ -26,9 +26,12 @@ record() runs each case through sh and ps1 (both must exist here), refuses to wr
 {ROOT} and {TS} (every ISO-8601 'Z' time stamp), then writes the PowerShell result. replay() checks each implementation that
 runs here against the record.
 
-Known gap (open, see the follow-up PR): because {TS} hides the time stamp value and format, a difference in time stamp
-format between the sh and ps1 twins is not detected. Line endings are also compared after text-mode translation, so a
-CRLF-versus-LF difference is not detected either. The parity claim covers the normalised outputs only.
+What is checked: exit codes, stdout and stderr after {ROOT} and {TS} are normalised, and the files a case leaves behind
+(compared after CRLF is folded to LF). Each stdout and stderr stream also has its line endings checked: sh must write LF,
+ps1 must write CRLF (the PowerShell console's line ending on Windows, kept on purpose). A stream that mixes the two fails.
+Time stamps: only the value is masked ({TS} matches millisecond UTC stamps only), so a format difference shows as a difference.
+What is not checked: the line endings of files a case leaves behind (the sh and ps1 writers differ there, and the record
+holds one text per file).
 """
 import concurrent.futures
 import json
@@ -67,7 +70,7 @@ def fill(text, root, variant):
     return text.replace('{ROOT}', root_form(root, variant)).replace('{STUB_EXT}', stub_ext(variant))
 
 
-TS = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z')   # a run's own timestamp, never part of the behaviour
+TS = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z')   # a run's own timestamp (millisecond UTC, the format sh and ps1 both write); only its value is masked, so a format drift shows as a difference
 
 
 def normalise(text, root, variant):
@@ -107,6 +110,36 @@ def apply_mask(text, masks):
     return text
 
 
+# Line endings are part of the record, per implementation: sh writes LF, PowerShell's console writes CRLF on Windows (kept as it is).
+EXPECTED_EOL = {'sh': 'lf', 'ps1': 'crlf'}
+
+
+def universal(raw):
+    """Content comparison: CRLF and a lone CR become LF (the same translation text mode applies)."""
+    return raw.replace('\r\n', '\n').replace('\r', '\n')
+
+
+def eol_style(raw):
+    """'none' without a line break, 'lf' or 'crlf' when every break is that kind, 'mixed' otherwise."""
+    lf = raw.count('\n')
+    if lf == 0:
+        return 'none'
+    crlf = raw.count('\r\n')
+    if crlf == lf:
+        return 'crlf'
+    return 'lf' if crlf == 0 else 'mixed'
+
+
+def eol_ok(outcome, variant):
+    return all(style in ('none', EXPECTED_EOL[variant])
+               for step in outcome['steps'] for style in step.get('eol', {}).values())
+
+
+def content(outcome):
+    """What record() compares between sh and ps1: exit, stdout, stderr and files (line endings are checked on their own)."""
+    return {'steps': [{k: s[k] for k in ('exit', 'stdout', 'stderr')} for s in outcome['steps']], 'files': outcome['files']}
+
+
 def run_case(cmd, case, variant):
     """Runs one case in a fresh root and returns the normalised outcome of each step plus the files left behind."""
     BASE.mkdir(exist_ok=True)
@@ -122,10 +155,13 @@ def run_case(cmd, case, variant):
             env = dict(os.environ, **{k: fill(v, root, variant) for k, v in st.get('env', {}).items()})
             cwd = pathlib.Path(root) / st.get('cwd', '.')
             p = subprocess.run(cmd + [fill(a, root, variant) for a in st.get('argv', [])],
-                               input=fill(st.get('stdin', ''), root, variant), capture_output=True, text=True,
+                               input=fill(st.get('stdin', ''), root, variant).encode('utf-8'), capture_output=True,
                                timeout=st.get('timeout', 120), env=env, cwd=str(cwd))
-            steps.append({'exit': p.returncode, 'stdout': apply_mask(normalise(p.stdout, root, variant), masks),
-                          'stderr': apply_mask(normalise(p.stderr, root, variant), masks)})
+            out, err = p.stdout.decode('utf-8'), p.stderr.decode('utf-8')
+            steps.append({'exit': p.returncode,
+                          'stdout': apply_mask(normalise(universal(out), root, variant), masks),
+                          'stderr': apply_mask(normalise(universal(err), root, variant), masks),
+                          'eol': {'stdout': eol_style(out), 'stderr': eol_style(err)}})
         files = {apply_mask(rel, masks): apply_mask(normalise(text, root, variant), masks) for rel, text in snapshot(root).items()}
         return {'steps': steps, 'files': files}
     finally:
@@ -148,7 +184,7 @@ def record(cases, script, path):
     golden, bad = [], []
     for c in cases:
         out = {v: next(done) for v in ('sh', 'ps1')}
-        if out['sh'] != out['ps1']:
+        if content(out['sh']) != content(out['ps1']) or not all(eol_ok(out[v], v) for v in out):
             bad.append(c['id'])
         golden.append({**c, 'steps': [{**st, 'exit': o['exit'], 'stdout': o['stdout'], 'stderr': o['stderr']}
                                       for st, o in zip(c['steps'], out['ps1']['steps'])],
@@ -174,6 +210,9 @@ def replay(path, script, results, check):
                 for f in ('exit', 'stdout', 'stderr'):
                     if g[f] != st[f]:
                         wrong.append(f'step {i + 1} {f}')
+                for stream, style in g['eol'].items():
+                    if style not in ('none', EXPECTED_EOL[v]):
+                        wrong.append(f'step {i + 1} {stream} line endings {style} (expected {EXPECTED_EOL[v]})')
             if got['files'] != c.get('files', {}):
                 wrong.append('files')
             check(f'[{v}] {c["id"]} matches the record', not wrong, 'differs in ' + ', '.join(wrong))

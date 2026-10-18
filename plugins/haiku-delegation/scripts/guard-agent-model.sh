@@ -27,7 +27,14 @@ case "$AGENT_ID" in ''|false|0|null)
     printf '%s\n' "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"general-purpose routed to haiku-delegation:coordinator\",\"updatedInput\":$NEW}}"
     exit 0
   fi ;;
-*) exit 0 ;; esac
+*)
+  # a subagent (agent_id present) that calls the built-in general-purpose type is blocked: routing only applies to the main agent
+  if [ "$TYPE" = general-purpose ] && [ "${AGENT_GENERAL_ROUTE:-on}" != off ]; then
+    printf '%s\n' "BLOCKED: a subagent may not call the built-in general-purpose type. Call haiku-delegation:coordinator or a kit agent instead. To allow it on purpose, set AGENT_GENERAL_ROUTE=off." >&2
+    exit 2
+  fi
+  exit 0 ;;
+esac
 
 BASE="${TYPE##*:}"
 if [ -n "$BASE" ] && tr -d '\r' < "$KIT_SCRIPT_DIR/haiku-pinned.txt" 2>/dev/null | awk -v a="$BASE" '$1 !~ /^#/ && $1 == a { f = 1 } END { exit !f }'; then exit 0; fi

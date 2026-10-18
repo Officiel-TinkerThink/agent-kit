@@ -23,7 +23,14 @@ try {
             exit 0
         }
     }
-    if ($id -and $id -ne 'false' -and $id -ne '0') { exit 0 }
+    if ($id -and $id -ne 'false' -and $id -ne '0') {
+        # a subagent (agent_id present) that calls the built-in general-purpose type is blocked: routing only applies to the main agent
+        if ($type -ceq 'general-purpose' -and $env:AGENT_GENERAL_ROUTE -cne 'off') {
+            [Console]::Error.WriteLine("BLOCKED: a subagent may not call the built-in general-purpose type. Call haiku-delegation:coordinator or a kit agent instead. To allow it on purpose, set AGENT_GENERAL_ROUTE=off.")
+            exit 2
+        }
+        exit 0
+    }
     $base = $type.Substring($type.LastIndexOf(':') + 1)
     if ($base) {
         foreach ($row in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'haiku-pinned.txt') -ErrorAction Stop)) {

@@ -1,6 +1,6 @@
 """guard-agent-model (PreToolUse on the Agent tool): a main-agent call of the built-in general-purpose type is routed to haiku-delegation:coordinator (updatedInput, JSON checked here). Any other
 subagent that is not a kit agent (Explore, Plan, no type) must be called with a Haiku model, and its brief must hold one unit of work (fewer than 4 numbered steps, at most 4000 characters). Kit agents
-(haiku-pinned.txt) pin Haiku themselves and are never blocked. Only the main agent's calls are checked; bad input and the off switches (AGENT_MODEL_GUARD=off, AGENT_BRIEF_GUARD=off) allow the call;
+(haiku-pinned.txt) pin Haiku themselves and are never blocked. Only the main agent's calls are checked, except that a subagent's call of general-purpose is blocked (AGENT_GENERAL_ROUTE=off lifts that); bad input and the off switches (AGENT_MODEL_GUARD=off, AGENT_BRIEF_GUARD=off) allow the call;
 AGENT_GENERAL_ROUTE=off turns the routing off. Runs the PowerShell and the POSIX sh version (whichever exist here) on the same inputs and requires the same exit code
 and the same message. Run: python test_guard_agent_model.py"""
 import concurrent.futures
@@ -75,7 +75,11 @@ CASES = [
     ('AGENT_GENERAL_ROUTE=off lets general-purpose on haiku through', hook('general-purpose', model='haiku'), {'AGENT_GENERAL_ROUTE': 'off'}, 0, []),
     ('AGENT_BRIEF_GUARD=off allows a long brief', hook('Explore', model='haiku', prompt=steps(8)), {'AGENT_BRIEF_GUARD': 'off'}, 0, []),
     ('AGENT_BRIEF_GUARD=off does not allow a missing model', hook('Explore', prompt=steps(8)), {'AGENT_BRIEF_GUARD': 'off'}, 2, [MODEL_MSG]),
-    ('a call made by a subagent (agent_id present) is not checked and not routed', hook('general-purpose', agent_id='abc123'), {}, 0, []),
+    ('a subagent calling general-purpose is blocked (routing applies to the main agent only)', hook('general-purpose', agent_id='abc123'), {}, 2, ['may not call the built-in general-purpose']),
+    ('a subagent calling general-purpose on haiku is blocked too', hook('general-purpose', model='haiku', agent_id='abc123'), {}, 2, ['may not call the built-in general-purpose']),
+    ('AGENT_GENERAL_ROUTE=off lets a subagent call general-purpose through', hook('general-purpose', agent_id='abc123'), {'AGENT_GENERAL_ROUTE': 'off'}, 0, []),
+    ('a subagent calling a kit agent is not checked', hook('haiku-delegation:code-explorer', agent_id='abc123', prompt='Task kind: read\nq'), {}, 0, []),
+    ('a subagent calling Explore without a model is not checked (only the main agent is)', hook('Explore', agent_id='abc123'), {}, 0, []),
     ('input that is not JSON is allowed (fail-open)', 'this is not json', {}, 0, []),
     ('empty input is allowed (fail-open)', '', {}, 0, []),
 ]

@@ -27,6 +27,7 @@ A topic agent replaces several narrower agents (12 agents in all). Each kind of 
 | `triage` | `log-triage`, `test-run-summarizer`, `ticket-classifier` | low; `effort: medium` for `ticket-classifier` |
 | `compliance-lister` | `audit-coverage-lister`, `secret-candidate-lister`, `citation-verifier` | low; `effort: medium` for `audit-coverage-lister`, `high` for the other two |
 | `researcher` | `doc-researcher`, `release-diff`, `advisory-collector` | low; `effort: medium` for `doc-researcher`, `high` for `release-diff`, `max` for `advisory-collector` |
+| `coordinator` | none: a multi-step worker that delegates to the kit agents; a built-in `general-purpose` call from the main agent is routed to it | medium |
 
 The effort of each kind is the one its old agent ran at, listed in `kinds.txt` (a plugin file). The Agent tool's `effort` parameter sets it for one call.
 

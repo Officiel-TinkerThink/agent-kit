@@ -22,8 +22,13 @@ Placeholders: {ROOT} stands for the case root. Each implementation receives the 
 {STUB_EXT} is '.cmd' for the PowerShell variant on Windows (a stub program there is a .cmd file), '' otherwise.
 Recorded outputs and files store {ROOT}, so the same record holds for both forms.
 
-record() runs each case through sh and ps1 (both must exist here), refuses to write unless they agree byte for byte after
-normalising {ROOT}, then writes the PowerShell result. replay() checks each implementation that runs here against the record.
+record() runs each case through sh and ps1 (both must exist here), refuses to write unless they agree after normalising
+{ROOT} and {TS} (every ISO-8601 'Z' time stamp), then writes the PowerShell result. replay() checks each implementation that
+runs here against the record.
+
+Known gap (open, see the follow-up PR): because {TS} hides the time stamp value and format, a difference in time stamp
+format between the sh and ps1 twins is not detected. Line endings are also compared after text-mode translation, so a
+CRLF-versus-LF difference is not detected either. The parity claim covers the normalised outputs only.
 """
 import concurrent.futures
 import json

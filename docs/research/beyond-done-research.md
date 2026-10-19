@@ -1,6 +1,6 @@
 ﻿# Research: "Beyond Done" (workos/beyond-done) — agent self-verification
 
-Status: research only. No code written. Build planned for the next working session.
+Status: research only. No code written. Build planned for the next working session. Not reviewed by a human; not for validation use.
 Date of research: 2026-10-19.
 
 ## 0. Read this first: source quality

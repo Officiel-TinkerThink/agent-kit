@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+### Fixed
+- The marketplace listing for `code-review` names the reviewers that exist now (spec, defect, architecture, security, project rules, history, simplicity) instead of the removed `design` reviewer.
+
 ## [0.3.0] - 2026-10-20
 
 ### Added

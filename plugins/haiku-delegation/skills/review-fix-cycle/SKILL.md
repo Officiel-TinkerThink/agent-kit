@@ -88,7 +88,7 @@ Also search the other code paths for the same faulty assumption, and add a regre
 
 - **Done:** the latest review of the latest fix commit yields no actionable finding, meaning no in-scope finding of medium or higher that you did not reject with evidence. A fix that has not been reviewed is not done, so never report "clean" or "done" before that review has run on it.
 - **Change the design, not the patch:** count findings per function (`path:function`), not per cycle. When the same function is named in findings in three consecutive cycles, stop patching it in that cycle: apply the bounded alternative (see "Is the mechanism bounded?"), move what is left of the old stream to the backlog, record the decision in the close-out, and continue. No question to the user.
-- **Cap:** after four review cycles, check the stream against the scope contract on your own: findings in the in-scope classes continue the loop; the rest go to the backlog and the loop ends. If the user raised the cap, repeat that check every four cycles.
+- **Cap:** five review cycles at most, no more. Before each cycle after the third, check the stream against the scope contract on your own: findings in the in-scope classes continue the loop; the rest go to the backlog. A run that reaches the cap without a review of its latest fix is **not done**. Then: write the last review head, the fixes that were never reviewed and the open in-scope findings into the backlog file and the close-out, state "Cap reached: not done" in the close-out, and notify the user at once. Do not start a sixth cycle.
 - **Escalate** only for a decision you cannot make from the evidence (see below).
 
 ## Deciding and escalating
@@ -105,6 +105,7 @@ Report, in this order:
 
 - Commits on the branch, one line each: hash and subject.
 - Last review head: the commit the final review ran on, so the next agent knows what is covered.
+- Cycles used: `<n> of 5`. `Cap reached: not done` when the cap ended the run before a review of the latest fix; then list the unreviewed fixes and the open in-scope findings, and say that the user was notified. Otherwise `Cap reached: no`.
 - Tests and gates run: the command and its result, for the final commit.
 - Review outcome: each validated finding with `fixed`, `rejected: <evidence>` or `escalated`.
 - `Unresolved: <items>`, or `Unresolved: none`.

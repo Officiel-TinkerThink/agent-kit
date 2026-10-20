@@ -2,6 +2,7 @@
 
 Every case runs through three paths: the POSIX guard, its PowerShell twin, and the router the hook command calls
 (run.sh picks one of the two by machine). A path that is not available on this machine is reported as skipped.
+The rules are in docs/design/proof-lab-guard-v2.md.
 """
 import json
 import pathlib
@@ -68,8 +69,6 @@ BLOCKED = [
     "node src/run-spec.js --spec s.json --note prove.js --verify",
     # the runner named without its .js suffix
     "node src/run-spec --spec s.json --key-file /keys/k.txt",
-    # a Windows path with a runner and a key in it: the path separators must still split the words
-    r"node D:\core\proof-lab\src\prove.js --verify --key abc123",
     # the key flag at the end of the command, after the JSON quote is dropped
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key',
     # a tab between the flag and its value (JSON-escaped as \t)
@@ -79,18 +78,31 @@ BLOCKED = [
     # a runner that is not the program of a closed form: behind a cd prefix, or inside sh -c
     "cd proof && node src/run-spec.js --spec s.json",
     "sh -c 'node src/run-spec.js --spec s.json'",
-    # a later field or text containing "command:" must not hide a runner named before it
+    # a runner followed by a comment that says "command:"
     "node src/run-spec.js --spec s.json # command: x",
-    # a runner followed by the JSON closing braces (no argument after it)
+    # a runner with no argument after it
     "node src/prove.js",
-    # a newline escaped with an even run of backslashes is a real newline (the \\ is an escaped backslash)
+    # a newline escaped with an even run of backslashes is a real newline
     "node setup.mjs --run --spec s.json\\\\\nnode src/run-spec.js --spec s.json",
     # process substitution chains
     "node setup.mjs --run --spec s.json >(node src/run-spec.js --spec s.json)",
     # a glob in the program path names no runner word
     "node src/run-s*.js --spec s.json",
+    # a glob after the program word, behind a cd prefix, and behind another word
+    "cd proof && node src/run-s*.js --spec s.json",
+    "node --no-warnings src/run-s*.js --spec s.json",
     # a variable in a src/ path names the runner at run time
     'node "$PROOF_LAB_HOME/src/$R.js" --spec s.json',
+    # an option token before the program is not the program: the runner is the entry point (cycle-4 security F1)
+    "node --import=/p/scripts/setup.mjs src/run-spec.js --spec s.json",
+    # a brace expands to the runner name in the shell (cycle-4 defect F3)
+    "node src/run-{spec,}.js --spec s.json",
+    # a backslash inside the runner name is removed by the shell (cycle-4 defect F2)
+    "node src/run\\-spec.js --spec s.json",
+    # Windows backslash paths are refused: forward slashes only (decision in the v2 design)
+    r"node D:\core\proof-lab\src\prove.js --verify",
+    r"node D:\new\lab\src\prove.js --verify",
+    r"node D:\core\proof-lab\src\prove.js --verify --key abc123",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -99,13 +111,22 @@ ALLOWED = [
     "ls -la",
     "npm run build --key x",
     'git commit -m "approve --key rotation"',
-    r"node D:\core\proof-lab\src\prove.js --verify",
-    r"node D:\new\lab\src\prove.js --verify",
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
     # setup.mjs names no runner, so a cd prefix does not block it
     "cd /x && node setup.mjs --check-only",
     # the sanctioned doctor call: a variable outside the src/ file name is not a runner
     'node "$PROOF_LAB_HOME/src/lab.js" doctor',
+]
+# Whole hook inputs, for the cases a plain command cannot express.
+RAW_BLOCKED = [
+    # a description that carries "command:" ahead of the real command must not hide the runner (cycle-4 spec F1, defect F4)
+    ("description carries command: before the runner", json.dumps({"tool_name": "Bash", "tool_input": {
+        "description": "command: node setup.mjs --run", "command": "node src/run-spec.js --spec s.json"}})),
+]
+RAW_ALLOWED = [
+    # a description with no runner name does not stop a closed form
+    ("closed form with a description", json.dumps({"tool_name": "Bash", "tool_input": {
+        "description": "check the setup", "command": "node setup.mjs --check-only"}})),
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 
@@ -120,10 +141,16 @@ for label, run in paths:
         continue
     for command in BLOCKED:
         p = run(bash(command))
-        check(f"{label} blocks: {command}", p.returncode == 2 and "BLOCKED" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
+        check(f"{label} blocks: {command!r}", p.returncode == 2 and "BLOCKED" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
     for command in ALLOWED:
         p = run(bash(command))
         check(f"{label} allows: {command}", p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}")
+    for name, payload in RAW_BLOCKED:
+        p = run(payload)
+        check(f"{label} blocks: {name}", p.returncode == 2 and "BLOCKED" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
+    for name, payload in RAW_ALLOWED:
+        p = run(payload)
+        check(f"{label} allows: {name}", p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}")
     for name, payload in UNREADABLE:
         p = run(payload)
         check(f"{label} blocks unreadable input ({name})", p.returncode == 2 and "guard error" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")

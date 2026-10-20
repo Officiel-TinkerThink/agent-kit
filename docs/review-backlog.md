@@ -34,7 +34,9 @@ Deferred findings and open items from the review-fix cycles on `feat/proof-lab-p
 
 ## Open at the review cap (cycle 4 delta, 2026-10-20)
 
-Cap reached: not done. Five review cycles used; no sixth cycle run. Each finding below was confirmed by reading `plugins/proof-lab/scripts/guard-proof-key.sh` and `.ps1`. None is fixed on the branch. All are in scope under decision 6 (guard bypasses of the documented rules). Each one lets a proof runner start without `setup.mjs`'s pin and clean-tree check.
+Resolved by the v2 guard (`docs/design/proof-lab-guard-v2.md`): items 15 to 19 are covered by new cases in `tests/proof-lab/test_guard_proof_key.py`, which passes on the POSIX guard, the PowerShell twin and the router (151 checks, 0 failures). The review of the v2 change is the next cycle.
+
+Previously: cap reached, not done, after five review cycles. Each finding below was confirmed by reading `plugins/proof-lab/scripts/guard-proof-key.sh` and `.ps1`. None is fixed on the branch. All are in scope under decision 6 (guard bypasses of the documented rules). Each one lets a proof runner start without `setup.mjs`'s pin and clean-tree check.
 
 15. **Closed form accepts an option token as the program** (security, medium, confidence 90). `node --import=<path>/setup.mjs src/run-spec.js --spec s.json` matches ALLOW (`[^[:space:]]*setup\.mjs` on the option token). The runner runs as the entry point. Fix direction: the program is the first token after `node`, must not start with `-`, and its basename must be exactly `setup.mjs` or `prove.js`.
 16. **Command value taken from the first `command:` text anywhere** (spec medium, defect medium, security medium, confidence 50 to 60). `COMMAND=${CMD#*command:}` (sh:22) and `-replace '^.*?command:'` (ps1:21) read a `description` field that contains `command:` placed earlier. Reachable only if the harness writes `description` before `command`, which backlog item 12 leaves unverified. Fix direction: require exactly one `command:` in the input, and fail closed otherwise.

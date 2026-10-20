@@ -64,6 +64,18 @@ BLOCKED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json; node src/run-spec.js --spec s.json',
     "node src/prove.js --KEY abc",
     "node setup.mjs --check-only && node src/run-spec.js --spec s.json --key-file k.txt",
+    # a verify call does not exempt a direct run of another runner in the same command
+    "node src/run-spec.js --spec s.json --note prove.js --verify",
+    # the runner named without its .js suffix
+    "node src/run-spec --spec s.json --key-file /keys/k.txt",
+    # a Windows path with a runner and a key in it: the path separators must still split the words
+    r"node D:\core\proof-lab\src\prove.js --verify --key abc123",
+    # the key flag at the end of the command, after the JSON quote is dropped
+    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key',
+    # a tab between the flag and its value (JSON-escaped as \t)
+    "node setup.mjs --run --spec s.json --key\tabc123",
+    # a newline chains a second command after a verify call
+    "node src/prove.js --verify\nnode x",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -72,6 +84,9 @@ ALLOWED = [
     "ls -la",
     "npm run build --key x",
     'git commit -m "approve --key rotation"',
+    r"node D:\core\proof-lab\src\prove.js --verify",
+    r"node D:\new\lab\src\prove.js --verify",
+    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 

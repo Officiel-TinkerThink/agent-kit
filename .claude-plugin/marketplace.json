@@ -37,6 +37,12 @@
       "source": "./plugins/code-review",
       "description": "Focused Haiku 5.5 reviewers (spec, defect, architecture, security, project rules, history, simplicity) with an independent finding validator and a /code-review:review skill.",
       "version": "0.3.0"
+    },
+    {
+      "name": "proof-lab",
+      "source": "./plugins/proof-lab",
+      "description": "Prove a feature works in the real app: a spec run, a signed receipt, and a guard on the signing key. Uses a proof-lab checkout pinned by commit.",
+      "version": "0.3.0"
     }
   ]
 }

@@ -1,0 +1,17 @@
+{
+  "description": "Blocks a Bash command that puts the proof-lab signing key in the environment (PROOF_LAB_KEY) or passes it inline with --key instead of --key-file.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-proof-key\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

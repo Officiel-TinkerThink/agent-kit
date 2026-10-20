@@ -9,6 +9,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 ### Fixed
 - The marketplace listing for `code-review` names the reviewers that exist now (spec, defect, architecture, security, project rules, history, simplicity) instead of the removed `design` reviewer.
 
+### Added
+- New plugin `proof-lab`: a skill and a `proof-runner` agent that run one proof-lab spec and report its verdict and signed receipt. A `PreToolUse` guard (`guard-proof-key.sh`, PowerShell twin `guard-proof-key.ps1`) blocks a Bash command that names `PROOF_LAB_KEY`, passes the signing key with `--key` on a proof-lab command, or runs `run-spec.js` directly. Every run goes through `setup.mjs --run`, which refuses a proof-lab checkout unless its commit matches `proof-lab.pin` and it has no uncommitted changes. The plugin does not contain proof-lab's code. Design: `docs/design/proof-lab-plugin.md`.
+
 ## [0.3.0] - 2026-10-20
 
 ### Added

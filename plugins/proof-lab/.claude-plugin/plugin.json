@@ -1,0 +1,16 @@
+{
+  "name": "proof-lab",
+  "version": "0.3.0",
+  "description": "Prove that a feature works in the real app: a spec run, a signed receipt, and a guard on the signing key. Uses the proof-lab checkout named by PROOF_LAB_HOME, pinned to one commit.",
+  "author": {
+    "name": "Unidentified"
+  },
+  "license": "UNLICENSED",
+  "keywords": [
+    "proof",
+    "receipts",
+    "verification",
+    "playwright",
+    "gxp"
+  ]
+}

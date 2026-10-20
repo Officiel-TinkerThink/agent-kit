@@ -76,6 +76,9 @@ BLOCKED = [
     "node setup.mjs --run --spec s.json --key\tabc123",
     # a newline chains a second command after a verify call
     "node src/prove.js --verify\nnode x",
+    # a runner that is not the program of a closed form: behind a cd prefix, or inside sh -c
+    "cd proof && node src/run-spec.js --spec s.json",
+    "sh -c 'node src/run-spec.js --spec s.json'",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -87,6 +90,8 @@ ALLOWED = [
     r"node D:\core\proof-lab\src\prove.js --verify",
     r"node D:\new\lab\src\prove.js --verify",
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
+    # setup.mjs names no runner, so a cd prefix does not block it
+    "cd /x && node setup.mjs --check-only",
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 

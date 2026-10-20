@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to agent-kit are recorded here, newest first. The four plugins (`haiku-delegation`, `agent-guards`, `agent-eval`, `verification-runner`) and the marketplace entry are released together under one version number. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/) while below 1.0 (a new feature bumps the patch number).
+All notable changes to agent-kit are recorded here, newest first. The six plugins (`haiku-delegation`, `agent-guards`, `agent-eval`, `verification-runner`, `code-review`, `proof-lab`) and the marketplace entries are released together under one version number. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/) while below 1.0 (a new feature bumps the patch number).
 
 **How to keep it.** Each pull request adds its own line under `## [Unreleased]` and does not change any version; a separate release step renames `[Unreleased]` to the version and date and bumps the versions. The full rules, the release steps and the pull request template are in [`CONTRIBUTING.md`](CONTRIBUTING.md). `tests/haiku-delegation/test_changelog.py` checks that this file and the version numbers agree.
 

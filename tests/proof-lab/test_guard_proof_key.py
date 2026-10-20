@@ -79,6 +79,18 @@ BLOCKED = [
     # a runner that is not the program of a closed form: behind a cd prefix, or inside sh -c
     "cd proof && node src/run-spec.js --spec s.json",
     "sh -c 'node src/run-spec.js --spec s.json'",
+    # a later field or text containing "command:" must not hide a runner named before it
+    "node src/run-spec.js --spec s.json # command: x",
+    # a runner followed by the JSON closing braces (no argument after it)
+    "node src/prove.js",
+    # a newline escaped with an even run of backslashes is a real newline (the \\ is an escaped backslash)
+    "node setup.mjs --run --spec s.json\\\\\nnode src/run-spec.js --spec s.json",
+    # process substitution chains
+    "node setup.mjs --run --spec s.json >(node src/run-spec.js --spec s.json)",
+    # a glob in the program path names no runner word
+    "node src/run-s*.js --spec s.json",
+    # a variable in a src/ path names the runner at run time
+    'node "$PROOF_LAB_HOME/src/$R.js" --spec s.json',
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -92,6 +104,8 @@ ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
     # setup.mjs names no runner, so a cd prefix does not block it
     "cd /x && node setup.mjs --check-only",
+    # the sanctioned doctor call: a variable outside the src/ file name is not a runner
+    'node "$PROOF_LAB_HOME/src/lab.js" doctor',
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 

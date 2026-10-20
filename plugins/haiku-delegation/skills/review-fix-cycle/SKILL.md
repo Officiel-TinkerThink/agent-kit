@@ -30,6 +30,8 @@ Write the code yourself. Do not delegate edits. Keep the change to one topic.
 
 - Run the relevant tests with `verification-runner`, one agent per gate, in parallel: tests, lint, type check, build. Use the exact commands from the project README or CONTRIBUTING. Targeted runs are allowed for the first pass, but a full run is required before the final commit.
 - Any failure: fix it yourself, re-run the failing gate, and repeat. Do not commit on red.
+- Gates run only after the code is final for the cycle, and reviewers start only after the gates are green. A reviewer never reads code that fails its tests.
+- Never delete or move a file during a gate or a review, including the gate's own log. Each run writes a new log name. A runner that removes a file is a defect to report, not a cleanup to accept.
 
 ## Step 3: commit
 
@@ -39,7 +41,10 @@ Write the code yourself. Do not delegate edits. Keep the change to one topic.
 
 ## Step 4: review
 
-- Run `/code-review:review <base>...HEAD [spec path]`. It fans out the focused reviewers, validates every finding, and reports only validated findings.
+- Freeze the diff first: write `git diff <base>...HEAD` to a scratch file outside the repo and review that snapshot. Do not edit source until this cycle's findings are triaged; a reviewer that reads code you are still changing reports findings about code that no longer exists.
+- Size gate: a change under about 20 changed lines in one file runs the defect and spec reviewers only, and the report says which axes were skipped. Run the other axes only when the change touches them (security for auth, input, paths or secrets; architecture for new modules or dependencies).
+- Run `/code-review:review <base>...HEAD [spec path]` with the scope contract and the backlog path. It fans out the focused reviewers, validates every finding, and reports only validated findings.
+- Reviewers suppress items already in the backlog and report out-of-scope items as a count (`out-of-scope: <class>`), not in full. A report that repeats known limits costs tokens and hides the new findings.
 - Do not run the reviewers by hand around that skill.
 
 ## Step 5: triage each finding yourself
@@ -62,7 +67,9 @@ Check the independent findings in parallel with `code-review:finding-validator` 
 | 2 Immediate cause | the trigger is corrected, a deeper defect may remain (a nil check where an upstream owner should never return nil) | accepted only with a note on why the deeper cause is out of scope or unreachable |
 | 3 Root cause | the contract or mechanism that allowed it is corrected (initialization and ownership, so the invalid state cannot arise) | the target |
 
-Also search the other code paths for the same faulty assumption, and add a regression test of the invariant (it fails on the old code), not of the message. Before closing a finding ask: would this fix hold if the error showed up in another module, and what evidence shows the mechanism is gone? A fix that only makes this failure disappear is not done, and a finding is never rejected because its proposed fix is shallow: rewrite the fix.
+Also search the other code paths for the same faulty assumption, and add a regression test of the invariant (it fails on the old code), not of the message. Write one test per invariant, named after it, and extend that test with a new case when a new shape appears; a new test per reproduced input makes the suite grow with every cycle.
+
+**Severity floor.** A finding keeps the loop going only when it is in scope and medium or higher. A valid low-severity in-scope finding is fixed only when the fix is small and removes the mechanism; otherwise it goes to the backlog with its reason. Nothing valid is dropped silently. Before closing a finding ask: would this fix hold if the error showed up in another module, and what evidence shows the mechanism is gone? A fix that only makes this failure disappear is not done, and a finding is never rejected because its proposed fix is shallow: rewrite the fix.
 
 **Is the mechanism bounded?** A level 3 fix also asks whether the mechanism can ever be finished. Recognising bad input in an open set (a pattern list for secrets in free text, a denylist, a parser for hostile formats) is unbounded: every patch adds surface and the next cycle finds a new shape. Two signs: the same component yields findings in two cycles in a row, or a fix creates the next finding. Then change the design to a bounded question (an allow-list of what may be written, structured data instead of text, a typed field instead of a string) and keep the old mechanism only as a second layer, with its limits written in the backlog.
 
@@ -74,12 +81,13 @@ Also search the other code paths for the same faulty assumption, and add a regre
 ## Step 7: re-review the fixes
 
 - Run `/code-review:review <previous review head>...HEAD` so the reviewers look at the fix commits. Include the spec path again.
+- Delta only: the reviewers get the fix-range diff, with the enclosing function of each changed hunk. They do not re-read whole files or code that passed the previous cycle unchanged, unless a fix touched it.
 - Return to Step 5 with the new findings.
 
 ## Stop conditions
 
-- **Done:** a review cycle yields no actionable finding. Findings you rejected with evidence count as not actionable.
-- **Change the design, not the patch:** the same component producing findings in three cycles in a row is a design signal, not bad luck. Do not patch a fourth time: apply the bounded alternative yourself (see "Is the mechanism bounded?"), move what is left of the old stream to the backlog, record the decision in the close-out, and continue. No question to the user.
+- **Done:** the latest review of the latest fix commit yields no actionable finding, meaning no in-scope finding of medium or higher that you did not reject with evidence. A fix that has not been reviewed is not done, so never report "clean" or "done" before that review has run on it.
+- **Change the design, not the patch:** count findings per function (`path:function`), not per cycle. When the same function is named in findings in three consecutive cycles, stop patching it in that cycle: apply the bounded alternative (see "Is the mechanism bounded?"), move what is left of the old stream to the backlog, record the decision in the close-out, and continue. No question to the user.
 - **Cap:** after four review cycles, check the stream against the scope contract on your own: findings in the in-scope classes continue the loop; the rest go to the backlog and the loop ends. If the user raised the cap, repeat that check every four cycles.
 - **Escalate** only for a decision you cannot make from the evidence (see below).
 
@@ -96,6 +104,7 @@ The user wants autonomous work. Before you ask anything:
 Report, in this order:
 
 - Commits on the branch, one line each: hash and subject.
+- Last review head: the commit the final review ran on, so the next agent knows what is covered.
 - Tests and gates run: the command and its result, for the final commit.
 - Review outcome: each validated finding with `fixed`, `rejected: <evidence>` or `escalated`.
 - `Unresolved: <items>`, or `Unresolved: none`.

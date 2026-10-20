@@ -61,6 +61,7 @@ function main(argv) {
   try {
     const { home, pin, receipts } = check(process.env, readFileSync(PIN_FILE, "utf8"));
     if (runMode) {
+      if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }

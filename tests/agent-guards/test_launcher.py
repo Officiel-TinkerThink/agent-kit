@@ -49,6 +49,8 @@ def main():
 
     libs = {p.name: (p / 'scripts' / 'lib.sh').read_bytes() for p in PLUGINS if (p / 'scripts' / 'lib.sh').is_file()}
     check('lib.sh is identical in every plugin that ships scripts', len(libs) == len(PLUGINS) and len(set(libs.values())) == 1, str(sorted(libs)))
+    routers = {p.name: (p / 'scripts' / 'run.sh').read_bytes() for p in PLUGINS if (p / 'scripts' / 'run.sh').is_file()}
+    check('run.sh is identical in every plugin that ships scripts', len(routers) == len(PLUGINS) and len(set(routers.values())) == 1, str(sorted(routers)))
     check('every plugin without scripts or hooks is documentation only (agents or skills)', all((p / 'agents').is_dir() or (p / 'skills').is_dir() for p in ALL_PLUGINS if p not in PLUGINS), str([p.name for p in ALL_PLUGINS if p not in PLUGINS]))
     check('lib.sh uses LF line endings', all(b'\r' not in v for v in libs.values()))
 

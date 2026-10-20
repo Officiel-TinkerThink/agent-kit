@@ -36,6 +36,7 @@ skill = text(PLUGIN / "skills" / "proof-lab" / "SKILL.md")
 front = re.match(r"^---\n(.*?)\n---\n", skill, re.S)
 check("skill has frontmatter", front is not None)
 check("skill has a description", front is not None and re.search(r"^description:", front.group(1), re.M) is not None)
+check("skill is named proof-lab", front is not None and re.search(r"^name: proof-lab$", front.group(1), re.M) is not None)
 
 agent = text(PLUGIN / "agents" / "proof-runner.md")
 check("agent is named proof-runner", re.search(r"^name: proof-runner$", agent, re.M) is not None)

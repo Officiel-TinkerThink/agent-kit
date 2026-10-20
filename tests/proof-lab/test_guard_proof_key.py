@@ -58,6 +58,12 @@ BLOCKED = [
     'node "$PROOF_LAB_HOME/src/run-spec.js" --spec s.json --key-file /keys/k.txt',
     "node src/run-spec.js --spec s.json --key-file /keys/k.txt",
     "node src/lab.js run --spec s.json --key-file /keys/k.txt",
+    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key abc123',
+    "npm run prove -- --key abc123",
+    "node src/prove.js --url http://localhost:3000 --key-file /keys/k.txt",
+    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json; node src/run-spec.js --spec s.json',
+    "node src/prove.js --KEY abc",
+    "node setup.mjs --check-only && node src/run-spec.js --spec s.json --key-file k.txt",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',

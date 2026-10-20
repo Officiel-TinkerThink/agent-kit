@@ -1,4 +1,5 @@
 ---
+name: proof-lab
 description: Prove that a feature works in the real app: write a spec, run it, read the signed receipt. Uses the proof-lab checkout named by PROOF_LAB_HOME. Use when a change must be shown to work in the app, not only in unit tests.
 argument-hint: "<spec.json>"
 allowed-tools: Bash, Read
@@ -6,7 +7,7 @@ allowed-tools: Bash, Read
 
 # proof-lab
 
-Proof-lab runs a spec against the app and writes a signed receipt. A feature is done only on a PASS receipt, and only for what the spec states.
+Proof-lab runs a spec against the app and writes a signed receipt. A feature is done only on exit 0 (PASS with no open claims), and only for what the spec states.
 
 ## Before the first run
 
@@ -31,7 +32,7 @@ The format is in `$PROOF_LAB_HOME/SPECS.md`. A spec needs at least one assertion
 | 0 | PASS | Every check in the spec passed on this revision | Yes, for what the spec states |
 | 1 | FAIL | A check failed | No. Fix the app or the spec and run again |
 | 2 | ERROR | The run could not finish or could not be trusted | No. Look at the receipt's error |
-| 3 | NEEDS-REVIEW | A claim only a human can judge | No. Hand it to a person |
+| 3 | NEEDS-REVIEW | The checks passed, but the spec lists a claim only a human can judge. The receipt's verdict still reads PASS; the exit code is 3 | No. Hand it to a person |
 
 ## Receipts
 

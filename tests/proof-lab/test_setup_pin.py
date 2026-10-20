@@ -33,14 +33,17 @@ def git(cwd, *args):
 RUNNER = 'console.log("ran " + process.argv.slice(2).join(" ")); process.exitCode = process.argv.includes("--fail") ? 1 : 0;\n'
 
 
-def make_checkout(root, name="proof-lab"):
+def make_checkout(root, name="proof-lab", deps=True):
     home = root / "lab"
     (home / "src").mkdir(parents=True)
     (home / "package.json").write_text(f'{{"name": "{name}"}}\n', encoding="utf-8")
     (home / "src" / "run-spec.js").write_text(RUNNER, encoding="utf-8")
+    (home / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
     git(home, "init", "-q")
-    git(home, "add", "package.json", "src/run-spec.js")
+    git(home, "add", "package.json", "src/run-spec.js", ".gitignore")
     git(home, "commit", "-q", "-m", "init")
+    if deps:
+        (home / "node_modules").mkdir()
     return home, git(home, "rev-parse", "HEAD")
 
 
@@ -110,5 +113,12 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out, err = run(script, str(home), args=("--run", "--spec", "s.json"))
     check("--run refuses a dirty checkout before it runs", code == 2 and "uncommitted changes" in err and "ran" not in out, f"exit {code} out {out!r} err {err!r}")
     (home / "dirty.txt").unlink()
+
+    bare, bare_head = make_checkout(tmp / "bare", deps=False)
+    bare_script = make_plugin(tmp / "bare", f"{bare_head}\n")
+    code, out, err = run(bare_script, str(bare), args=("--run", "--spec", "s.json"))
+    check("--run refuses a checkout with no node_modules before it runs", code == 2 and "has no node_modules" in err and "ran" not in out, f"exit {code} out {out!r} err {err!r}")
+    code, out, err = run(bare_script, str(bare))
+    check("setup without --run does not refuse a checkout with no node_modules", "has no node_modules" not in err, f"exit {code} err {err!r}")
 
 sys.exit(1 if failed else 0)

@@ -23,3 +23,4 @@ guidance-reviewer 25
 history-reviewer 25
 simplicity-reviewer 25
 finding-validator 12
+proof-runner 6

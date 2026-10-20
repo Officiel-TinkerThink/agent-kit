@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-20
+
 ### Added
 - `agent-guards` gets a `PreToolUse` guard, `guard-shell-os`, for `PowerShell` and `Bash` calls. On a machine with no Windows PowerShell on PATH (Linux, macOS), a `PowerShell` tool call, or a Bash command that starts `pwsh` or `powershell`, is blocked, and the message names the POSIX command or the `<name>.sh` version to use instead. On Windows it allows every call. The SessionStart text now states the machine's shell, so an agent picks the right command from the start. It guards against accidental use, not against a deliberate bypass (for example a call hidden inside `eval`).
 - `run.sh` (all four plugins) picks the implementation by machine: Windows (`uname` reports MINGW, MSYS or CYGWIN) runs `<name>.ps1` in Windows PowerShell 5.1, and Linux, WSL and macOS run `<name>.sh`. Set `AGENT_KIT_SHELL=ps` or `posix` in the machine environment to force one. Every call appends a line to `verification-logs/_shell_routing.jsonl` before it runs; a call whose line cannot be written is blocked. Design: `docs/design/shell-adapter.md`.

@@ -8,10 +8,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SETUP = ROOT / "plugins" / "proof-lab" / "scripts" / "setup.mjs"
 failed = 0
+old_time = 1_000_000_000
 
 
 def check(name, cond, extra=""):
@@ -171,9 +174,24 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s4.json"))
     check("a half-made install (no marker) is redone before the run", code == 0 and "ran --spec s4.json" in out and marker.is_file() and not (data / remote_head / "node_modules" / "half").exists(), f"exit {code} out {out!r} err {err!r}")
 
+    # Two repairs never share one npm ci: a held lock is waited for, an old one is cleared.
+    marker.unlink()
+    lock = pathlib.Path(str(data / remote_head) + ".lock")
+    lock.mkdir()
+    threading.Timer(3.0, lambda: shutil.rmtree(lock, ignore_errors=True)).start()
+    started = time.time()
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s5.json"))
+    check("a repair waits for a held install lock, then runs", code == 0 and time.time() - started >= 2.5 and marker.is_file() and not lock.exists(), f"exit {code} after {time.time() - started:.1f}s err {err!r}")
+
+    marker.unlink()
+    lock.mkdir()
+    os.utime(lock, (old_time, old_time))
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s6.json"))
+    check("an old install lock is cleared and the repair runs", code == 0 and marker.is_file() and not lock.exists(), f"exit {code} err {err!r}")
+
     stale = data / (remote_head + ".tmp-99999")
     stale.mkdir()
-    old = 1_000_000_000
+    old = old_time
     os.utime(stale, (old, old))
     young = data / (remote_head + ".tmp-88888")
     young.mkdir()

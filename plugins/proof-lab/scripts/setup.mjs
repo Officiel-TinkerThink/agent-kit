@@ -57,7 +57,7 @@ export function managedHome(env, pin) {
 }
 
 // The repository address without any user:password part, for messages.
-const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
+const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/).*@/i, "$1");
 
 // Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
 function removeStaleTemps(home) {
@@ -104,7 +104,7 @@ export function provision(env, pin, home) {
     run("npm", ["ci", "--ignore-scripts"], tmp);
     const playwright = join(tmp, "node_modules", "playwright", "cli.js");
     if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp, BROWSER_TIMEOUT_MS);
-    writeFileSync(join(tmp, "node_modules", DEPS_DONE), "");
+    markInstalled(tmp);
     moveIntoPlace(tmp, home);
   } catch (error) {
     if (error instanceof Refused) throw error;
@@ -135,11 +135,40 @@ export function check(env, pinText) {
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
 }
 
+function markInstalled(folder) {
+  mkdirSync(join(folder, "node_modules"), { recursive: true });
+  writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
+}
+
+// One repair at a time: the lock is a folder (mkdir is atomic). A run that finds it held waits for it to go, then looks
+// again, because the holder has usually finished the install. A lock older than a whole install belongs to a killed run.
+function withInstallLock(home, work) {
+  const lock = `${home}.lock`;
+  const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > STEP_TIMEOUT_MS + 60_000) rmSync(lock, { recursive: true, force: true });
+      } catch {}
+      pause(2000);
+    }
+    }
+  try {
+    work();
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
+  }
+}
+
 // The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
 // npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
 function installDependencies(home, own) {
   execFileSync("npm", own ? ["ci", "--ignore-scripts"] : ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
-  if (own) writeFileSync(join(home, "node_modules", DEPS_DONE), "");
+  if (own) markInstalled(home);
 }
 
 function main(argv) {
@@ -154,7 +183,8 @@ function main(argv) {
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
-    if (ownCheckout && !checkOnly && !existsSync(join(home, "node_modules", DEPS_DONE))) installDependencies(home, true);
+    const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
+    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });

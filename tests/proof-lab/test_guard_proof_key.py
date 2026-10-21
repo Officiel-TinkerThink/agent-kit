@@ -168,6 +168,8 @@ ALLOWED = [
     "grep -rn @PLUGIN_ROOT@ plugins/proof-lab/scripts",
     # the src/ variable check stays within one command text: a $ in the other text is not after src/ (review cycle 17, defect F2)
     "$(which node) src/tool.js",
+    # ( alone does not make a node command suspect: an inline script with no runner name is allowed
+    "node -e \"console.log(1)\"",
     "echo \"don't ${CLAUDE_PLUGIN_ROOT}\"",
     # the sanctioned setup path unquoted
     f"node {P}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
@@ -248,6 +250,9 @@ BLOCKED += [
     # a glob word whose stem is split by parentheses, read with ( and ) deleted and as spaces (review cycle 17)
     "r(un)*",
     "x(r*un)",
+    # an extglob group splits the runner name: @ + ! are dropped with ( ), and ( marks the word suspect (review cycle 18)
+    "./src/pro@(v)e.js --spec s.json",
+    "node -e \"require('./src/run-spec.js')\"",
     # the variable prefix of prove.js must be balanced (backlog item 34)
     'node "$PROOF_LAB_HOME}/src/prove.js" --verify',
 ]

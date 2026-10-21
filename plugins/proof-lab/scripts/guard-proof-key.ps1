@@ -38,7 +38,8 @@ function View([string]$s) {
   # Two shell views: ( and ) deleted (a stem that extglob builds across them, such as pro@(v)e, reads as one word),
   # and ( and ) as spaces (they are operators that end a word, so a node word after them is still a word; backlog
   # item 30). A name in any view counts (review cycle 17, security F1 and defect F1).
-  ($s -replace '[\\$*?\[\]{}()`"'']', '') + "`n" + (($s -replace '[()]', ' ') -replace '[\\$*?\[\]{}`"'']', '') + "`n" + ($s -replace '\\', '/')
+  # The extglob group operators @ + ! are dropped too, so pro@(v)e reads as prove (review cycle 18, security F1).
+  ($s -replace '[\\$*?\[\]{}()`"''@+!]', '') + "`n" + (($s -replace '[()]', ' ') -replace '[\\$*?\[\]{}`"''@+!]', '') + "`n" + ($s -replace '\\', '/')
 }
 function Hit([string]$s, [string]$pattern) {
   [regex]::IsMatch((View $s), $pattern, 'IgnoreCase')
@@ -113,7 +114,8 @@ if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, 'src/[^ \t\
   Block "a node command names its program in src/ with a variable; $runProg"
 }
 # Words split on space and tab only, the characters bash splits on; .NET \s also splits on NBSP, VT and FF (backlog item 31).
-$suspectWords = @(("$cmdU $cmdD" -split '[ \t]+') | Where-Object { $_ -match $suspectChars -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
+# A word is suspect with a glob, brace or backslash, or a ( that opens an extglob group or a call (node -e "require(...)").
+$suspectWords = @(("$cmdU $cmdD" -split '[ \t]+') | Where-Object { $_ -match '[*?\[{\\(]' -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
 if ($suspectWords.Count -gt 0) {
   Block "a glob, brace or backslash in a word that names a runner or a script; $runProg"
 }

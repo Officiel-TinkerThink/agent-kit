@@ -43,8 +43,9 @@ view() {
   # Two shell views: ( and ) deleted (a stem that extglob builds across them, such as pro@(v)e, reads as one word),
   # and ( and ) as spaces (they are operators that end a word, so a node word after them is still a word; backlog
   # item 30). A name in any view counts (review cycle 17, security F1 and defect F1).
-  printf '%s\n%s\n%s\n' "$(printf '%s' "$1" | tr -d '\\$*?[]{}()`' | tr -d "\"'")" \
-    "$(printf '%s' "$1" | tr '()' '  ' | tr -d '\\$*?[]{}`' | tr -d "\"'")" "$(printf '%s' "$1" | tr '\\' '/')"
+  # The extglob group operators @ + ! are dropped too, so pro@(v)e reads as prove (review cycle 18, security F1).
+  printf '%s\n%s\n%s\n' "$(printf '%s' "$1" | tr -d '\\$*?[]{}()`@+!' | tr -d "\"'")" \
+    "$(printf '%s' "$1" | tr '()' '  ' | tr -d '\\$*?[]{}`@+!' | tr -d "\"'")" "$(printf '%s' "$1" | tr '\\' '/')"
 }
 PROOF='PROOF_LAB|run-spec|(^|[^[:alnum:]_])prove|lab\.js|setup\.mjs'
 RUNNER='run-spec|(^|[^[:alnum:]_-])prove(\.js)?([^[:alnum:]_.-]|$)|npm[[:space:]]+run[[:space:]]+prove([^[:alnum:]_.-]|$)|(^|[^[:alnum:]_-])lab(\.js)?[[:space:]]+run([^[:alnum:]_.-]|$)|(^|[^[:alnum:]_-])setup[.]mjs[[:space:]]+--run([^[:alnum:]_.-]|$)'
@@ -113,7 +114,8 @@ if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "s
 fi
 # Every word of both texts on its own line; the words with a glob, brace or backslash are viewed as one stream (each
 # word stays its own line, so the stem's line anchors still bound one word). A few processes instead of several per word.
-SUSPECT=$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | grep -- "$SUSPECT_CHARS")
+# A word is suspect with a glob, brace or backslash, or a ( that opens an extglob group or a call (node -e "require(...)").
+SUSPECT=$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | grep -- '[*?[{\\(]')
 if [ -n "$SUSPECT" ] && view "$SUSPECT" | grep -Eqi -- "$STEM"; then
   block "a glob, brace or backslash in a word that names a runner or a script; $RUN_PROG"
 fi

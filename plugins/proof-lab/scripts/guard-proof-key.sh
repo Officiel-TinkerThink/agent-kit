@@ -12,13 +12,15 @@ case "$(printf '%s' "$INPUT" | tr -d ' \t\r\n')" in
   \{*\}) ;;
   *) printf '%s\n' "BLOCKED: proof-lab guard error (the hook input is not one JSON object)" >&2; exit 2 ;;
 esac
-# RAWW: the input as the harness wrote it, raw newlines as spaces, nothing rewritten; the closed form is judged on it.
+# RAWW: the input as the harness wrote it, nothing rewritten; the closed form is judged on it.
 # RAWU: RAWW with the sanctioned ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only add a chain,
 # never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
-# A raw newline is JSON whitespace (a newline inside a string is always the \n escape, which is decoded to a chain below);
-# Claude Code ends the hook input with one (found in real use, 2026-10-21).
-RAWW=$(printf '%s' "$INPUT" | tr '\n\r' '  ')
+# Claude Code ends the hook input with a newline (found in real use, 2026-10-21); $(cat) has already dropped it, so
+# trailing newlines are never a chain. Any other raw newline stays a chain: valid JSON has none inside a string, and
+# the guard does not trust the input to be valid (review cycle 14, security F1 and defect F1). A carriage return is
+# a space: bash does not split a command on it.
+RAWW=$(printf '%s' "$INPUT" | tr '\n\r' '; ')
 RAWU=$(printf '%s' "$RAWW" | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
 # cut_cmd: the text after the first "command" key and its colon (awk's match finds the leftmost one).
@@ -57,8 +59,11 @@ if printf '%s' "$ROOT_N" | grep -Eq '^([A-Za-z]:)?(/[^/]+){2,}$'; then
   printf '%s' "$ROOT_N" | grep -Eq '^[A-Za-z0-9_./:~-]+$' && ROOT_BARE_RE=$ROOT_RE
 fi
 SETUP_TAIL='/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
-SETUP="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_RE:+|$ROOT_RE})${SETUP_TAIL}"
-SETUP_BARE="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_BARE_RE:+|$ROOT_BARE_RE})${SETUP_TAIL}"
+# Only the exact root: the literal ${CLAUDE_PLUGIN_ROOT} is expanded by the shell from an environment the guard does
+# not read (unset, it would give /scripts/setup.mjs), and agents never need it, because Claude Code substitutes it in
+# their text (review cycle 14, security F2). With no root, no setup form matches ("x^" matches nothing).
+SETUP="(${ROOT_RE:-x^})${SETUP_TAIL}"
+SETUP_BARE="(${ROOT_BARE_RE:-x^})${SETUP_TAIL}"
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 PROVE_BARE='([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
@@ -86,7 +91,7 @@ fi
 if in_view "$VIEW_RAW" "$PROOF" && in_view "$VIEW_RAW" '--key([^[:alnum:]_-]|$)'; then
   block "pass the signing key with --key-file <path>, never --key <value>."
 fi
-RUN_PROG='run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run, which checks the pin and a clean checkout before the run.'
+RUN_PROG="run proof-lab through node \"${ROOT_N:-<plugin root>}/scripts/setup.mjs\" --run, alone in one Bash call, which checks the pin and a clean checkout before the run."
 NODE_CMD=no
 in_view "$VIEW_CMD" "$NODE_WORD" && NODE_CMD=yes
 if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "$SUSPECT_CHARS"; then

@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / "plugins" / "proof-lab"
+P = PLUGIN.as_posix()  # the plugin root as Claude Code substitutes it in agent text (forward slashes)
 SCRIPTS = PLUGIN / "scripts"
 failed = 0
 
@@ -42,7 +43,7 @@ def run_powershell(stdin_text):
 
 
 def run_router(stdin_text):
-    # The exact shape of the hook command in hooks/hooks.json, with CLAUDE_PLUGIN_ROOT set to the plugin folder.
+    # The exact shape of the hook command in hooks/hooks.json, as hooks/hooks.json runs it; the guard takes the plugin root from its own location.
     return subprocess.run(
         ["sh", str(SCRIPTS / "run.sh"), str(SCRIPTS / "guard-proof-key")],
         input=stdin_text, capture_output=True, text=True, encoding="utf-8", timeout=60,
@@ -148,13 +149,13 @@ BLOCKED = [
     "node $PROOF_LAB_HOME/src/prove.js --verify",
 ]
 ALLOWED = [
-    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
+    f'node "{P}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
     "node src/prove.js --key-file /keys/k.txt --verify",
     "node src/lab.js doctor",
     "ls -la",
     "npm run build --key x",
     'git commit -m "approve --key rotation"',
-    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
+    f'node "{P}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
     # setup.mjs names no runner, so a cd prefix does not block it
     "cd /x && node setup.mjs --check-only",
     # the sanctioned doctor call: a variable outside the src/ file name is not a runner
@@ -167,7 +168,7 @@ ALLOWED = [
     "grep -rn @PLUGIN_ROOT@ plugins/proof-lab/scripts",
     "echo \"don't ${CLAUDE_PLUGIN_ROOT}\"",
     # the sanctioned setup path unquoted
-    "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
+    f"node {P}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
     # a variable prefix inside the quoted program path is not word-split
     'node "$PROOF_LAB_HOME/src/prove.js" --verify',
 ]
@@ -186,7 +187,7 @@ RAW_ALLOWED = [
         "description": "check the setup", "command": "node setup.mjs --check-only"}})),
     # a capitalised Command: in the description does not move the cut (cycle-6 defect F3)
     ("sanctioned run with Command: in the description", json.dumps({"tool_name": "Bash", "tool_input": {
-        "description": "Command: check", "command": 'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec run-spec.json'}})),
+        "description": "Command: check", "command": f'node "{P}/scripts/setup.mjs" --run --spec run-spec.json'}})),
     # a node word in a description field is not a node command (cycle-6 defect F2)
     ("node word only in the description", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "node {a,b} files", "command": "ls -la"}})),
@@ -203,14 +204,19 @@ RAW_ALLOWED = [
         "tool_use_id": "toolu_01QjVcenCxrhhpkSWrDFdTuw"}, separators=(",", ":")) + "\n"),
     # a description whose value is the word "command" is not the key: the cut needs the colon on both twins (backlog item 21)
     ("description equal to the word command", json.dumps({"tool_name": "Bash", "tool_input": {
-        "description": "command", "command": 'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json'}})),
+        "description": "command", "command": f'node "{P}/scripts/setup.mjs" --run --spec s.json'}})),
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 
 # The command the real proof-runner agent typed (headless run, 2026-10-21): Claude Code substitutes ${CLAUDE_PLUGIN_ROOT}
-# in agent text with the absolute root (forward slashes on Windows), and the agent quotes its arguments. The guard knows
-# its own root (CLAUDE_PLUGIN_ROOT in the hook environment, else the script's location), so only that root matches.
-P = PLUGIN.as_posix()
+# in agent text with the absolute root (forward slashes on Windows), and the agent quotes its arguments. The guard takes
+# its own root from its location, so only that root matches.
+RAW_BLOCKED += [
+    # a raw newline inside the command string would be a separator for the shell; only a trailing one is whitespace
+    # (review cycle 14, security F1 and defect F1)
+    ("raw newline inside the command string", '{"tool_name":"Bash","tool_input":{"command":"node \\"' + P
+     + '/scripts/setup.mjs\\" --run --spec s.json\nrm -rf /tmp/x"}}'),
+]
 ALLOWED += [
     f'node "{P}/scripts/setup.mjs" --run --spec "D:/core/projects/proof-lab/demo/specs/06-error-invalid-spec.json"'
     ' --key-file "C:/Users/WAHYU~1.SIN/AppData/Local/Temp/proof-lab-demo-x/demo.key" --json',
@@ -223,6 +229,10 @@ BLOCKED += [
     f'node "{P}/../x/setup.mjs" --run --spec s.json',
     f'node "{P}x/scripts/setup.mjs" --run --spec s.json',
     f'node "{PLUGIN.parent.as_posix()}/agent-guards/scripts/setup.mjs" --run --spec s.json',
+    # the literal placeholder is expanded by the shell from an environment the guard does not read (unset, it gives
+    # /scripts/setup.mjs), so only the exact root is a closed form (review cycle 14, security F2)
+    'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
+    "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json",
 ]
 
 paths = [("posix", run_posix), ("powershell", run_powershell), ("router", run_router)]

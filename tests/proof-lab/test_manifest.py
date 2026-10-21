@@ -54,10 +54,11 @@ def plain_scalar_errors(md):
         if kv is None:
             continue
         value = kv.group(2).strip()
+        # a quoted value is one quoted string, optionally followed by a " #" comment (cycle 14, defect F2)
         if value[:1] == '"':
-            ok = re.fullmatch(r'"(?:[^"\\]|\\.)*"', value) is not None
+            ok = re.fullmatch(r'"(?:[^"\\]|\\.)*"(?:\s+#.*)?', value) is not None
         elif value[:1] == "'":
-            ok = re.fullmatch(r"'(?:[^']|'')*'", value) is not None
+            ok = re.fullmatch(r"'(?:[^']|'')*'(?:\s+#.*)?", value) is not None
         elif value[:1] in ("[", "{", "|", ">"):
             ok = True
         else:

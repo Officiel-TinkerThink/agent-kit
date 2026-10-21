@@ -16,7 +16,7 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
 # A raw newline is JSON whitespace (a newline inside a string is always the \n escape, which is decoded to a chain below);
 # Claude Code ends the hook input with one (found in real use, 2026-10-21).
-$rawW = $inputText -replace '\r|\n', ' '
+$rawW = $inputText.TrimEnd() -replace '\r', ' ' -replace '\n', ';'
 $rawU = $rawW -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
 # The command value: the text after the first "command" key and its colon (case-sensitive). $cmdD decoded, $cmdU as
@@ -64,8 +64,11 @@ if ($rootNorm -cmatch '^([A-Za-z]:)?(/[^/]+){2,}$') {
   if ($rootNorm -cmatch '^[A-Za-z0-9_./:~-]+$') { $rootBareAlt = $rootAlt }
 }
 $setupTail = '/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
-$setupPath = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootAlt + ')' + $setupTail
-$setupBare = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootBareAlt + ')' + $setupTail
+# Only the exact root: the literal ${CLAUDE_PLUGIN_ROOT} is expanded by the shell from an environment the guard does
+# not read (unset, it would give /scripts/setup.mjs), and agents never need it, because Claude Code substitutes it in
+# their text (review cycle 14, security F2). With no root, no setup form matches ("(?!)" matches nothing).
+$setupPath = '(' + $(if ($rootAlt) { $rootAlt.Substring(1) } else { '(?!)' }) + ')' + $setupTail
+$setupBare = '(' + $(if ($rootBareAlt) { $rootBareAlt.Substring(1) } else { '(?!)' }) + ')' + $setupTail
 # An argument is plain text, bare or in one pair of double quotes (agents quote paths).
 $argQ = '(' + $q + $arg + $q + '|' + $arg + ')'
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
@@ -83,7 +86,9 @@ function Block([string]$reason) {
   [Console]::Error.WriteLine("BLOCKED (intentional guard, not a hook failure): $reason")
   exit 2
 }
-$runProg = 'run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run, which checks the pin and a clean checkout before the run.'
+$shownRoot = $rootNorm
+if (-not $shownRoot) { $shownRoot = '<plugin root>' }
+$runProg = 'run proof-lab through node "' + $shownRoot + '/scripts/setup.mjs" --run, alone in one Bash call, which checks the pin and a clean checkout before the run.'
 if (Hit $raw 'PROOF_LAB_KEY') {
   Block 'the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file.'
 }

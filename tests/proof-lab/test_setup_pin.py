@@ -178,10 +178,18 @@ with tempfile.TemporaryDirectory() as tmp:
     marker.unlink()
     lock = pathlib.Path(str(data / remote_head) + ".lock")
     lock.mkdir()
-    threading.Timer(3.0, lambda: shutil.rmtree(lock, ignore_errors=True)).start()
+    half = data / remote_head / "node_modules" / "half"
+    half.mkdir(parents=True, exist_ok=True)
+    seen = {}
+
+    def release():
+        seen["untouched"] = half.exists()  # an install that ignored the lock would already have emptied node_modules
+        shutil.rmtree(lock, ignore_errors=True)
+
+    threading.Timer(3.0, release).start()
     started = time.time()
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s5.json"))
-    check("a repair waits for a held install lock, then runs", code == 0 and time.time() - started >= 2.5 and marker.is_file() and not lock.exists(), f"exit {code} after {time.time() - started:.1f}s err {err!r}")
+    check("a repair waits for a held install lock, then runs", code == 0 and seen.get("untouched") is True and time.time() - started >= 2.5 and marker.is_file() and not lock.exists(), f"exit {code} after {time.time() - started:.1f}s err {err!r}")
 
     marker.unlink()
     lock.mkdir()

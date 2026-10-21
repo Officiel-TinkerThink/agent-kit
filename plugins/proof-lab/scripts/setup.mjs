@@ -57,7 +57,7 @@ export function managedHome(env, pin) {
 }
 
 // The repository address without any user:password part, for messages.
-const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/).*@/i, "$1");
+const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
 
 // Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
 function removeStaleTemps(home) {

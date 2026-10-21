@@ -62,7 +62,7 @@ out("shQuote: an apostrophe becomes '\''", shQuote("o'brien") === "'o'\\''brien'
 const samples = ["/home/o'brien/pl", "a b", "$(echo x)", "`echo x`", 'a"b', "it's $HOME; ls", "a\b", "''", "x'"];
 const probe = spawnSync("sh", ["-c", "true"]);
 if (probe.error) {
-  out("shQuote: round trip through sh (skipped: no sh on this machine)", true);
+  out("shQuote: round trip through sh needs a sh on this machine (Git Bash on Windows)", false, "no sh found: the quoting is not verified");
 } else {
   for (const sample of samples) {
     const got = spawnSync("sh", [], { input: `printf %s ${shQuote(sample)}

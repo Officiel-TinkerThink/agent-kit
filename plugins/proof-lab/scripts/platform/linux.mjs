@@ -4,12 +4,15 @@
 //     root owns every file it would run, or
 //   - refuses with the exact command, when the plugin runs as a normal user.
 // In this browser step root never runs a file that a normal user can change: as root, on a checkout root does not own, the
-// adapter does nothing. (setup.mjs itself still runs npm ci and the spec as root in a checkout you name with PROOF_LAB_HOME.)
+// adapter does nothing. (setup.mjs itself still runs npm ci and the spec as root from whichever checkout it uses.)
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, parse } from "node:path";
+import { pathToFileURL } from "node:url";
 
-const START = "import { chromium } from 'playwright'; const b = await chromium.launch({ headless: true }); await b.close();";
+// The probe imports Playwright by absolute path (argument 1) and runs from the filesystem root, so Node never looks at
+// files directly inside the checkout (a package.json there could change what a bare "playwright" import means).
+const START = "const { chromium } = await import(process.argv[1]); const b = await chromium.launch({ headless: true }); await b.close();";
 const PROBES_AFTER_INSTALL = 12; // apt allows one install at a time; another run may be installing, so look for about two minutes
 const PAUSE_MS = 10_000;
 
@@ -52,8 +55,11 @@ const real = {
       return false;
     }
   },
-  starts: home => spawnSync(process.execPath, ["--input-type=module", "-e", START], { cwd: home, stdio: "ignore", timeout: 60_000 }).status === 0,
-  installDeps: (cli, home, timeout) => execFileSync(process.execPath, [cli, "install-deps", "chromium"], { cwd: home, stdio: ["ignore", process.stderr, process.stderr], timeout }),
+  starts: home => {
+    const entry = pathToFileURL(join(home, "node_modules", "playwright", "index.mjs")).href;
+    return spawnSync(process.execPath, ["--input-type=module", "-e", START, entry], { cwd: parse(home).root, stdio: "ignore", timeout: 60_000 }).status === 0;
+  },
+  installDeps: (cli, home, timeout) => execFileSync(process.execPath, [cli, "install-deps", "chromium"], { cwd: parse(home).root, stdio: ["ignore", process.stderr, process.stderr], timeout }),
   pause: ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
 };
 

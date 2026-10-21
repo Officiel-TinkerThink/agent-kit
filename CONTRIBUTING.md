@@ -4,7 +4,7 @@ For people and for agents that open pull requests in this repository.
 
 ## The rule in one paragraph
 
-A pull request **adds its changelog line** under `## [Unreleased]` in `CHANGELOG.md` and **does not bump any version**. Versions are bumped once, in a separate release step by a maintainer, when `main` is ready to ship. Why: five files carry the version (four `plugin.json` and `.claude-plugin/marketplace.json`), so PRs that each bump it conflict with one another and claim the same number; and the changelog text is best written by the author while the reason for the change is still known.
+A pull request **adds its changelog line** under `## [Unreleased]` in `CHANGELOG.md` and **does not bump any version**. Versions are bumped once, in a separate release step by a maintainer, when `main` is ready to ship. Why: seven files carry the version (six `plugin.json` and `.claude-plugin/marketplace.json`), so PRs that each bump it conflict with one another and claim the same number; and the changelog text is best written by the author while the reason for the change is still known.
 
 ## Opening a pull request
 
@@ -30,7 +30,7 @@ A pull request **adds its changelog line** under `## [Unreleased]` in `CHANGELOG
 Done in its own commit or PR titled `release X.Y.Z`, after the feature PRs are merged:
 
 1. In `CHANGELOG.md`: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add a new empty `## [Unreleased]` above it.
-2. Set `"version": "X.Y.Z"` in all four `plugins/*/.claude-plugin/plugin.json` and all four entries of `.claude-plugin/marketplace.json`. Installed plugins update only when this number changes, so a merge users should receive needs a release.
+2. Set `"version": "X.Y.Z"` in all six `plugins/*/.claude-plugin/plugin.json` and all six entries of `.claude-plugin/marketplace.json`. Installed plugins update only when this number changes, so a merge users should receive needs a release.
 3. Run `python tests/haiku-delegation/test_changelog.py` (versions and changelog agree) and the full suite.
 4. Merge, then tag `vX.Y.Z` on the merge commit.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to agent-kit are recorded here, newest first. The four plugins (`haiku-delegation`, `agent-guards`, `agent-eval`, `verification-runner`) and the marketplace entry are released together under one version number. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/) while below 1.0 (a new feature bumps the patch number).
+All notable changes to agent-kit are recorded here, newest first. The six plugins (`haiku-delegation`, `agent-guards`, `agent-eval`, `verification-runner`, `code-review`, `proof-lab`) and the marketplace entries are released together under one version number. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/) while below 1.0 (a new feature bumps the patch number).
 
 **How to keep it.** Each pull request adds its own line under `## [Unreleased]` and does not change any version; a separate release step renames `[Unreleased]` to the version and date and bumps the versions. The full rules, the release steps and the pull request template are in [`CONTRIBUTING.md`](CONTRIBUTING.md). `tests/haiku-delegation/test_changelog.py` checks that this file and the version numbers agree.
 
@@ -8,6 +8,9 @@ All notable changes to agent-kit are recorded here, newest first. The four plugi
 
 ### Fixed
 - The marketplace listing for `code-review` names the reviewers that exist now (spec, defect, architecture, security, project rules, history, simplicity) instead of the removed `design` reviewer.
+
+### Added
+- New plugin `proof-lab`: a skill and a `proof-runner` agent that run one proof-lab spec and report its verdict and signed receipt. A `PreToolUse` guard (`guard-proof-key.sh`, PowerShell twin `guard-proof-key.ps1`) blocks a Bash command that names `PROOF_LAB_KEY`, passes the signing key with `--key` on a proof-lab command, or names a proof runner (`run-spec`, `prove`, `lab run`, `npm run prove`) outside two closed forms that chain nothing: `node .../setup.mjs ...` and a read-only `prove.js ... --verify`. A node command with a glob, brace or backslash, and such a word that names a runner or a script, is refused; so are Windows backslash paths to a runner. Every run goes through `setup.mjs --run`, which refuses a proof-lab checkout unless its commit matches `proof-lab.pin` and it has no uncommitted changes. The plugin does not contain proof-lab's code. Design: `docs/design/proof-lab-plugin.md`.
 
 ## [0.3.0] - 2026-10-20
 

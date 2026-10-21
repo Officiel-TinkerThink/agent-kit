@@ -1,5 +1,5 @@
 # agent-kit shell helpers (POSIX sh: dash, busybox ash, bash --posix). Sourced by every .sh hook of this plugin.
-# This file is identical in all four plugins (a test enforces it). Needs only sh, awk, sed, grep, coreutils.
+# This file is identical in all five plugins (a test enforces it). Needs only sh, awk, sed, grep, coreutils.
 # Before sourcing, a script sets KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)".
 
 # --- kit data folder (KIT_DATA): $AGENT_KIT_DATA > <CLAUDE_CONFIG_DIR>/agent-kit > config folder derived from the

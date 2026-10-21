@@ -8,10 +8,12 @@
 #   4. A node command, or a word that names a runner or a script, with a glob, brace or backslash is blocked.
 # Unreadable hook input is blocked (fail-closed).
 INPUT=$(cat)
-# Trailing whitespace (Claude Code ends the input with a newline) is dropped, the same as the PowerShell twin's TrimEnd.
+# Trailing whitespace (Claude Code ends the input with a newline) is dropped. Both twins use the same explicit ASCII set
+# (space, tab, CR, LF, VT, FF), never a locale or Unicode class, so they agree on every byte (backlog item 29).
 # A shell pattern loop starts no process.
-while :; do case "$INPUT" in *[[:space:]]) INPUT=${INPUT%?} ;; *) break ;; esac; done
-case "$(printf '%s' "$INPUT" | tr -d ' \t\r\n')" in
+WS=$(printf ' \t\r\n\v\f.'); WS=${WS%.}
+while :; do case "$INPUT" in *["$WS"]) INPUT=${INPUT%?} ;; *) break ;; esac; done
+case "$(printf '%s' "$INPUT" | tr -d "$WS")" in
   \{*\}) ;;
   *) printf '%s\n' "BLOCKED: proof-lab guard error (the hook input is not one JSON object)" >&2; exit 2 ;;
 esac
@@ -38,7 +40,8 @@ VALUE=$(printf '%s' "$CMD_D" | tr -d "\"'" | sed 's/[,}].*$//')
 # Two views of a text: the shell view (characters the shell drops or expands are removed, quotes too) and the path
 # view (a backslash reads as a path separator). A name is searched in both, so neither view can hide it.
 view() {
-  printf '%s\n%s\n' "$(printf '%s' "$1" | tr -d '\\$*?[]{}()`' | tr -d "\"'")" "$(printf '%s' "$1" | tr '\\' '/')"
+  # ( and ) are shell operators, so they end a word: they become spaces, not nothing (backlog item 30).
+  printf '%s\n%s\n' "$(printf '%s' "$1" | tr '()' '  ' | tr -d '\\$*?[]{}`' | tr -d "\"'")" "$(printf '%s' "$1" | tr '\\' '/')"
 }
 PROOF='PROOF_LAB|run-spec|(^|[^[:alnum:]_])prove|lab\.js|setup\.mjs'
 RUNNER='run-spec|(^|[^[:alnum:]_-])prove(\.js)?([^[:alnum:]_.-]|$)|npm[[:space:]]+run[[:space:]]+prove([^[:alnum:]_.-]|$)|(^|[^[:alnum:]_-])lab(\.js)?[[:space:]]+run([^[:alnum:]_.-]|$)|(^|[^[:alnum:]_-])setup[.]mjs[[:space:]]+--run([^[:alnum:]_.-]|$)'
@@ -57,7 +60,8 @@ Q='\\"'
 ROOT_DIR=$(cd "$(dirname -- "$0")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
 ROOT_N=$(printf '%s' "$ROOT_DIR" | tr '\\' '/' | sed 's#/*$##')
 ROOT_RE=; ROOT_BARE_RE=
-if printf '%s' "$ROOT_N" | grep -Eq '^([A-Za-z]:)?(/[^/]+){2,}$'; then
+# No $, backtick, quote or backslash in the root: inside the quoted form bash would expand or end on them (backlog item 33).
+if printf '%s' "$ROOT_N" | grep -Eq '^([A-Za-z]:)?(/[^/$`"\]+){2,}$'; then
   ROOT_RE=$(printf '%s' "$ROOT_N" | sed 's/[][\.*^$+?(){}|]/\\&/g')
   printf '%s' "$ROOT_N" | grep -Eq '^[A-Za-z0-9_./:~-]+$' && ROOT_BARE_RE=$ROOT_RE
 fi
@@ -70,7 +74,8 @@ SETUP_BARE="(${ROOT_BARE_RE:-x^})${SETUP_TAIL}"
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 PROVE_BARE='([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
-PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+# The variable prefix is balanced: $NAME/ or ${NAME}/, never $NAME}/ or ${NAME/ (backlog item 34).
+PROVE='(([$][{][A-Za-z_][A-Za-z0-9_]*[}]|[$][A-Za-z_][A-Za-z0-9_]*)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Separators are space and tab only, the characters bash splits words on (the same class as the PowerShell twin).
 SP="[ $(printf '\t')]"
 # An argument is plain text, bare or in one pair of double quotes (agents quote paths).
@@ -100,7 +105,7 @@ in_view "$VIEW_CMD" "$NODE_WORD" && NODE_CMD=yes
 if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "$SUSPECT_CHARS"; then
   block "a node command has a glob, brace or backslash in it; $RUN_PROG"
 fi
-if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- 'src/[^[:space:]]*[$]'; then
+if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "src/[^ $(printf '\t')]*[\$]"; then
   block "a node command names its program in src/ with a variable; $RUN_PROG"
 fi
 # Every word of both texts on its own line; the words with a glob, brace or backslash are viewed as one stream (each

@@ -7,7 +7,10 @@
 #   4. A node command, or a word that names a runner or a script, with a glob, brace or backslash is blocked.
 # Unreadable hook input is blocked (fail-closed).
 $inputText = [Console]::In.ReadToEnd()
-if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
+# Both twins trim the same explicit ASCII whitespace set (space, tab, CR, LF, VT, FF), never .NET's Unicode set, so they
+# agree on every byte (backlog item 29).
+$ws = [char[]](32, 9, 13, 10, 11, 12)
+if ($inputText.Trim($ws) -notmatch '^\{[\s\S]*\}$') {
   [Console]::Error.WriteLine('BLOCKED: proof-lab guard error (the hook input is not one JSON object)')
   exit 2
 }
@@ -18,7 +21,7 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
 # Any other raw newline or carriage return fails closed as a chain: valid JSON has neither inside a string, and the
 # guard does not trust the input to be valid. A carriage return is not a space to bash, which keeps it inside a word,
 # so "k.txt<CR>--verify" would be one argument (review cycles 14 and 15).
-$rawW = $inputText.TrimEnd() -replace '\r|\n', ';'
+$rawW = $inputText.TrimEnd($ws) -replace '\r|\n', ';'
 $rawU = $rawW -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
 # The command value: the text after the first "command" key and its colon (case-sensitive). $cmdD decoded, $cmdU as
@@ -32,7 +35,8 @@ $value = ($cmdD -replace '["'']', '') -replace '[,}].*$', ''
 # Two views of a text: the shell view (characters the shell drops or expands, quotes too) and the path view (a
 # backslash reads as a path separator). A name is searched in both, so neither view can hide it.
 function View([string]$s) {
-  ($s -replace '[\\$*?\[\]{}()`"'']', '') + "`n" + ($s -replace '\\', '/')
+  # ( and ) are shell operators, so they end a word: they become spaces, not nothing (backlog item 30).
+  (($s -replace '[()]', ' ') -replace '[\\$*?\[\]{}`"'']', '') + "`n" + ($s -replace '\\', '/')
 }
 function Hit([string]$s, [string]$pattern) {
   [regex]::IsMatch((View $s), $pattern, 'IgnoreCase')
@@ -61,7 +65,8 @@ $rootNorm = ''
 if ($PSScriptRoot) { $rootNorm = ((Split-Path $PSScriptRoot -Parent) -replace '\\', '/').TrimEnd('/') }
 $rootAlt = ''
 $rootBareAlt = ''
-if ($rootNorm -cmatch '^([A-Za-z]:)?(/[^/]+){2,}$') {
+# No $, backtick, quote or backslash in the root: inside the quoted form bash would expand or end on them (backlog item 33).
+if ($rootNorm -cmatch '^([A-Za-z]:)?(/[^/$`"\\]+){2,}$') {
   $rootAlt = '|' + [regex]::Escape($rootNorm)
   if ($rootNorm -cmatch '^[A-Za-z0-9_./:~-]+$') { $rootBareAlt = $rootAlt }
 }
@@ -76,7 +81,8 @@ $argQ = '(' + $q + $arg + $q + '|' + $arg + ')'
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 $proveBare = '([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
-$provePath = '([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+# The variable prefix is balanced: $NAME/ or ${NAME}/, never $NAME}/ or ${NAME/ (backlog item 34).
+$provePath = '(([$][{][A-Za-z_][A-Za-z0-9_]*[}]|[$][A-Za-z_][A-Za-z0-9_]*)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Case-sensitive on purpose: prove.js reads --verify case-sensitively, so the guard must not accept --VERIFY.
 # Separators are space and tab only, the characters bash splits words on (.NET \s also matches Unicode spaces such as
 # U+00A0, which bash keeps inside a word; review cycle 10, security F1).
@@ -101,10 +107,11 @@ $both = "$cmdD`n$cmdU"
 if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, $suspectChars)) {
   Block "a node command has a glob, brace or backslash in it; $runProg"
 }
-if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, 'src/[^\s]*[$]')) {
+if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, 'src/[^ \t]*[$]')) {
   Block "a node command names its program in src/ with a variable; $runProg"
 }
-$suspectWords = @(("$cmdU $cmdD" -split '\s+') | Where-Object { $_ -match $suspectChars -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
+# Words split on space and tab only, the characters bash splits on; .NET \s also splits on NBSP, VT and FF (backlog item 31).
+$suspectWords = @(("$cmdU $cmdD" -split '[ \t]+') | Where-Object { $_ -match $suspectChars -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
 if ($suspectWords.Count -gt 0) {
   Block "a glob, brace or backslash in a word that names a runner or a script; $runProg"
 }

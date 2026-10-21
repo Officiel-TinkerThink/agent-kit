@@ -241,6 +241,16 @@ BLOCKED += [
     # /scripts/setup.mjs), so only the exact root is a closed form (review cycle 14, security F2)
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
     "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json",
+    # ) is a shell operator that ends a word, so it cannot hide the node word from the node glob check (backlog item 30)
+    "a)node src/*",
+    # the variable prefix of prove.js must be balanced (backlog item 34)
+    'node "$PROOF_LAB_HOME}/src/prove.js" --verify',
+]
+RAW_BLOCKED += [
+    # a trailing no-break space is not in the ASCII whitespace set both twins trim, so both refuse the input alike
+    # (backlog item 29: PowerShell used to trim it with .NET's Unicode set while sh kept it)
+    ("trailing no-break space", json.dumps({"tool_name": "Bash", "tool_input": {
+        "command": f'node "{P}/scripts/setup.mjs" --run --spec s.json'}}, separators=(",", ":")) + " "),
 ]
 
 paths = [("posix", run_posix), ("powershell", run_powershell), ("router", run_router)]

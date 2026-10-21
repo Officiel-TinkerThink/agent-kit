@@ -28,7 +28,10 @@ def check(name, cond, extra=""):
 
 
 def run_posix(stdin_text):
-    return subprocess.run(["sh", str(SCRIPTS / "guard-proof-key.sh")], input=stdin_text, capture_output=True, text=True, encoding="utf-8", timeout=60)
+    # 180 s: one POSIX guard call starts about 60 processes, which takes about 8 s under Git Bash on Windows and longer
+    # while tests/run_all.py runs other suites at the same time (calls passed 60 s there). Linux and macOS take well
+    # under a second; Windows runs the PowerShell twin in production.
+    return subprocess.run(["sh", str(SCRIPTS / "guard-proof-key.sh")], input=stdin_text, capture_output=True, text=True, encoding="utf-8", timeout=180)
 
 
 def run_powershell(stdin_text):
@@ -193,6 +196,24 @@ RAW_ALLOWED = [
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 
+# The command the real proof-runner agent typed (headless run, 2026-10-21): Claude Code substitutes ${CLAUDE_PLUGIN_ROOT}
+# in agent text with the absolute root (forward slashes on Windows), and the agent quotes its arguments. The guard knows
+# its own root (CLAUDE_PLUGIN_ROOT in the hook environment, else the script's location), so only that root matches.
+P = PLUGIN.as_posix()
+ALLOWED += [
+    f'node "{P}/scripts/setup.mjs" --run --spec "D:/core/projects/proof-lab/demo/specs/06-error-invalid-spec.json"'
+    ' --key-file "C:/Users/WAHYU~1.SIN/AppData/Local/Temp/proof-lab-demo-x/demo.key" --json',
+    f"node {P}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
+]
+BLOCKED += [
+    # the same run wrapped in a chain, as the agent first wrote it
+    f'if [ -z "$PROOF_LAB_HOME" ]; then exit 2; fi; node "{P}/scripts/setup.mjs" --run --spec s.json',
+    # a parent segment, a longer root, and another plugin's setup.mjs are not this plugin's setup
+    f'node "{P}/../x/setup.mjs" --run --spec s.json',
+    f'node "{P}x/scripts/setup.mjs" --run --spec s.json',
+    f'node "{PLUGIN.parent.as_posix()}/agent-guards/scripts/setup.mjs" --run --spec s.json',
+]
+
 paths = [("posix", run_posix), ("powershell", run_powershell), ("router", run_router)]
 # PROOF_LAB_GUARD_PATHS=powershell,router limits the run; the POSIX guard takes seconds per call under Git Bash on Windows.
 import os
@@ -233,7 +254,7 @@ def execute(job):
         p = run(payload)
     except subprocess.TimeoutExpired:
         # one slow call is a failed case, not a crash of the whole run
-        return label, name, False, "timed out after 60 s"
+        return label, name, False, "timed out"
     if marker is None:
         return label, name, p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}"
     return label, name, p.returncode == 2 and marker in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}"

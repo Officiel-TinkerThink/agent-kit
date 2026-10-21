@@ -44,12 +44,21 @@ function RunnerCount([string]$s) {
 function NodeIn([string]$s) {
   [regex]::IsMatch((View $s), $nodeWord, 'IgnoreCase')
 }
-$arg = '[-A-Za-z0-9_./:=@%+]+'
+$arg = '[-A-Za-z0-9_./:=@%+~]+'
 # The closed form is an allow-list on $cmdW: the program path is bare or in one pair of double quotes (\" in JSON), and
 # every argument is plain text. A single quote, any other quote, a typed or joined marker fails the match, because the
 # text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
 $q = '\\"'
-$setupPath = '[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+# The plugin's own root. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} in agent and skill text (forward slashes on
+# Windows), so the agent types the absolute root, and it exports the same root to hook processes. Taken from that
+# environment variable, else from this script's location; with neither, only the literal placeholder matches.
+$rootDir = $env:CLAUDE_PLUGIN_ROOT
+if (-not $rootDir -and $PSScriptRoot) { $rootDir = Split-Path $PSScriptRoot -Parent }
+$rootAlt = ''
+if ($rootDir) { $rootAlt = '|' + [regex]::Escape(($rootDir -replace '\\', '/').TrimEnd('/')) }
+$setupPath = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootAlt + ')/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+# An argument is plain text, bare or in one pair of double quotes (agents quote paths).
+$argQ = '(' + $q + $arg + $q + '|' + $arg + ')'
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 $proveBare = '([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
@@ -58,7 +67,7 @@ $provePath = '([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]j
 # Separators are space and tab only, the characters bash splits words on (.NET \s also matches Unicode spaces such as
 # U+00A0, which bash keeps inside a word; review cycle 10, security F1).
 $sp = '[ \t]'
-$closed = '^' + $sp + '*node' + $sp + '+((' + $q + $setupPath + $q + '|' + $setupPath + ')(' + $sp + '+' + $arg + ')*|(' + $q + $provePath + $q + '|' + $proveBare + ')(' + $sp + '+' + $arg + ')*' + $sp + '+--verify(' + $sp + '+' + $arg + ')*)' + $sp + '*$'
+$closed = '^' + $sp + '*node' + $sp + '+((' + $q + $setupPath + $q + '|' + $setupPath + ')(' + $sp + '+' + $argQ + ')*|(' + $q + $provePath + $q + '|' + $proveBare + ')(' + $sp + '+' + $argQ + ')*' + $sp + '+--verify(' + $sp + '+' + $argQ + ')*)' + $sp + '*$'
 $chain = '[;&|`]|[$][(]|[<>][(]'
 
 function Block([string]$reason) {

@@ -38,56 +38,66 @@ RUNNER='run-spec|(^|[^[:alnum:]_-])prove(\.js)?([^[:alnum:]_.-]|$)|npm[[:space:]
 NODE_WORD='(^|[^[:alnum:]_])node([^[:alnum:]_]|$)'
 SUSPECT_CHARS='[*?[{\\]'
 STEM='(^|[^[:alnum:]_])(run|prove|setup|lab)([^[:alnum:]_]|$)|[.]m?js'
-ARG='[-A-Za-z0-9_./:=@%+]+'
+ARG='[-A-Za-z0-9_./:=@%+~]+'
 # The closed form is an allow-list on CMD_W: the program path is bare or in one pair of double quotes (\" in JSON), and
 # every argument is plain text. A single quote, any other quote, a typed or joined marker fails the match, because the
 # text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
 Q='\\"'
-SETUP='[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+# The plugin's own root. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} in agent and skill text (forward slashes on
+# Windows), so the agent types the absolute root, and it exports the same root to hook processes. Taken from that
+# environment variable, else from this script's location; with neither, only the literal placeholder matches.
+ROOT_DIR=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })}
+ROOT_RE=$(printf '%s' "$ROOT_DIR" | tr '\\' '/' | sed 's#/*$##; s/[][\.*^$+?(){}|]/\\&/g')
+SETUP="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_RE:+|$ROOT_RE})/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs"
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 PROVE_BARE='([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Separators are space and tab only, the characters bash splits words on (the same class as the PowerShell twin).
 SP="[ $(printf '\t')]"
-CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARG})*|(${Q}${PROVE}${Q}|${PROVE_BARE})(${SP}+${ARG})*${SP}+--verify(${SP}+${ARG})*)${SP}*\$"
+# An argument is plain text, bare or in one pair of double quotes (agents quote paths).
+ARGQ="(${Q}${ARG}${Q}|${ARG})"
+CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARGQ})*|(${Q}${PROVE}${Q}|${PROVE_BARE})(${SP}+${ARGQ})*${SP}+--verify(${SP}+${ARGQ})*)${SP}*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
 block() {
   printf '%s\n' "BLOCKED (intentional guard, not a hook failure): $1" >&2
   exit 2
 }
-hit() { view "$1" | grep -Eqi -- "$2"; }
-runner_count() { view "$1" | grep -Eoi -- "$RUNNER" | wc -l | tr -d ' '; }
-node_in() { view "$1" | grep -Eqi -- "$NODE_WORD"; }
-suspect_word() {
-  printf '%s\n' "$1" | grep -q -- "$SUSPECT_CHARS" || return 1
-  view "$1" | grep -Eqi -- "$STEM"
-}
+# Each view is built once and searched many times: under Git Bash on Windows every process start is slow.
+VIEW_RAW=$(view "$RAW")
+VIEW_CMD=$(view "$CMD_D"; view "$CMD_U")
+in_view() { printf '%s\n' "$1" | grep -Eqi -- "$2"; }
+count_runners() { printf '%s\n' "$1" | grep -Eoi -- "$RUNNER" | wc -l | tr -d ' '; }
 
-if hit "$RAW" 'PROOF_LAB_KEY'; then
+if in_view "$VIEW_RAW" 'PROOF_LAB_KEY'; then
   block "the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file."
 fi
-if hit "$RAW" "$PROOF" && hit "$RAW" '--key([^[:alnum:]_-]|$)'; then
+if in_view "$VIEW_RAW" "$PROOF" && in_view "$VIEW_RAW" '--key([^[:alnum:]_-]|$)'; then
   block "pass the signing key with --key-file <path>, never --key <value>."
 fi
 RUN_PROG='run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run, which checks the pin and a clean checkout before the run.'
-if { node_in "$CMD_D" || node_in "$CMD_U"; } && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "$SUSPECT_CHARS"; then
+NODE_CMD=no
+in_view "$VIEW_CMD" "$NODE_WORD" && NODE_CMD=yes
+if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "$SUSPECT_CHARS"; then
   block "a node command has a glob, brace or backslash in it; $RUN_PROG"
 fi
-if { node_in "$CMD_D" || node_in "$CMD_U"; } && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- 'src/[^[:space:]]*[$]'; then
+if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- 'src/[^[:space:]]*[$]'; then
   block "a node command names its program in src/ with a variable; $RUN_PROG"
 fi
-if [ -n "$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | while IFS= read -r w; do suspect_word "$w" && echo hit; done)" ]; then
+# Every word of both texts on its own line; the words with a glob, brace or backslash are viewed as one stream (each
+# word stays its own line, so the stem's line anchors still bound one word). A few processes instead of several per word.
+SUSPECT=$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | grep -- "$SUSPECT_CHARS")
+if [ -n "$SUSPECT" ] && { printf '%s\n' "$SUSPECT" | tr -d '\\$*?[]{}()`' | tr -d "\"'"; printf '%s\n' "$SUSPECT" | tr '\\' '/'; } | grep -Eqi -- "$STEM"; then
   block "a glob, brace or backslash in a word that names a runner or a script; $RUN_PROG"
 fi
-RAW_N=$(runner_count "$RAW")
+RAW_N=$(count_runners "$VIEW_RAW")
 [ "$RAW_N" = 0 ] && exit 0
 # The closed form is judged on the command as written, and the value must hold every runner name in the input.
 if ! printf '%s' "$RAW" | grep -Eq -- "$CHAIN" \
   && [ "$(printf '%s' "$RAW" | grep -o '"command"[[:space:]]*:' | wc -l | tr -d ' ')" = 1 ] \
   && printf '%s' "$CMD_W" | grep -Eq -- "$CLOSED" \
-  && [ "$(runner_count "$VALUE")" = "$RAW_N" ]; then
+  && [ "$(count_runners "$(view "$VALUE")")" = "$RAW_N" ]; then
   exit 0
 fi
 block "$RUN_PROG"

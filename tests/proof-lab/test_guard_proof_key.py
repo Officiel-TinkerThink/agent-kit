@@ -5,10 +5,12 @@ Every case runs through three paths: the POSIX guard, its PowerShell twin, and t
 The rules are in docs/design/proof-lab-guard-v2.md.
 """
 import json
+import os
 import pathlib
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PLUGIN = ROOT / "plugins" / "proof-lab"
@@ -103,6 +105,21 @@ BLOCKED = [
     r"node D:\core\proof-lab\src\prove.js --verify",
     r"node D:\new\lab\src\prove.js --verify",
     r"node D:\core\proof-lab\src\prove.js --verify --key abc123",
+    # the node word spelled with a backslash or in another case: the shell still runs node (cycle-6 security F2, guidance F2)
+    "n\\\\ode src/run-s*.js --spec s.json",
+    "\\\\node src/run-s*.js --spec s.json",
+    "NODE src/run-s*.js --spec s.json",
+    "n\\ode src/*",
+    # a runner or script word with a glob, brace or backslash, with no node word (cycle-6 defect, security)
+    "./src/run-{spec,}.js --spec s.json",
+    "./src/run-s*.js --spec s.json",
+    "./src/{ru,n}-spec.js --spec s.json",
+    # the closed form is case-sensitive: prove.js reads --verify case-sensitively (cycle-6 security F1)
+    "node src/prove.js --VERIFY --key-file /keys/k.txt",
+    # setup.mjs runs the pin check only at the plugin's own path; a relative or other path is refused (cycle-6 spec F3)
+    "node ./scripts/setup.mjs --run --spec s.json",
+    "node ../scratch/setup.mjs --run --spec run-spec.json",
+    "node $HOME/x/setup.mjs --run --spec s.json",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -116,6 +133,10 @@ ALLOWED = [
     "cd /x && node setup.mjs --check-only",
     # the sanctioned doctor call: a variable outside the src/ file name is not a runner
     'node "$PROOF_LAB_HOME/src/lab.js" doctor',
+    # node_modules is not the node word, and a glob in an ordinary command is not a node command (cycle-6 defect F2)
+    "ls node_modules/*",
+    "cat src/*.py",
+    "grep -rn foo src/",
 ]
 # Whole hook inputs, for the cases a plain command cannot express.
 RAW_BLOCKED = [
@@ -127,33 +148,57 @@ RAW_ALLOWED = [
     # a description with no runner name does not stop a closed form
     ("closed form with a description", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "check the setup", "command": "node setup.mjs --check-only"}})),
+    # a capitalised Command: in the description does not move the cut (cycle-6 defect F3)
+    ("sanctioned run with Command: in the description", json.dumps({"tool_name": "Bash", "tool_input": {
+        "description": "Command: check", "command": 'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec run-spec.json'}})),
+    # a node word in a description field is not a node command (cycle-6 defect F2)
+    ("node word only in the description", json.dumps({"tool_name": "Bash", "tool_input": {
+        "description": "node {a,b} files", "command": "ls -la"}})),
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 
 paths = [("posix", run_posix), ("powershell", run_powershell), ("router", run_router)]
+# PROOF_LAB_GUARD_PATHS=powershell,router limits the run; the POSIX guard takes seconds per call under Git Bash on Windows.
+import os
+only = os.environ.get("PROOF_LAB_GUARD_PATHS")
+if only:
+    paths = [p for p in paths if p[0] in only.split(",")]
 if shutil.which("sh") is None:
     print("skip proof-lab guard: sh is not on PATH (Git Bash on Windows)")
     sys.exit(0)
 
+# Each case is one independent process, so they run concurrently; results are printed in case order.
+# Each job: (label, name, run, payload, expect_blocked, must_contain). Blocked cases need exit 2 and BLOCKED,
+# allowed cases exit 0, unreadable input exit 2 with "guard error".
+jobs = []
 for label, run in paths:
     if label == "powershell" and shutil.which("powershell.exe") is None:
         print("skip proof-lab guard (powershell): powershell.exe is not on PATH")
         continue
     for command in BLOCKED:
-        p = run(bash(command))
-        check(f"{label} blocks: {command!r}", p.returncode == 2 and "BLOCKED" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
+        jobs.append((label, f"blocks: {command!r}", run, bash(command), "BLOCKED"))
     for command in ALLOWED:
-        p = run(bash(command))
-        check(f"{label} allows: {command}", p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}")
+        jobs.append((label, f"allows: {command}", run, bash(command), None))
     for name, payload in RAW_BLOCKED:
-        p = run(payload)
-        check(f"{label} blocks: {name}", p.returncode == 2 and "BLOCKED" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
+        jobs.append((label, f"blocks: {name}", run, payload, "BLOCKED"))
     for name, payload in RAW_ALLOWED:
-        p = run(payload)
-        check(f"{label} allows: {name}", p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}")
+        jobs.append((label, f"allows: {name}", run, payload, None))
     for name, payload in UNREADABLE:
-        p = run(payload)
-        check(f"{label} blocks unreadable input ({name})", p.returncode == 2 and "guard error" in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}")
+        jobs.append((label, f"blocks unreadable input ({name})", run, payload, "guard error"))
+
+
+def execute(job):
+    label, name, run, payload, marker = job
+    p = run(payload)
+    if marker is None:
+        return label, name, p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}"
+    return label, name, p.returncode == 2 and marker in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}"
+
+
+workers = int(os.environ.get("PROOF_LAB_GUARD_WORKERS", "12"))
+with ThreadPoolExecutor(max_workers=workers) as pool:
+    for label, name, ok, extra in pool.map(execute, jobs):
+        check(f"{label} {name}", ok, extra)
 
 # The router fails closed: with PowerShell missing from PATH, the hook exits 2 (blocks), not some other code (lets the call through).
 no_ps = subprocess.run(

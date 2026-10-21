@@ -159,4 +159,32 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out, err = run(missing, None, repo_env, args=("--run", "--spec", "s.json"))
     check("a pin the repository does not have is refused and leaves nothing behind", code == 2 and "could not set up" in err and leftovers(missing) == [], f"exit {code} err {err!r} left {leftovers(missing)}")
 
+    # Review findings (cycle 1 of auto-setup): self-heal, stale temp folders, credentials in messages, refusal before install.
+    shutil.rmtree(data / remote_head / "node_modules")
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s3.json"))
+    check("the plugin's own checkout is repaired when its node_modules are gone", code == 0 and "ran --spec s3.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
+
+    stale = data / (remote_head + ".tmp-99999")
+    stale.mkdir()
+    old = 1_000_000_000
+    os.utime(stale, (old, old))
+    young = data / (remote_head + ".tmp-88888")
+    young.mkdir()
+    sibling = make_plugin(tmp / "stale", f"{remote_head}\n")
+    sdata = sibling.parent.parent / "data" / "checkouts"
+    sdata.mkdir(parents=True)
+    (sdata / (remote_head + ".tmp-99999")).mkdir()
+    os.utime(sdata / (remote_head + ".tmp-99999"), (old, old))
+    (sdata / (remote_head + ".tmp-88888")).mkdir()
+    code, out, err = run(sibling, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("a first run removes an old install folder a killed run left, and keeps a recent one", code == 0 and not (sdata / (remote_head + ".tmp-99999")).exists() and (sdata / (remote_head + ".tmp-88888")).exists(), f"exit {code} err {err!r}")
+
+    secret = make_plugin(tmp / "secret", f"{remote_head}\n")
+    code, out, err = run(secret, None, {"PROOF_LAB_REPO": "https://user:hunter2token@127.0.0.1:1/x.git"}, args=("--run", "--spec", "s.json"))
+    check("a refusal never prints credentials from PROOF_LAB_REPO", code == 2 and "hunter2token" not in err and "127.0.0.1:1/x.git" in err, f"exit {code} err {err!r}")
+
+    rel = make_plugin(tmp / "rel", f"{remote_head}\n")
+    code, out, err = run(rel, None, {"PROOF_LAB_REPO": str(remote), "PROOF_LAB_DATA": "relative/dir"}, args=("--run", "--spec", "s.json"))
+    check("a relative PROOF_LAB_DATA is refused before anything is fetched", code == 2 and "absolute" in err and "setting up" not in err and not pathlib.Path("relative").exists(), f"exit {code} err {err!r}")
+
 sys.exit(1 if failed else 0)

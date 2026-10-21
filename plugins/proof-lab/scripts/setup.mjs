@@ -6,9 +6,9 @@
 // --run <args>: checks the same way, then runs src/run-spec.js with <args> and returns its exit code. Every proof run goes
 // through this, so a run never starts on a checkout that does not match the pin.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -17,6 +17,8 @@ const MIN_NODE = 24;
 // The repository the pin is fetched from. PROOF_LAB_REPO replaces it (tests); the pin check holds for any source.
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
 const sh = process.platform === "win32";
+const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
+const STALE_TMP_MS = 60 * 60 * 1000; // an install folder this old belongs to a run that was killed
 const firstLine = text => String(text).split("\n")[0].trim();
 
 class Refused extends Error {}
@@ -52,16 +54,45 @@ export function managedHome(env, pin) {
   return join(env.PROOF_LAB_DATA ?? join(homedir(), ".proof-lab"), "checkouts", pin);
 }
 
+// The repository address without any user:password part, for messages.
+const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1");
+
+// Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
+function removeStaleTemps(home) {
+  const parent = dirname(home);
+  const prefix = `${basename(home)}.tmp-`;
+  for (const name of readdirSync(parent)) {
+    if (!name.startsWith(prefix)) continue;
+    try {
+      if (Date.now() - statSync(join(parent, name)).mtimeMs > STALE_TMP_MS) rmSync(join(parent, name), { recursive: true, force: true });
+    } catch {}
+  }
+}
+
+// Renames tmp to home. On Windows a scanner can hold a file for a moment, so a failed rename is tried again a few times.
+function moveIntoPlace(tmp, home) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return renameSync(tmp, home);
+    } catch (error) {
+      if (existsSync(home)) return; // another run finished first: use its checkout
+      if (attempt >= 4) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+    }
+  }
+}
+
 // Fetches the pinned commit into a temporary folder, installs dependencies and the browser there, then renames it into place,
 // so a failed or interrupted install never leaves a half-made checkout at the final path.
 export function provision(env, pin, home) {
   const repo = env.PROOF_LAB_REPO ?? DEFAULT_REPO;
   const tmp = `${home}.tmp-${process.pid}`;
   mkdirSync(dirname(home), { recursive: true });
+  removeStaleTemps(home);
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp);
   try {
-    const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm" });
+    const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm", timeout: STEP_TIMEOUT_MS });
     console.error(`setting up proof-lab ${pin} in ${home} (first use only)`);
     run("git", ["init", "-q"], tmp);
     run("git", ["remote", "add", "origin", repo], tmp);
@@ -71,31 +102,38 @@ export function provision(env, pin, home) {
     run("npm", ["ci", "--ignore-scripts"], tmp);
     const playwright = join(tmp, "node_modules", "playwright", "cli.js");
     if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp);
-    try {
-      renameSync(tmp, home);
-    } catch (error) {
-      if (!existsSync(home)) throw error; // another run finished first: use its checkout
-    }
+    moveIntoPlace(tmp, home);
   } catch (error) {
     if (error instanceof Refused) throw error;
-    refuse(`could not set up proof-lab in ${home} (${firstLine(error.message)}): check the network and that ${repo} is reachable, or set PROOF_LAB_HOME to a checkout at the pin`);
+    refuse(`could not set up proof-lab in ${home} (${firstLine(error.message)}): check the network and that ${shownRepo(repo)} is reachable, or set PROOF_LAB_HOME to a checkout at the pin`);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
 }
 
-// Every check the plugin makes before it trusts a checkout. Throws Refused with the reason.
-export function check(env, pinText) {
+// The checks that need nothing from the checkout. They run before anything is fetched, so a refusal costs no install.
+// Returns the pin and the folder the checkout is (or will be) in.
+function preflight(env, pinText) {
   const major = Number(process.versions.node.split(".")[0]);
   if (major < MIN_NODE) refuse(`Node ${MIN_NODE} or later is required; this is ${process.versions.node}`);
   const pin = readPin(pinText);
   const home = env.PROOF_LAB_HOME || managedHome(env, pin);
-  if (!isAbsolute(home)) refuse("PROOF_LAB_HOME must be an absolute path");
+  if (!isAbsolute(home)) refuse(`${env.PROOF_LAB_HOME ? "PROOF_LAB_HOME" : "PROOF_LAB_DATA"} must be an absolute path`);
+  return { pin, home };
+}
+
+// Every check the plugin makes before it trusts a checkout. Throws Refused with the reason.
+export function check(env, pinText) {
+  const { pin, home } = preflight(env, pinText);
   if (!existsSync(home) || proofLabName(home) !== "proof-lab") refuse(`${home} is not a proof-lab checkout (no package.json named proof-lab)${env.PROOF_LAB_HOME ? "" : ": run node setup.mjs once (without --check-only) to fetch it"}`);
   const head = git(home, ["rev-parse", "HEAD"]).trim();
   if (head !== pin) refuse(`the checkout is at ${head}, this plugin is pinned to ${pin}: check out ${pin} in ${home}, or change the pin in a pull request`);
   if (git(home, ["status", "--porcelain"]).trim() !== "") refuse(`${home} has uncommitted changes: commit or stash them first, so the receipts match one revision`);
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
+}
+
+function installDependencies(home) {
+  execFileSync("npm", ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
 }
 
 function main(argv) {
@@ -104,17 +142,19 @@ function main(argv) {
   try {
     const pinText = readFileSync(PIN_FILE, "utf8");
     if (!process.env.PROOF_LAB_HOME && !checkOnly) {
-      const pin = readPin(pinText);
-      const home = managedHome(process.env, pin);
-      if (!existsSync(home)) provision(process.env, pin, home);
+      const planned = preflight(process.env, pinText);
+      if (!existsSync(planned.home)) provision(process.env, planned.pin, planned.home);
     }
     const { home, pin, receipts } = check(process.env, pinText);
+    // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
+    const ownCheckout = !process.env.PROOF_LAB_HOME;
+    if (ownCheckout && !checkOnly && !existsSync(join(home, "node_modules"))) installDependencies(home);
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
-    if (!checkOnly && process.env.PROOF_LAB_HOME) execFileSync("npm", ["ci"], { cwd: home, stdio: "inherit", shell: sh });
+    if (!checkOnly && !ownCheckout) installDependencies(home);
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

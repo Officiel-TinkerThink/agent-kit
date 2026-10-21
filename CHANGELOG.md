@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-21
+
 ### Added
 - `proof-lab` works on Ubuntu / Linux. `setup.mjs` is now OS-agnostic and asks a machine adapter (`scripts/platform/`: Linux, Windows, macOS) what to do; the Linux adapter starts Chromium on every run and, if it cannot start, refuses a normal user with the exact `sudo node '<cli>' install-deps chromium` command; root installs the system libraries itself only on the plugin's own checkout when root owns the checkout, its parent folders and `node_modules` (otherwise root does nothing in that step and warns). New `plugins/proof-lab/README.md` (requirements per system); `tests/linux/proof-lab-e2e.sh` runs the whole proof-lab demo on a clean Ubuntu 24.04 container as a normal user and as root; the Ubuntu test image now has Node 24.
 

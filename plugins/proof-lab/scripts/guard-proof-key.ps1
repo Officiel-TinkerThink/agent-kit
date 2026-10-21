@@ -11,18 +11,18 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
   [Console]::Error.WriteLine('BLOCKED: proof-lab guard error (the hook input is not one JSON object)')
   exit 2
 }
-# @PLUGIN_ROOT@ is reserved: only the rewrite below may produce it, so a typed copy is refused (review cycle 8, security F1).
-if ($inputText.Contains('@PLUGIN_ROOT@')) {
-  [Console]::Error.WriteLine('BLOCKED (intentional guard, not a hook failure): @PLUGIN_ROOT@ is reserved for the sanctioned ${CLAUDE_PLUGIN_ROOT} placeholder')
-  exit 2
-}
-# $rawU: the input as written (JSON escapes kept), newlines as chains, ${CLAUDE_PLUGIN_ROOT} written as ROOT.
+# $rawW: the input as written, newlines as chains, nothing rewritten; the closed form is judged on it.
+# $rawU: $rawW with ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
-$rawU = $inputText -replace '\r|\n', ';' -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
+$rawW = $inputText -replace '\r|\n', ';'
+$rawU = $rawW -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
-# The command value: the text after the one `command:` key (case-sensitive). $cmdD decoded, $cmdU as written.
+# The command value: the text after the first "command" key and its colon (case-sensitive). $cmdD decoded, $cmdU as
+# written with \" dropped; both cut at the JSON string end.
 $cmdD = ($raw -creplace '^.*?"command"\s*:', '') -replace '"\s*[,}].*$', ''
 $cmdU = (($rawU -replace '\\"', '') -creplace '^.*?"command"\s*:', '') -replace '"\s*[,}].*$', ''
+# $cmdW: the command string exactly as written in JSON (\" kept, nothing rewritten), cut at its closing quote.
+$cmdW = ($rawW -creplace '^.*?"command"\s*:\s*"', '') -replace '(?<!\\)".*$', ''
 # $value: the closed-form candidate, quotes dropped, cut at the next JSON separator.
 $value = ($cmdD -replace '["'']', '') -replace '[,}].*$', ''
 # Two views of a text: the shell view (characters the shell drops or expands, quotes too) and the path view (a
@@ -45,10 +45,14 @@ function NodeIn([string]$s) {
   [regex]::IsMatch((View $s), $nodeWord, 'IgnoreCase')
 }
 $arg = '[-A-Za-z0-9_./:=@%+]+'
-$setupPath = '@PLUGIN_ROOT@/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
-$provePath = '((@PLUGIN_ROOT@|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+# The closed form is an allow-list on $cmdW: the program path is bare or in one pair of double quotes (\" in JSON), and
+# every argument is plain text. A single quote, any other quote, a typed or joined marker fails the match, because the
+# text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
+$q = '\\"'
+$setupPath = '[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+$provePath = '([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Case-sensitive on purpose: prove.js reads --verify case-sensitively, so the guard must not accept --VERIFY.
-$closed = '^\s*node\s+(' + $setupPath + '(\s+' + $arg + ')*|' + $provePath + '(\s+' + $arg + ')*\s+--verify(\s+' + $arg + ')*)\s*$'
+$closed = '^\s*node\s+((' + $q + $setupPath + $q + '|' + $setupPath + ')(\s+' + $arg + ')*|(' + $q + $provePath + $q + '|' + $provePath + ')(\s+' + $arg + ')*\s+--verify(\s+' + $arg + ')*)\s*$'
 $chain = '[;&|`]|[$][(]|[<>][(]'
 
 function Block([string]$reason) {
@@ -56,10 +60,6 @@ function Block([string]$reason) {
   exit 2
 }
 $runProg = 'run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run, which checks the pin and a clean checkout before the run.'
-if ($rawU.Contains("'@PLUGIN_ROOT@")) {
-  [Console]::Error.WriteLine('BLOCKED (intentional guard, not a hook failure): the placeholder is single-quoted, so the shell does not expand it; run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run')
-  exit 2
-}
 if (Hit $raw 'PROOF_LAB_KEY') {
   Block 'the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file.'
 }
@@ -81,7 +81,6 @@ $rawN = RunnerCount $raw
 if ($rawN -eq 0) { exit 0 }
 $commandKeys = ([regex]::Matches($raw, '"command"\s*:')).Count
 $isClosed = (-not [regex]::IsMatch($raw, $chain)) -and ($commandKeys -eq 1) -and
-  [regex]::IsMatch($value, $closed) -and ((RunnerCount $value) -eq $rawN) -and
-  (([regex]::Matches($value, '@PLUGIN_ROOT@')).Count -le ([regex]::Matches($rawU, '@PLUGIN_ROOT@')).Count)
+  [regex]::IsMatch($cmdW, $closed) -and ((RunnerCount $value) -eq $rawN)
 if ($isClosed) { exit 0 }
 Block $runProg

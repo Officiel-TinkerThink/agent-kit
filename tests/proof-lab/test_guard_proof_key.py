@@ -136,6 +136,11 @@ BLOCKED = [
     "node @PLU''GIN_ROOT@/scripts/setup.mjs --run --spec s.json",
     # a single-quoted placeholder is not expanded by the shell, so it is refused
     "node '${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs' --run --spec s.json",
+    # the closed form is matched on the command as written, so no quoting shape can build the sanctioned path (review cycle 9)
+    'node @PLU""GIN_ROOT@/scripts/setup.mjs --run --spec s.json, note ${CLAUDE_PLUGIN_ROOT}',
+    "node '\"${CLAUDE_PLUGIN_ROOT}\"'/scripts/setup.mjs --run --spec s.json",
+    "node ' ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs' --run --spec s.json",
+    'node "${CLAUDE_PLUGIN_ROOT}"/scripts/setup.mjs --run --spec s.json',
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -153,6 +158,11 @@ ALLOWED = [
     "ls node_modules/*",
     "cat src/*.py",
     "grep -rn foo src/",
+    # the marker text and a placeholder in an ordinary command are plain text, not a runner (review cycle 9, over-blocks removed)
+    "grep -rn @PLUGIN_ROOT@ plugins/proof-lab/scripts",
+    "echo \"don't ${CLAUDE_PLUGIN_ROOT}\"",
+    # the sanctioned setup path unquoted
+    "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
 ]
 # Whole hook inputs, for the cases a plain command cannot express.
 RAW_BLOCKED = [
@@ -170,6 +180,9 @@ RAW_ALLOWED = [
     # a node word in a description field is not a node command (cycle-6 defect F2)
     ("node word only in the description", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "node {a,b} files", "command": "ls -la"}})),
+    # a description whose value is the word "command" is not the key: the cut needs the colon on both twins (backlog item 21)
+    ("description equal to the word command", json.dumps({"tool_name": "Bash", "tool_input": {
+        "description": "command", "command": 'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json'}})),
 ]
 UNREADABLE = [("not JSON", "not json"), ("empty input", "")]
 

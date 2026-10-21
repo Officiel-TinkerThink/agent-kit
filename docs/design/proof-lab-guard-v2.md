@@ -15,9 +15,10 @@ Each input is one hook JSON object. The guard reads the command value of the `co
 3. **Runner.** If either view names a runner (`run-spec`, `prove`, `npm run prove`, `lab run`, or `setup.mjs --run`), the call is allowed only when all of these hold:
    - the input has exactly one `command:` key;
    - nothing in the input is chained (`; & | ` $( <( >(`, a newline, or the JSON `\n` escape);
-   - the command value, quotes dropped and cut at the next JSON separator (`,` or `}`), is one closed form:
+   - the command string exactly as written in the JSON (nothing rewritten, decoded or quote-stripped) is one closed form:
      - `node ${CLAUDE_PLUGIN_ROOT}/<path>/setup.mjs <args>`: the plugin's own setup, the only path that runs the pin check; or
      - `node [<prefix>/]<path>/prove.js <args> --verify <args>`: read-only, so any plain path is accepted (the prefix is `${CLAUDE_PLUGIN_ROOT}/` or `$NAME/`);
+     - the program path is bare or in one pair of double quotes around the whole path; no other quote is accepted;
      - args are plain: `[-A-Za-z0-9_./:=@%+]`; the first token after `node` is never an option;
      - the match is case-sensitive, because `prove.js` reads `--verify` case-sensitively;
    - the command value holds every runner name the input names, so no runner sits in another JSON field.
@@ -32,11 +33,10 @@ Views. The shell view drops `\ $ * ? [ ] { } ( )`, backtick and quotes, and a ru
 ## Decisions
 
 - **Windows paths are refused.** A backslash path (`node D:\core\…\prove.js --verify`) names a runner and is not a closed form, so it is blocked. Use forward slashes; Git Bash accepts them.
-- **The sanctioned plugin root is `${CLAUDE_PLUGIN_ROOT}`.** It is rewritten to `@PLUGIN_ROOT@` before the checks, so the closed form matches it and the brace rule does not block it. A literal `ROOT/` typed by the agent is not the placeholder and does not match the setup form.
-- **`@PLUGIN_ROOT@` is reserved.** An input containing the literal marker is refused before the rewrite, so only `${CLAUDE_PLUGIN_ROOT}` produces it (review cycle 8, security F1 and spec F1). Accepted over-block: an ordinary command that searches for the marker text (for example `grep @PLUGIN_ROOT@ …`) is refused too; the Grep tool searches without this rule.
-- **The closed form may use only placeholders the rewrite made.** The placeholder count of the quote-stripped value must not exceed the count in the rewritten input, so a marker the shell joins from quoted pieces (`@PLU''GIN_ROOT@`) is refused. A single-quoted `'${CLAUDE_PLUGIN_ROOT}'` is refused, because the shell does not expand it (review cycle 8, security out-of-scope).
+- **The closed form is an allow-list on the command as written.** Review cycles 7 to 9 found four ways to build the sanctioned path from text the guard had rewritten or quote-stripped: a literal `ROOT/`, a typed marker, a marker joined from quoted pieces, and a single-quoted placeholder (which the shell does not expand). The cause was one mechanism: the closed form was judged on a text that differs from the one the shell runs. The closed form is now matched on the JSON command string itself, with the literal `${CLAUDE_PLUGIN_ROOT}` and at most one pair of double quotes around the program path, so none of those shapes can match. Over-block accepted: `node "${CLAUDE_PLUGIN_ROOT}"/scripts/setup.mjs` (quotes around the placeholder only) is refused; quote the whole path.
+- **The placeholder rewrite serves rule 4 only.** `${CLAUDE_PLUGIN_ROOT}` is rewritten to `@PLUGIN_ROOT@` in the texts that rules 1, 2 and 4 read, so the brace rule does not block it. A typed `@PLUGIN_ROOT@` is plain text there and never reaches the closed form.
 - **`setup.mjs` must be the plugin's own.** A relative or other `setup.mjs` path is refused, because only the plugin's setup runs the pin check. Each directory segment after the placeholder starts with a letter, digit or underscore, so `${CLAUDE_PLUGIN_ROOT}/../x/setup.mjs` is refused (review cycle 7, security F1, confirmed).
-- **Unknown field order is fail-closed.** A `description` containing `"command":` is not counted, so the real key is the only one judged; a duplicate `"command":` key is counted, and the closed form fails then. Known gap: a duplicate key hides a glob from the node checks (review cycle 7, history F1, confirmed at 50; in Notes, not fixed).
+- **Unknown field order is fail-closed.** The command value starts after the first `"command"` key followed by a colon, on both twins, so a `description` whose value is `command` or contains `command:` is not the key. A duplicate `"command":` key is counted, and the closed form fails then. Known gap: a duplicate key hides a glob from the node checks (review cycle 7, history F1, confirmed at 50; backlog item 20).
 - **Spellings.** `prove.mjs` and `prove-all.js` are not runner names (a runner is `prove` or `prove.js`).
 - **Over-block accepted.** A `grep` for the word `node` with a `*` in another word is blocked by rule 4. Fail-closed; the Glob tool lists files instead.
 

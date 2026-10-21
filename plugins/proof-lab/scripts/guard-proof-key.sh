@@ -12,18 +12,20 @@ case "$(printf '%s' "$INPUT" | tr -d ' \t\r\n')" in
   \{*\}) ;;
   *) printf '%s\n' "BLOCKED: proof-lab guard error (the hook input is not one JSON object)" >&2; exit 2 ;;
 esac
-# RAWU: the input as the harness wrote it (JSON escapes kept), newlines as chains, the sanctioned ${CLAUDE_PLUGIN_ROOT}
-# written as ROOT. RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only
-# add a chain, never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
-# @PLUGIN_ROOT@ is reserved: only the rewrite below may produce it, so a typed copy is refused (review cycle 8, security F1).
-case "$INPUT" in
-  *@PLUGIN_ROOT@*) printf '%s\n' "BLOCKED (intentional guard, not a hook failure): @PLUGIN_ROOT@ is reserved for the sanctioned \${CLAUDE_PLUGIN_ROOT} placeholder" >&2; exit 2 ;;
-esac
-RAWU=$(printf '%s' "$INPUT" | tr '\n\r' ';;' | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
+# RAWW: the input as the harness wrote it, newlines as chains, nothing rewritten; the closed form is judged on it.
+# RAWU: RAWW with the sanctioned ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
+# RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only add a chain,
+# never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
+RAWW=$(printf '%s' "$INPUT" | tr '\n\r' ';;')
+RAWU=$(printf '%s' "$RAWW" | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
-# The command value: the text after the one `command:` key. CMD_D is decoded, CMD_U is as written.
-CMD_D=$(printf '%s' "${RAW#*\"command\"}" | sed 's/^[[:space:]]*://; s/"[[:space:]]*[,}].*$//')
-CMD_U=$(printf '%s' "${RAWU#*\"command\"}" | sed 's/\\"//g; s/^[[:space:]]*://; s/"[[:space:]]*[,}].*$//')
+# cut_cmd: the text after the first "command" key and its colon (awk's match finds the leftmost one).
+cut_cmd() { printf '%s' "$1" | awk '{ if (match($0, /"command"[ \t]*:/)) print substr($0, RSTART + RLENGTH) }'; }
+# The command value. CMD_D is decoded, CMD_U is as written with \" dropped; both are cut at the JSON string end.
+CMD_D=$(cut_cmd "$RAW" | sed 's/"[[:space:]]*[,}].*$//')
+CMD_U=$(cut_cmd "$RAWU" | sed 's/\\"//g; s/"[[:space:]]*[,}].*$//')
+# CMD_W: the command string exactly as written in JSON (\" kept, nothing rewritten), cut at its closing quote.
+CMD_W=$(cut_cmd "$RAWW" | sed 's/^[[:space:]]*"//; s/\([^\\]\)".*$/\1/')
 # VALUE: the closed-form candidate, quotes dropped, cut at the next JSON separator.
 VALUE=$(printf '%s' "$CMD_D" | tr -d "\"'" | sed 's/[,}].*$//')
 # Two views of a text: the shell view (characters the shell drops or expands are removed, quotes too) and the path
@@ -37,9 +39,13 @@ NODE_WORD='(^|[^[:alnum:]_])node([^[:alnum:]_]|$)'
 SUSPECT_CHARS='[*?[{\\]'
 STEM='(^|[^[:alnum:]_])(run|prove|setup|lab)([^[:alnum:]_]|$)|[.]m?js'
 ARG='[-A-Za-z0-9_./:=@%+]+'
-SETUP='@PLUGIN_ROOT@/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
-PROVE='((@PLUGIN_ROOT@|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
-CLOSED="^[[:space:]]*node[[:space:]]+(${SETUP}([[:space:]]+${ARG})*|${PROVE}([[:space:]]+${ARG})*[[:space:]]+--verify([[:space:]]+${ARG})*)[[:space:]]*\$"
+# The closed form is an allow-list on CMD_W: the program path is bare or in one pair of double quotes (\" in JSON), and
+# every argument is plain text. A single quote, any other quote, a typed or joined marker fails the match, because the
+# text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
+Q='\\"'
+SETUP='[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+CLOSED="^[[:space:]]*node[[:space:]]+((${Q}${SETUP}${Q}|${SETUP})([[:space:]]+${ARG})*|(${Q}${PROVE}${Q}|${PROVE})([[:space:]]+${ARG})*[[:space:]]+--verify([[:space:]]+${ARG})*)[[:space:]]*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
 block() {
@@ -48,17 +54,12 @@ block() {
 }
 hit() { view "$1" | grep -Eqi -- "$2"; }
 runner_count() { view "$1" | grep -Eoi -- "$RUNNER" | wc -l | tr -d ' '; }
-# Placeholder count: the closed form may use only placeholders the rewrite made, never one the shell joins from quoted pieces.
-ph_count() { printf '%s' "$1" | grep -o -- '@PLUGIN_ROOT@' | wc -l | tr -d ' '; }
 node_in() { view "$1" | grep -Eqi -- "$NODE_WORD"; }
 suspect_word() {
   printf '%s\n' "$1" | grep -q -- "$SUSPECT_CHARS" || return 1
   view "$1" | grep -Eqi -- "$STEM"
 }
 
-case "$RAWU" in
-  *"'@PLUGIN_ROOT@"*) printf '%s\n' "BLOCKED (intentional guard, not a hook failure): the placeholder is single-quoted, so the shell does not expand it; run proof-lab through node \"\${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs\" --run" >&2; exit 2 ;;
-esac
 if hit "$RAW" 'PROOF_LAB_KEY'; then
   block "the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file."
 fi
@@ -77,12 +78,11 @@ if [ -n "$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | while IFS=
 fi
 RAW_N=$(runner_count "$RAW")
 [ "$RAW_N" = 0 ] && exit 0
-# The closed form is judged on the command value, and the value must hold every runner name in the input.
+# The closed form is judged on the command as written, and the value must hold every runner name in the input.
 if ! printf '%s' "$RAW" | grep -Eq -- "$CHAIN" \
   && [ "$(printf '%s' "$RAW" | grep -o '"command"[[:space:]]*:' | wc -l | tr -d ' ')" = 1 ] \
-  && printf '%s' "$VALUE" | grep -Eq -- "$CLOSED" \
-  && [ "$(runner_count "$VALUE")" = "$RAW_N" ] \
-  && [ "$(ph_count "$VALUE")" -le "$(ph_count "$RAWU")" ]; then
+  && printf '%s' "$CMD_W" | grep -Eq -- "$CLOSED" \
+  && [ "$(runner_count "$VALUE")" = "$RAW_N" ]; then
   exit 0
 fi
 block "$RUN_PROG"

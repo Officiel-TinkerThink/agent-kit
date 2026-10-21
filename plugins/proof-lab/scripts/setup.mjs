@@ -6,7 +6,7 @@
 // --run <args>: checks the same way, then runs src/run-spec.js with <args> and returns its exit code. Every proof run goes
 // through this, so a run never starts on a checkout that does not match the pin.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,8 @@ const MIN_NODE = 24;
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
 const sh = process.platform === "win32";
 const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
+const BROWSER_TIMEOUT_MS = 30 * 60 * 1000; // the Chromium download is the one large step
+const DEPS_DONE = ".proof-lab-installed"; // written inside node_modules after a whole install; a killed install lacks it
 const STALE_TMP_MS = 60 * 60 * 1000; // an install folder this old belongs to a run that was killed
 const firstLine = text => String(text).split("\n")[0].trim();
 
@@ -55,7 +57,7 @@ export function managedHome(env, pin) {
 }
 
 // The repository address without any user:password part, for messages.
-const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1");
+const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
 
 // Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
 function removeStaleTemps(home) {
@@ -92,7 +94,7 @@ export function provision(env, pin, home) {
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp);
   try {
-    const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm", timeout: STEP_TIMEOUT_MS });
+    const run = (cmd, args, cwd, timeout = STEP_TIMEOUT_MS) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm", timeout });
     console.error(`setting up proof-lab ${pin} in ${home} (first use only)`);
     run("git", ["init", "-q"], tmp);
     run("git", ["remote", "add", "origin", repo], tmp);
@@ -101,7 +103,8 @@ export function provision(env, pin, home) {
     if (git(tmp, ["rev-parse", "HEAD"]).trim() !== pin) refuse(`the fetched commit is not ${pin}`);
     run("npm", ["ci", "--ignore-scripts"], tmp);
     const playwright = join(tmp, "node_modules", "playwright", "cli.js");
-    if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp);
+    if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp, BROWSER_TIMEOUT_MS);
+    writeFileSync(join(tmp, "node_modules", DEPS_DONE), "");
     moveIntoPlace(tmp, home);
   } catch (error) {
     if (error instanceof Refused) throw error;
@@ -132,8 +135,11 @@ export function check(env, pinText) {
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
 }
 
-function installDependencies(home) {
-  execFileSync("npm", ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+// The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
+// npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
+function installDependencies(home, own) {
+  execFileSync("npm", own ? ["ci", "--ignore-scripts"] : ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+  if (own) writeFileSync(join(home, "node_modules", DEPS_DONE), "");
 }
 
 function main(argv) {
@@ -148,13 +154,13 @@ function main(argv) {
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
-    if (ownCheckout && !checkOnly && !existsSync(join(home, "node_modules"))) installDependencies(home);
+    if (ownCheckout && !checkOnly && !existsSync(join(home, "node_modules", DEPS_DONE))) installDependencies(home, true);
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
-    if (!checkOnly && !ownCheckout) installDependencies(home);
+    if (!checkOnly && !ownCheckout) installDependencies(home, false);
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

@@ -164,6 +164,13 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s3.json"))
     check("the plugin's own checkout is repaired when its node_modules are gone", code == 0 and "ran --spec s3.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
 
+    marker = data / remote_head / "node_modules" / ".proof-lab-installed"
+    check("a whole install leaves its marker", marker.is_file())
+    marker.unlink()
+    (data / remote_head / "node_modules" / "half").mkdir()
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s4.json"))
+    check("a half-made install (no marker) is redone before the run", code == 0 and "ran --spec s4.json" in out and marker.is_file() and not (data / remote_head / "node_modules" / "half").exists(), f"exit {code} out {out!r} err {err!r}")
+
     stale = data / (remote_head + ".tmp-99999")
     stale.mkdir()
     old = 1_000_000_000

@@ -11,12 +11,14 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
   [Console]::Error.WriteLine('BLOCKED: proof-lab guard error (the hook input is not one JSON object)')
   exit 2
 }
-# $rawW: the input as written, raw newlines as spaces, nothing rewritten; the closed form is judged on it.
+# $rawW: the input as written, nothing rewritten; the closed form is judged on it.
 # $rawU: $rawW with ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
-# A raw newline is JSON whitespace (a newline inside a string is always the \n escape, which is decoded to a chain below);
-# Claude Code ends the hook input with one (found in real use, 2026-10-21).
-$rawW = $inputText.TrimEnd() -replace '\r', ' ' -replace '\n', ';'
+# Trailing whitespace is dropped, so the newline Claude Code appends is never a chain (found in real use, 2026-10-21).
+# Any other raw newline or carriage return fails closed as a chain: valid JSON has neither inside a string, and the
+# guard does not trust the input to be valid. A carriage return is not a space to bash, which keeps it inside a word,
+# so "k.txt<CR>--verify" would be one argument (review cycles 14 and 15).
+$rawW = $inputText.TrimEnd() -replace '\r|\n', ';'
 $rawU = $rawW -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
 # The command value: the text after the first "command" key and its colon (case-sensitive). $cmdD decoded, $cmdU as

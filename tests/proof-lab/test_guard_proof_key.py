@@ -216,6 +216,14 @@ RAW_BLOCKED += [
     # (review cycle 14, security F1 and defect F1)
     ("raw newline inside the command string", '{"tool_name":"Bash","tool_input":{"command":"node \\"' + P
      + '/scripts/setup.mjs\\" --run --spec s.json\nrm -rf /tmp/x"}}'),
+    # a raw carriage return is not a separator to bash: "k.txt<CR>--verify" is one argument, so prove.js would run
+    # without --verify (review cycle 15, defect unclear item)
+    ("raw carriage return before --verify", '{"tool_name":"Bash","tool_input":{"command":"node src/prove.js --key-file /keys/k.txt\r--verify"}}'),
+]
+RAW_ALLOWED += [
+    # trailing whitespace of any kind is dropped on both twins (review cycle 15, defect F1)
+    ("sanctioned run with trailing CRLF and a space", json.dumps({"tool_name": "Bash", "tool_input": {
+        "command": f'node "{P}/scripts/setup.mjs" --run --spec s.json'}}, separators=(",", ":")) + "\r\n \n"),
 ]
 ALLOWED += [
     f'node "{P}/scripts/setup.mjs" --run --spec "D:/core/projects/proof-lab/demo/specs/06-error-invalid-spec.json"'

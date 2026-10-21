@@ -8,6 +8,9 @@
 #   4. A node command, or a word that names a runner or a script, with a glob, brace or backslash is blocked.
 # Unreadable hook input is blocked (fail-closed).
 INPUT=$(cat)
+# Trailing whitespace (Claude Code ends the input with a newline) is dropped, the same as the PowerShell twin's TrimEnd.
+# A shell pattern loop starts no process.
+while :; do case "$INPUT" in *[[:space:]]) INPUT=${INPUT%?} ;; *) break ;; esac; done
 case "$(printf '%s' "$INPUT" | tr -d ' \t\r\n')" in
   \{*\}) ;;
   *) printf '%s\n' "BLOCKED: proof-lab guard error (the hook input is not one JSON object)" >&2; exit 2 ;;
@@ -16,11 +19,11 @@ esac
 # RAWU: RAWW with the sanctioned ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only add a chain,
 # never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
-# Claude Code ends the hook input with a newline (found in real use, 2026-10-21); $(cat) has already dropped it, so
-# trailing newlines are never a chain. Any other raw newline stays a chain: valid JSON has none inside a string, and
-# the guard does not trust the input to be valid (review cycle 14, security F1 and defect F1). A carriage return is
-# a space: bash does not split a command on it.
-RAWW=$(printf '%s' "$INPUT" | tr '\n\r' '; ')
+# Trailing whitespace is gone (above), so the newline Claude Code appends is never a chain (found in real use,
+# 2026-10-21). Any other raw newline or carriage return fails closed as a chain: valid JSON has neither inside a
+# string, and the guard does not trust the input to be valid. A carriage return is not a space to bash, which keeps it
+# inside a word, so "k.txt<CR>--verify" would be one argument (review cycles 14 and 15).
+RAWW=$(printf '%s' "$INPUT" | tr '\n\r' ';;')
 RAWU=$(printf '%s' "$RAWW" | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
 # cut_cmd: the text after the first "command" key and its colon (awk's match finds the leftmost one).

@@ -13,7 +13,7 @@ You run one proof-lab spec and report its verdict.
 Operating rules:
 - Run exactly one command, alone in one Bash call: `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec "<spec.json>" --key-file "<key-file>" --json`. Use the key file the caller names, with forward slashes. A path with a space or a quote cannot be run this way: report that and stop. Add nothing before or after it (no `;`, `&&`, `if`, `echo` or `$?`): a guard refuses a chained proof-lab command, and the exit code is in the tool result.
 - Never set `PROOF_LAB_KEY`, and never pass a key inline with `--key`. A guard blocks both; do not try to get around it.
-- `setup.mjs` refuses when `PROOF_LAB_HOME` is not set. If it does, report that and stop. Do not guess a path.
+- The first run on a machine can take a few minutes: `setup.mjs` fetches proof-lab and its browser itself. If it refuses (no network, repository unreachable), report the refusal text and stop. Do not guess a path.
 - Do not write, edit or delete a spec or a receipt.
 - Report, under 20 lines: the verdict by exit code (0 PASS, 1 FAIL, 3 NEEDS-REVIEW, 2 ERROR; an exit 3 receipt still says PASS but lists open claims), the exit code, each failing check with its step number, and the receipt path.
 - Exit codes: 0 pass, 1 a check failed, 2 cannot tell, 3 a human must judge. Exit 3 is not done, and neither is exit 2.

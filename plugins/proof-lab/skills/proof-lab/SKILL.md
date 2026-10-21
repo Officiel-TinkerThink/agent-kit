@@ -1,6 +1,6 @@
 ---
 name: proof-lab
-description: "Prove that a feature works in the real app: write a spec, run it, read the signed receipt. Uses the proof-lab checkout named by PROOF_LAB_HOME. Use when a change must be shown to work in the app, not only in unit tests."
+description: "Prove that a feature works in the real app: write a spec, run it, read the signed receipt. Sets up its own proof-lab checkout on first use (or uses PROOF_LAB_HOME). Use when a change must be shown to work in the app, not only in unit tests."
 argument-hint: "<spec.json>"
 allowed-tools: Bash, Read
 ---
@@ -11,14 +11,14 @@ Proof-lab runs a spec against the app and writes a signed receipt. A feature is 
 
 ## Before the first run
 
-1. Set `PROOF_LAB_HOME` to a proof-lab checkout (absolute path). The checkout must be at the commit in `proof-lab.pin`, with no uncommitted changes.
-2. Run the setup once: `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"`. It refuses a checkout that does not match the pin, and otherwise installs its dependencies.
-3. Check the environment: `node "$PROOF_LAB_HOME/src/lab.js" doctor`.
+1. Nothing to set up. On the first run, `setup.mjs` fetches proof-lab at the commit in `proof-lab.pin` into `~/.proof-lab`, installs its dependencies and Chromium (a few minutes, network needed). To use your own checkout instead, set `PROOF_LAB_HOME` to it (absolute path, at the pinned commit, no uncommitted changes).
+2. Run the setup once if you want it ready before the first run: `node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs"`. It refuses a checkout that does not match the pin.
+3. Check the environment: `node "<proof-lab folder>/src/lab.js" doctor` (the folder is `$PROOF_LAB_HOME`, or the one `setup.mjs` prints).
 4. The signing key is a file with mode 0600. Pass it with `--key-file <path>`. Never set `PROOF_LAB_KEY` and never pass `--key`; a guard blocks both.
 
 ## Write the spec
 
-The format is in `$PROOF_LAB_HOME/SPECS.md`. A spec needs at least one assertion, or the validator refuses it.
+The format is in `SPECS.md` in the proof-lab folder. A spec needs at least one assertion, or the validator refuses it.
 
 ## Run
 
@@ -36,4 +36,4 @@ The format is in `$PROOF_LAB_HOME/SPECS.md`. A spec needs at least one assertion
 
 ## Receipts
 
-Receipts go to `$PROOF_LAB_RECEIPTS`, or to `$PROOF_LAB_HOME/receipts` when that is not set. They are never committed.
+Receipts go to `$PROOF_LAB_RECEIPTS`, or to `receipts/` in the proof-lab folder when that is not set. They are never committed.

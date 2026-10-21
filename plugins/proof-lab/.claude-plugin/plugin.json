@@ -1,7 +1,7 @@
 {
   "name": "proof-lab",
   "version": "0.3.1",
-  "description": "Prove that a feature works in the real app: a spec run, a signed receipt, and a guard on the signing key. Uses the proof-lab checkout named by PROOF_LAB_HOME, pinned to one commit.",
+  "description": "Prove that a feature works in the real app: a spec run, a signed receipt, and a guard on the signing key. Sets up its own proof-lab checkout, pinned to one commit.",
   "author": {
     "name": "Unidentified"
   },

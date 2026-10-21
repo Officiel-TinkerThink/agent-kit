@@ -8,10 +8,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SETUP = ROOT / "plugins" / "proof-lab" / "scripts" / "setup.mjs"
 failed = 0
+old_time = 1_000_000_000
 
 
 def check(name, cond, extra=""):
@@ -56,7 +59,8 @@ def make_plugin(root, pin_text):
 
 
 def run(script, env_home, extra_env=None, args=("--check-only",)):
-    env = {k: v for k, v in os.environ.items() if k not in ("PROOF_LAB_HOME", "PROOF_LAB_RECEIPTS")}
+    env = {k: v for k, v in os.environ.items() if k not in ("PROOF_LAB_HOME", "PROOF_LAB_RECEIPTS", "PROOF_LAB_DATA", "PROOF_LAB_REPO")}
+    env["PROOF_LAB_DATA"] = str(script.parent.parent / "data")  # never the real home folder
     if env_home is not None:
         env["PROOF_LAB_HOME"] = env_home
     env.update(extra_env or {})
@@ -86,7 +90,7 @@ with tempfile.TemporaryDirectory() as tmp:
     (home / "dirty.txt").unlink()
 
     code, out, err = run(script, None)
-    check("unset PROOF_LAB_HOME is refused", code == 2 and "not set" in err, f"exit {code} err {err!r}")
+    check("unset PROOF_LAB_HOME with no managed checkout: --check-only says to run setup", code == 2 and "run node setup.mjs once" in err, f"exit {code} err {err!r}")
 
     code, out, err = run(script, "relative/path")
     check("a relative PROOF_LAB_HOME is refused", code == 2 and "absolute" in err, f"exit {code} err {err!r}")
@@ -120,5 +124,100 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--run refuses a checkout with no node_modules before it runs", code == 2 and "has no node_modules" in err and "ran" not in out, f"exit {code} out {out!r} err {err!r}")
     code, out, err = run(bare_script, str(bare))
     check("setup without --run does not refuse a checkout with no node_modules", "has no node_modules" not in err, f"exit {code} err {err!r}")
+
+    # Managed checkout: PROOF_LAB_HOME unset, the plugin fetches the pin from the repository (a local folder stands in for GitHub).
+    remote, _ = make_checkout(tmp / "remote", deps=False)
+    # One local dependency, so npm ci creates node_modules like the real playwright dependency does; no network is used.
+    (remote / "dep").mkdir()
+    (remote / "dep" / "package.json").write_text('{"name": "dep", "version": "1.0.0"}\n', encoding="utf-8")
+    (remote / "package.json").write_text('{"name": "proof-lab", "version": "0.0.0", "dependencies": {"dep": "file:./dep"}}\n', encoding="utf-8")
+    subprocess.run("npm install --ignore-scripts --no-audit --no-fund", cwd=remote, shell=True, check=True, capture_output=True)
+    shutil.rmtree(remote / "node_modules")
+    git(remote, "add", "package.json", "package-lock.json", "dep")
+    git(remote, "commit", "-q", "-m", "lock")
+    remote_head = git(remote, "rev-parse", "HEAD")
+    mscript = make_plugin(tmp / "managed", f"{remote_head}\n")
+    data = mscript.parent.parent / "data" / "checkouts"
+    repo_env = {"PROOF_LAB_REPO": str(remote)}
+
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("unset PROOF_LAB_HOME: --run fetches the pin on first use, then runs", code == 0 and "ran --spec s.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
+    check("the managed checkout is at the pin and clean", git(data / remote_head, "rev-parse", "HEAD") == remote_head and git(data / remote_head, "status", "--porcelain") == "")
+
+    code, out, err = run(mscript, None, {"PROOF_LAB_REPO": str(tmp / "nowhere")}, args=("--run", "--spec", "s2.json"))
+    check("the second run reuses the checkout and does not fetch again", code == 0 and "ran --spec s2.json" in out and "setting up" not in err, f"exit {code} out {out!r} err {err!r}")
+
+    code, out, err = run(mscript, None, repo_env)
+    check("setup without --run on a ready managed checkout is ready", code == 0 and "ready: proof-lab" in out, f"exit {code} err {err!r}")
+
+    def leftovers(plugin):
+        folder = plugin.parent.parent / "data" / "checkouts"
+        return list(folder.glob("*")) if folder.exists() else []
+
+    fresh = make_plugin(tmp / "fresh", f"{remote_head}\n")
+    code, out, err = run(fresh, None, {"PROOF_LAB_REPO": str(tmp / "nowhere")}, args=("--run", "--spec", "s.json"))
+    check("an unreachable repository is refused with a hint and leaves no half-made checkout", code == 2 and "could not set up" in err and "PROOF_LAB_HOME" in err and "ran" not in out and leftovers(fresh) == [], f"exit {code} err {err!r} left {leftovers(fresh)}")
+
+    missing = make_plugin(tmp / "missing", "1" * 40 + "\n")
+    code, out, err = run(missing, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("a pin the repository does not have is refused and leaves nothing behind", code == 2 and "could not set up" in err and leftovers(missing) == [], f"exit {code} err {err!r} left {leftovers(missing)}")
+
+    # Review findings (cycle 1 of auto-setup): self-heal, stale temp folders, credentials in messages, refusal before install.
+    shutil.rmtree(data / remote_head / "node_modules")
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s3.json"))
+    check("the plugin's own checkout is repaired when its node_modules are gone", code == 0 and "ran --spec s3.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
+
+    marker = data / remote_head / "node_modules" / ".proof-lab-installed"
+    check("a whole install leaves its marker", marker.is_file())
+    marker.unlink()
+    (data / remote_head / "node_modules" / "half").mkdir()
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s4.json"))
+    check("a half-made install (no marker) is redone before the run", code == 0 and "ran --spec s4.json" in out and marker.is_file() and not (data / remote_head / "node_modules" / "half").exists(), f"exit {code} out {out!r} err {err!r}")
+
+    # Two repairs never share one npm ci: a held lock is waited for, an old one is cleared.
+    marker.unlink()
+    lock = pathlib.Path(str(data / remote_head) + ".lock")
+    lock.mkdir()
+    half = data / remote_head / "node_modules" / "half"
+    half.mkdir(parents=True, exist_ok=True)
+    seen = {}
+
+    def release():
+        seen["untouched"] = half.exists()  # an install that ignored the lock would already have emptied node_modules
+        shutil.rmtree(lock, ignore_errors=True)
+
+    threading.Timer(3.0, release).start()
+    started = time.time()
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s5.json"))
+    check("a repair waits for a held install lock, then runs", code == 0 and seen.get("untouched") is True and time.time() - started >= 2.5 and marker.is_file() and not lock.exists(), f"exit {code} after {time.time() - started:.1f}s err {err!r}")
+
+    marker.unlink()
+    lock.mkdir()
+    os.utime(lock, (old_time, old_time))
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s6.json"))
+    check("an old install lock is cleared and the repair runs", code == 0 and marker.is_file() and not lock.exists(), f"exit {code} err {err!r}")
+
+    stale = data / (remote_head + ".tmp-99999")
+    stale.mkdir()
+    old = old_time
+    os.utime(stale, (old, old))
+    young = data / (remote_head + ".tmp-88888")
+    young.mkdir()
+    sibling = make_plugin(tmp / "stale", f"{remote_head}\n")
+    sdata = sibling.parent.parent / "data" / "checkouts"
+    sdata.mkdir(parents=True)
+    (sdata / (remote_head + ".tmp-99999")).mkdir()
+    os.utime(sdata / (remote_head + ".tmp-99999"), (old, old))
+    (sdata / (remote_head + ".tmp-88888")).mkdir()
+    code, out, err = run(sibling, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("a first run removes an old install folder a killed run left, and keeps a recent one", code == 0 and not (sdata / (remote_head + ".tmp-99999")).exists() and (sdata / (remote_head + ".tmp-88888")).exists(), f"exit {code} err {err!r}")
+
+    secret = make_plugin(tmp / "secret", f"{remote_head}\n")
+    code, out, err = run(secret, None, {"PROOF_LAB_REPO": "https://user:hunter2token@127.0.0.1:1/x.git"}, args=("--run", "--spec", "s.json"))
+    check("a refusal never prints credentials from PROOF_LAB_REPO", code == 2 and "hunter2token" not in err and "127.0.0.1:1/x.git" in err, f"exit {code} err {err!r}")
+
+    rel = make_plugin(tmp / "rel", f"{remote_head}\n")
+    code, out, err = run(rel, None, {"PROOF_LAB_REPO": str(remote), "PROOF_LAB_DATA": "relative/dir"}, args=("--run", "--spec", "s.json"))
+    check("a relative PROOF_LAB_DATA is refused before anything is fetched", code == 2 and "absolute" in err and "setting up" not in err and not pathlib.Path("relative").exists(), f"exit {code} err {err!r}")
 
 sys.exit(1 if failed else 0)

@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ## [Unreleased]
 
+### Changed
+- `proof-lab` sets itself up. When `PROOF_LAB_HOME` is not set, `setup.mjs` fetches the pinned proof-lab commit into `~/.proof-lab/checkouts/<pin>` on first use, runs `npm ci --ignore-scripts` and installs Chromium, then runs as before; the pin and clean-tree checks still run on every call. A failed install leaves nothing behind. Setting `PROOF_LAB_HOME` still works. It needs git, Node 24 and network on the first run, and the proof-lab repository must be readable without credentials.
+
 ## [0.3.1] - 2026-10-21
 
 ### Fixed

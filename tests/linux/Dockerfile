@@ -6,7 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git python3 python-is-python3 \
  && rm -rf /var/lib/apt/lists/*
-# Node 24 from the official tarball (the proof-lab plugin needs Node 24 or later); the checksum comes from the same release.
+# Node 24 from the official tarball (the proof-lab plugin needs Node 24 or later); the SHA-256 is pinned here (from the release's SHASUMS256.txt), so a changed download fails the build; change both lines together when the version moves.
 ARG NODE_VERSION=24.22.1
-RUN set -e; f=node-v${NODE_VERSION}-linux-x64.tar.gz; cd /tmp  && curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/$f  && curl -fsSL https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt | grep " $f\$" | sha256sum -c -  && tar -xzf $f -C /usr/local --strip-components=1 --no-same-owner && rm $f  && node --version
+ARG NODE_SHA256=eb6728e77c576a35162c122c45ccadf224d89ff00abc8dae46cc2897c6002d7c
+RUN set -e; f=node-v${NODE_VERSION}-linux-x64.tar.gz; cd /tmp  && curl -fsSLO https://nodejs.org/dist/v${NODE_VERSION}/$f  && echo "${NODE_SHA256}  $f" | sha256sum -c -  && tar -xzf $f -C /usr/local --strip-components=1 --no-same-owner && rm $f  && node --version
 WORKDIR /work

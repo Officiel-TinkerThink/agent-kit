@@ -9,7 +9,7 @@ if [ "$mode" = user ]; then
   useradd -m tester
   run() { su tester -c "PROOF_LAB_DATA=/home/tester/pl $1"; }
   out=$(run "$setup" 2>&1); code=$?
-  if [ "$code" -eq 2 ] && echo "$out" | grep -q 'sudo node ".*cli.js" install-deps chromium'; then ok "a normal user without the libraries is refused with the exact apt command"; else bad "no hint (exit $code): $out"; fi
+  if [ "$code" -eq 2 ] && echo "$out" | grep -q "sudo node '.*cli.js' install-deps chromium"; then ok "a normal user without the libraries is refused with the exact apt command"; else bad "no hint (exit $code): $out"; fi
   cli=$(echo "$out" | sed -n 's/.*sudo node "\([^"]*\)" install-deps.*/\1/p' | head -1)
   node "$cli" install-deps chromium >/dev/null 2>&1 || bad "the printed command failed"
   out=$(run "$setup" 2>&1); code=$?
@@ -22,5 +22,13 @@ else
   home=$(ls -d /root/pl/checkouts/*)
   out=$(cd "$home" && node demo/run-demo.mjs 2>&1); code=$?
 fi
-if [ "$code" -eq 0 ] && echo "$out" | grep -q 'VALID'; then ok "the proof-lab demo runs on Ubuntu (exit 0, chain checked)"; else bad "demo failed (exit $code): $(echo "$out" | tail -8)"; fi
+# The demo exits 0 whatever the verdicts are, so read them: the seven specs must end 0 1 1 3 0 2 2, then the chain check
+# must exit 0 and print "VALID:", and the tampered copy must exit 1 and print "INVALID:" (the lines are matched from the start).
+codes=$(echo "$out" | sed -n 's/^ *exit code: *\([0-9]*\).*//p' | tr '
+' ' ')
+if [ "$code" -eq 0 ] && [ "$codes" = "0 1 1 3 0 2 2 0 1 " ] && echo "$out" | grep -q '^VALID:' && echo "$out" | grep -q '^INVALID:'; then
+  ok "the proof-lab demo runs on Ubuntu: verdicts 0 1 1 3 0 2 2, chain valid, tampered copy refused"
+else
+  bad "demo result wrong (exit $code, verdict codes '$codes'): $(echo "$out" | tail -8)"
+fi
 exit "$fail"

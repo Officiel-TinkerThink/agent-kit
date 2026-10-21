@@ -10,17 +10,18 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { forThisMachine } from "./platform/index.mjs";
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PIN_FILE = join(PLUGIN, "proof-lab.pin");
 const MIN_NODE = 24;
 // The repository the pin is fetched from. PROOF_LAB_REPO replaces it (tests); the pin check holds for any source.
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
-const sh = process.platform === "win32";
+const machine = forThisMachine(); // the adapter for the operating system this runs on; no other code looks at the system
+const sh = machine.npmNeedsShell;
 const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
 const BROWSER_TIMEOUT_MS = 30 * 60 * 1000; // the Chromium download is the one large step
 const DEPS_DONE = ".proof-lab-installed"; // written inside node_modules after a whole install; a killed install lacks it
-const BROWSER_OK = ".proof-lab-browser-ok"; // written inside node_modules once Chromium has started on this machine
 const STALE_TMP_MS = 60 * 60 * 1000; // an install folder this old belongs to a run that was killed
 const firstLine = text => String(text).split("\n")[0].trim();
 
@@ -167,35 +168,6 @@ function withInstallLock(home, work) {
 
 // The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
 // npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
-// Linux only. The Chromium download works on a minimal Ubuntu, but the browser cannot start without system libraries, and
-// Playwright then reports only "browser has been closed". So the plugin starts the browser once and, if that fails, installs
-// the libraries itself when it already runs as root (a server or a container), or tells the user the exact command.
-function browserStarts(home) {
-  const code = "import { chromium } from 'playwright'; const b = await chromium.launch({ headless: true }); await b.close();";
-  const child = spawnSync(process.execPath, ["--input-type=module", "-e", code], { cwd: home, stdio: "ignore", timeout: 60_000 });
-  return child.status === 0;
-}
-
-function ensureBrowser(home, own) {
-  const cli = join(home, "node_modules", "playwright", "cli.js");
-  if (process.platform !== "linux" || !existsSync(cli)) return;
-  const mark = join(home, "node_modules", BROWSER_OK);
-  if (own && existsSync(mark)) return;
-  if (!browserStarts(home)) {
-    const asRoot = process.getuid?.() === 0;
-    if (asRoot) {
-      try {
-        console.error("Chromium cannot start: installing its system libraries (apt)");
-        execFileSync(process.execPath, [cli, "install-deps", "chromium"], { cwd: home, stdio: ["ignore", process.stderr, process.stderr], timeout: STEP_TIMEOUT_MS });
-      } catch {}
-    }
-    if (!asRoot || !browserStarts(home)) {
-      refuse(`Chromium cannot start on this machine, most likely because system libraries are missing. Install them (this uses apt) with: ${asRoot ? "" : "sudo "}node "${cli}" install-deps chromium  then run this again`);
-    }
-  }
-  if (own) writeFileSync(mark, "");
-}
-
 function installDependencies(home, own) {
   execFileSync("npm", own ? ["ci", "--ignore-scripts"] : ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
   if (own) markInstalled(home);
@@ -217,12 +189,12 @@ function main(argv) {
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
-      ensureBrowser(home, ownCheckout);
+      machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
     if (!checkOnly && !ownCheckout) installDependencies(home, false);
-    if (!checkOnly) ensureBrowser(home, ownCheckout);
+    if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

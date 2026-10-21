@@ -39,6 +39,30 @@ check("skill has a description", front is not None and re.search(r"^description:
 check("skill is named proof-lab", front is not None and re.search(r"^name: proof-lab$", front.group(1), re.M) is not None)
 
 agent = text(PLUGIN / "agents" / "proof-runner.md")
+
+
+def plain_scalar_errors(md):
+    # YAML reads ": " inside an unquoted value as a new key and " #" as a comment, so the whole frontmatter fails to
+    # parse and the skill or agent loads with empty metadata (claude plugin validate reports it; the regex checks here
+    # do not). A value that needs either must be quoted.
+    m = re.match(r"^---\n(.*?)\n---\n", md, re.S)
+    if m is None:
+        return ["no frontmatter"]
+    bad = []
+    for line in m.group(1).splitlines():
+        kv = re.match(r"^([A-Za-z][\w-]*):[ \t]+(.*)$", line)
+        if kv is None:
+            continue
+        value = kv.group(2).strip()
+        if value[:1] in ("'", '"', "[", "{", "|", ">"):
+            continue
+        if ": " in value or " #" in value or value.endswith(":"):
+            bad.append(kv.group(1))
+    return bad
+
+
+check("skill frontmatter parses as YAML (no unquoted ': ' or ' #')", plain_scalar_errors(skill) == [], str(plain_scalar_errors(skill)))
+check("agent frontmatter parses as YAML (no unquoted ': ' or ' #')", plain_scalar_errors(agent) == [], str(plain_scalar_errors(agent)))
 check("agent is named proof-runner", re.search(r"^name: proof-runner$", agent, re.M) is not None)
 check("agent runs on claude-haiku-5-5", re.search(r"^model: claude-haiku-5-5$", agent, re.M) is not None)
 check("skill runs proofs through setup.mjs --run", "scripts/setup.mjs\" --run" in skill and "run-spec.js\" --spec" not in skill)

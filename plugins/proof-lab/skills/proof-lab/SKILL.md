@@ -1,6 +1,6 @@
 ---
 name: proof-lab
-description: Prove that a feature works in the real app: write a spec, run it, read the signed receipt. Uses the proof-lab checkout named by PROOF_LAB_HOME. Use when a change must be shown to work in the app, not only in unit tests.
+description: "Prove that a feature works in the real app: write a spec, run it, read the signed receipt. Uses the proof-lab checkout named by PROOF_LAB_HOME. Use when a change must be shown to work in the app, not only in unit tests."
 argument-hint: "<spec.json>"
 allowed-tools: Bash, Read
 ---

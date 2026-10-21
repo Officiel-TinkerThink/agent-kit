@@ -1,6 +1,6 @@
 """scripts/setup.mjs --check-only: refuses a proof-lab checkout that does not match the pin, and accepts one that does.
 
-The test copies the setup script and a pin file into a temporary plugin folder, so the real pin is never changed.
+The test copies the setup script, its machine adapters and a pin file into a temporary plugin folder, so the real pin is never changed.
 """
 import os
 import pathlib
@@ -54,6 +54,7 @@ def make_plugin(root, pin_text):
     plugin = root / "plugin"
     (plugin / "scripts").mkdir(parents=True)
     shutil.copy(SETUP, plugin / "scripts" / "setup.mjs")
+    shutil.copytree(SETUP.parent / "platform", plugin / "scripts" / "platform")  # setup.mjs imports the machine adapters
     (plugin / "proof-lab.pin").write_text(pin_text, encoding="utf-8")
     return plugin / "scripts" / "setup.mjs"
 

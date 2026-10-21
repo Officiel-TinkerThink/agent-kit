@@ -14,7 +14,7 @@ if [ "$mode" = user ]; then
   cli=$(echo "$out" | sed -n "s/.*sudo node '\([^']*\)' install-deps.*/\1/p" | head -1)
   if [ -n "$cli" ] && node "$cli" install-deps chromium >/dev/null 2>&1; then ok "the printed command installs the libraries"; else bad "the printed command failed (path '$cli')"; fi
   out=$(run "$setup" 2>&1); code=$?
-  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab'; then ok "setup is ready once the libraries are installed"; else bad "not ready (exit $code): $out"; fi
+  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab' && [ -s /home/tester/pl/browsers-checked.json ]; then ok "setup checks the browser against its pinned digest and is ready once the libraries are installed"; else bad "not ready (exit $code): $out"; fi
   home=$(ls -d /home/tester/pl/checkouts/*)
   out=$(run "cd $home && node demo/run-demo.mjs" 2>&1); code=$?
 elif [ "$mode" = untrusted ]; then
@@ -24,11 +24,19 @@ elif [ "$mode" = untrusted ]; then
   # git refuses a repository that another user owns unless root says it is safe; the test says so, to reach the browser step.
   git config --global --add safe.directory "*"
   out=$(PROOF_LAB_DATA=/home/tester/pl $setup 2>&1); code=$?
-  if [ "$code" -eq 0 ] && echo "$out" | grep -q 'browser step is skipped' && ! dpkg -s libnss3 >/dev/null 2>&1; then ok "root on a user-owned checkout skips the browser step and installs nothing"; else bad "untrusted root case wrong (exit $code, libnss3 present: $(dpkg -s libnss3 >/dev/null 2>&1 && echo yes || echo no)): $(echo "$out" | tail -4)"; fi
+  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^warning: running as root on .*npm ci and the spec run as root' && echo "$out" | grep -q 'browser step is skipped' && ! dpkg -s libnss3 >/dev/null 2>&1; then ok "root on a user-owned checkout is warned, skips the browser step and installs nothing"; else bad "untrusted root case wrong (exit $code, libnss3 present: $(dpkg -s libnss3 >/dev/null 2>&1 && echo yes || echo no)): $(echo "$out" | tail -4)"; fi
   exit "$fail"
 else
   out=$(PROOF_LAB_DATA=/root/pl $setup 2>&1); code=$?
-  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab'; then ok "root: setup installs the libraries itself and is ready"; else bad "root not ready (exit $code): $out"; fi
+  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab' && [ -s /root/pl/browsers-checked.json ]; then ok "root: setup checks the browser against its pinned digest, installs the libraries itself and is ready"; else bad "root not ready (exit $code): $out"; fi
+  # A browser folder changed after the check, and installed again as far as Playwright's marker says: refused.
+  shell=$(ls -d /root/.cache/ms-playwright/chromium_headless_shell-*)
+  cp -a "$shell" /tmp/shell-copy
+  echo x >> "$(find "$shell" -name 'chrome-headless-shell' -type f | head -1)"
+  touch "$shell/INSTALLATION_COMPLETE"
+  out=$(PROOF_LAB_DATA=/root/pl $setup 2>&1); code=$?
+  if [ "$code" -eq 2 ] && echo "$out" | grep -q 'does not match the digest'; then ok "root: a changed browser folder is refused"; else bad "changed browser not refused (exit $code): $(echo "$out" | tail -3)"; fi
+  rm -rf "$shell" && mv /tmp/shell-copy "$shell"
   home=$(ls -d /root/pl/checkouts/*)
   out=$(cd "$home" && node demo/run-demo.mjs 2>&1); code=$?
 fi

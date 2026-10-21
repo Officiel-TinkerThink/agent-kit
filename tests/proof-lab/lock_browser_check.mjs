@@ -177,9 +177,9 @@ try {
   writeFileSync(cli, `if (process.env.FAKE_FAIL) { console.error("broken"); process.exit(1); }\nprocess.stdout.write(${JSON.stringify(dry)});\n`);
   const listed = downloads(cli);
   out("downloads: each folder with its archive path from builds/ on, fallbacks and <system> left out", JSON.stringify(listed) === JSON.stringify([
-    { dir: chrome, key: "builds/cft/1/x64/chrome.zip" },
-    { dir: join(browsers, "ffmpeg-1"), key: "builds/ffmpeg/1/ffmpeg.zip" },
-    { dir: shell, key: "builds/cft/1/x64/shell.zip" },
+    { dir: chrome, key: "builds/cft/1/x64/chrome.zip", url: "https://cdn.example/builds/cft/1/x64/chrome.zip" },
+    { dir: join(browsers, "ffmpeg-1"), key: "builds/ffmpeg/1/ffmpeg.zip", url: "https://cdn.example/dbazure/download/playwright/builds/ffmpeg/1/ffmpeg.zip" },
+    { dir: shell, key: "builds/cft/1/x64/shell.zip", url: "https://cdn.example/builds/cft/1/x64/shell.zip" },
   ]), JSON.stringify(listed));
   let threw = null;
   try {

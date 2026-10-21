@@ -30,7 +30,11 @@ Check it on a clean Ubuntu 24.04 container (from a Linux shell or WSL with Docke
 
 `scripts/setup.mjs` does not look at the operating system. It asks `scripts/platform/index.mjs` for the adapter that matches the machine it runs on (`linux.mjs`, `win32.mjs`, `darwin.mjs`, or a no-op for any other system). An adapter answers the same questions for its system: how npm is started, and whether the browser can start. Supporting a new system means adding one file there. A test fails if any other JavaScript file in `scripts/` names an operating system (the shell entry point `run.sh` and the guard scripts are the existing per-system routers).
 
+## The browser is pinned too
+
+Playwright checks only the size of the browser it downloads. The plugin compares every browser folder it uses with `browsers.sha256.json` (a digest per build: Linux x64 and arm64, macOS x64 and arm64, Windows x64) before the browser first starts, and again whenever Playwright installs it again. A folder that does not match is refused with the command that downloads it afresh. A browser that you installed yourself for the same Playwright version is the same download, so it passes.
+
 ## Limits
 
-- The Chromium download comes from Playwright's own servers; the commit pin does not cover it.
+- As root on a checkout a normal user can change, the plugin warns and goes on: `npm ci` and the spec run as root from that checkout, and the browser step (the check above and the system libraries) is skipped. Run it as the checkout's owner instead.
 - The guard checks the Bash command an agent types. It does not parse code run by an interpreter. See `docs/design/proof-lab-guard-v2.md`.

@@ -28,7 +28,7 @@ export function downloads(cli, env = process.env, names = ["chromium"]) {
     const url = /^\s+Download url:\s+(\S+)/.exec(line);
     if (url && dir) {
       const at = url[1].lastIndexOf("/builds/");
-      found.push({ dir, key: at === -1 ? url[1] : url[1].slice(at + 1) });
+      found.push({ dir, key: at === -1 ? url[1] : url[1].slice(at + 1), url: url[1] });
       dir = null;
     }
   }

@@ -21,8 +21,8 @@ Nothing else. On the first run `setup.mjs` fetches the pinned proof-lab commit i
 
 Chromium needs system libraries that a minimal Ubuntu (a server, a container) does not have. The plugin starts the browser once and tells you if it cannot:
 
-- **As root** (a container, or `sudo` from a root shell): the plugin installs the libraries itself with `apt`.
-- **As a normal user:** it refuses once and prints the exact command, which looks like `sudo node "<proof-lab folder>/node_modules/playwright/cli.js" install-deps chromium`. Run it, then run the plugin again.
+- **As root** (a container, or a root shell) on the plugin's own checkout: the plugin installs the libraries itself with `apt`, but only when root owns the checkout and the Playwright packages and nobody else can write to them. On a checkout you named with `PROOF_LAB_HOME`, or one root does not own, it does nothing as root and warns, so root never runs a file a normal user can change.
+- **As a normal user:** it refuses once and prints the exact command, which looks like `sudo node "<proof-lab folder>/node_modules/playwright/cli.js" install-deps chromium`. Run it, then run the plugin again. The plugin starts the browser on every run (about a second), so a browser that breaks later is noticed too.
 
 Check it on a clean Ubuntu 24.04 container (from a Linux shell or WSL with Docker; needs the network): `sh tests/linux/proof-lab-e2e.sh`. It runs the whole proof-lab demo as a normal user and as root.
 

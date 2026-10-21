@@ -7,7 +7,7 @@ bad() { echo "FAIL $1"; fail=1; }
 setup='node /work/repo/plugins/proof-lab/scripts/setup.mjs'
 if [ "$mode" = user ]; then
   useradd -m tester
-  run() { su tester -c "PROOF_LAB_DATA=/home/tester/pl $1"; }
+  run() { su tester -c "export PROOF_LAB_DATA=/home/tester/pl; $1"; }
   out=$(run "$setup" 2>&1); code=$?
   if [ "$code" -eq 2 ] && echo "$out" | grep -q "sudo node '.*cli.js' install-deps chromium"; then ok "a normal user without the libraries is refused with the exact apt command"; else bad "no hint (exit $code): $out"; fi
   # The command is printed with the path in single quotes: take the path out of the first "sudo node '...'" and run it as root.

@@ -17,7 +17,7 @@ Each input is one hook JSON object. The guard reads the command value of the `co
    - nothing in the input is chained (`; & | ` $( <( >(`, a newline, or the JSON `\n` escape);
    - the command string exactly as written in the JSON (nothing rewritten, decoded or quote-stripped) is one closed form:
      - `node ${CLAUDE_PLUGIN_ROOT}/<path>/setup.mjs <args>`: the plugin's own setup, the only path that runs the pin check; or
-     - `node [<prefix>/]<path>/prove.js <args> --verify <args>`: read-only, so any plain path is accepted (the prefix is `${CLAUDE_PLUGIN_ROOT}/` or `$NAME/`);
+     - `node [<prefix>/]<path>/prove.js <args> --verify <args>`: read-only, so any plain path is accepted (the prefix is `${CLAUDE_PLUGIN_ROOT}/` or `$NAME/`, and only inside the quoted path, because the shell word-splits an unquoted variable; review cycle 11, security F1);
      - the program path is bare or in one pair of double quotes around the whole path; no other quote is accepted;
      - args are plain: `[-A-Za-z0-9_./:=@%+]`; the first token after `node` is never an option;
      - the match is case-sensitive, because `prove.js` reads `--verify` case-sensitively;

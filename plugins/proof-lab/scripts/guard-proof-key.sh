@@ -44,10 +44,13 @@ ARG='[-A-Za-z0-9_./:=@%+]+'
 # text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
 Q='\\"'
 SETUP='[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+# A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
+# security F1), so the bare prove path is plain segments only.
+PROVE_BARE='([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Separators are space and tab only, the characters bash splits words on (the same class as the PowerShell twin).
 SP="[ $(printf '\t')]"
-CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARG})*|(${Q}${PROVE}${Q}|${PROVE})(${SP}+${ARG})*${SP}+--verify(${SP}+${ARG})*)${SP}*\$"
+CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARG})*|(${Q}${PROVE}${Q}|${PROVE_BARE})(${SP}+${ARG})*${SP}+--verify(${SP}+${ARG})*)${SP}*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
 block() {

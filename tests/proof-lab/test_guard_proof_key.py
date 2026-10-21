@@ -141,6 +141,8 @@ BLOCKED = [
     "node '\"${CLAUDE_PLUGIN_ROOT}\"'/scripts/setup.mjs --run --spec s.json",
     "node ' ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs' --run --spec s.json",
     'node "${CLAUDE_PLUGIN_ROOT}"/scripts/setup.mjs --run --spec s.json',
+    # an unquoted variable prefix is word-split by the shell, so the program is not the text the guard read (review cycle 11, security F1)
+    "node $PROOF_LAB_HOME/src/prove.js --verify",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -163,6 +165,8 @@ ALLOWED = [
     "echo \"don't ${CLAUDE_PLUGIN_ROOT}\"",
     # the sanctioned setup path unquoted
     "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
+    # a variable prefix inside the quoted program path is not word-split
+    'node "$PROOF_LAB_HOME/src/prove.js" --verify',
 ]
 # Whole hook inputs, for the cases a plain command cannot express.
 RAW_BLOCKED = [
@@ -225,13 +229,19 @@ for label, run in paths:
 
 def execute(job):
     label, name, run, payload, marker = job
-    p = run(payload)
+    try:
+        p = run(payload)
+    except subprocess.TimeoutExpired:
+        # one slow call is a failed case, not a crash of the whole run
+        return label, name, False, "timed out after 60 s"
     if marker is None:
         return label, name, p.returncode == 0, f"exit {p.returncode} stderr {p.stderr!r}"
     return label, name, p.returncode == 2 and marker in p.stderr, f"exit {p.returncode} stderr {p.stderr!r}"
 
 
-workers = int(os.environ.get("PROOF_LAB_GUARD_WORKERS", "12"))
+# Four workers by default: tests/run_all.py already runs several suites at once, and each POSIX guard call spawns about
+# 60 processes, which Git Bash on Windows starts slowly; more workers made calls exceed the 60 s timeout under the gate.
+workers = int(os.environ.get("PROOF_LAB_GUARD_WORKERS", "4"))
 with ThreadPoolExecutor(max_workers=workers) as pool:
     for label, name, ok, extra in pool.map(execute, jobs):
         check(f"{label} {name}", ok, extra)

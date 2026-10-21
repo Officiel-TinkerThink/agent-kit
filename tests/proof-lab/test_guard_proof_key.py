@@ -166,6 +166,9 @@ ALLOWED = [
 ]
 # Whole hook inputs, for the cases a plain command cannot express.
 RAW_BLOCKED = [
+    # a no-break space (raw UTF-8, not a \u escape) is not a word separator in bash, so it cannot stand before --verify (review cycle 10, security F1)
+    ("no-break space before --verify", json.dumps({"tool_name": "Bash", "tool_input": {
+        "command": "node src/prove.js --key-file /keys/k.txt --verify"}}, ensure_ascii=False)),
     # a description that carries "command:" ahead of the real command must not hide the runner (cycle-4 spec F1, defect F4)
     ("description carries command: before the runner", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "command: node setup.mjs --run", "command": "node src/run-spec.js --spec s.json"}})),

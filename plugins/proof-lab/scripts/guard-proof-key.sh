@@ -45,7 +45,9 @@ ARG='[-A-Za-z0-9_./:=@%+]+'
 Q='\\"'
 SETUP='[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
 PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
-CLOSED="^[[:space:]]*node[[:space:]]+((${Q}${SETUP}${Q}|${SETUP})([[:space:]]+${ARG})*|(${Q}${PROVE}${Q}|${PROVE})([[:space:]]+${ARG})*[[:space:]]+--verify([[:space:]]+${ARG})*)[[:space:]]*\$"
+# Separators are space and tab only, the characters bash splits words on (the same class as the PowerShell twin).
+SP="[ $(printf '\t')]"
+CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARG})*|(${Q}${PROVE}${Q}|${PROVE})(${SP}+${ARG})*${SP}+--verify(${SP}+${ARG})*)${SP}*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
 block() {

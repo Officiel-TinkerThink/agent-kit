@@ -52,7 +52,10 @@ $q = '\\"'
 $setupPath = '[$][{]CLAUDE_PLUGIN_ROOT[}]/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
 $provePath = '([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Case-sensitive on purpose: prove.js reads --verify case-sensitively, so the guard must not accept --VERIFY.
-$closed = '^\s*node\s+((' + $q + $setupPath + $q + '|' + $setupPath + ')(\s+' + $arg + ')*|(' + $q + $provePath + $q + '|' + $provePath + ')(\s+' + $arg + ')*\s+--verify(\s+' + $arg + ')*)\s*$'
+# Separators are space and tab only, the characters bash splits words on (.NET \s also matches Unicode spaces such as
+# U+00A0, which bash keeps inside a word; review cycle 10, security F1).
+$sp = '[ \t]'
+$closed = '^' + $sp + '*node' + $sp + '+((' + $q + $setupPath + $q + '|' + $setupPath + ')(' + $sp + '+' + $arg + ')*|(' + $q + $provePath + $q + '|' + $provePath + ')(' + $sp + '+' + $arg + ')*' + $sp + '+--verify(' + $sp + '+' + $arg + ')*)' + $sp + '*$'
 $chain = '[;&|`]|[$][(]|[<>][(]'
 
 function Block([string]$reason) {

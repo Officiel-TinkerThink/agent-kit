@@ -166,6 +166,8 @@ ALLOWED = [
     "grep -rn foo src/",
     # the marker text and a placeholder in an ordinary command are plain text, not a runner (review cycle 9, over-blocks removed)
     "grep -rn @PLUGIN_ROOT@ plugins/proof-lab/scripts",
+    # the src/ variable check stays within one command text: a $ in the other text is not after src/ (review cycle 17, defect F2)
+    "$(which node) src/tool.js",
     "echo \"don't ${CLAUDE_PLUGIN_ROOT}\"",
     # the sanctioned setup path unquoted
     f"node {P}/scripts/setup.mjs --run --spec s.json --key-file /keys/k.txt",
@@ -243,6 +245,9 @@ BLOCKED += [
     "node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs --run --spec s.json",
     # ) is a shell operator that ends a word, so it cannot hide the node word from the node glob check (backlog item 30)
     "a)node src/*",
+    # a glob word whose stem is split by parentheses, read with ( and ) deleted and as spaces (review cycle 17)
+    "r(un)*",
+    "x(r*un)",
     # the variable prefix of prove.js must be balanced (backlog item 34)
     'node "$PROOF_LAB_HOME}/src/prove.js" --verify',
 ]

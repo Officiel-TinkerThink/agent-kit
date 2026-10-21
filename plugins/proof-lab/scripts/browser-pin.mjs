@@ -19,7 +19,7 @@ const DONE = "INSTALLATION_COMPLETE";
 // downloads nothing). Runs from the filesystem root, so no file inside the checkout can change how Node starts.
 export function downloads(cli, env = process.env, names = ["chromium"]) {
   const p = spawnSync(process.execPath, [cli, "install", "--dry-run", ...names], { cwd: parse(cli).root, env, encoding: "utf8", timeout: 60_000 });
-  if (p.status !== 0) throw new Error(`playwright install --dry-run failed: ${String(p.stderr || p.error?.message || "").split("\n")[0]}`);
+  if (p.status !== 0) throw new Error(`playwright install --dry-run failed: ${String(p.stderr?.trim() || p.stdout?.trim() || p.error?.message || `exit ${p.status}`).split("\n")[0]}`);
   const found = [];
   let dir = null;
   for (const line of p.stdout.split(/\r?\n/)) {

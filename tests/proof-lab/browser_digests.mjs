@@ -15,11 +15,12 @@ const cli = join(home, "node_modules", "playwright", "cli.js");
 const BUILDS = ["ubuntu24.04-x64", "ubuntu24.04-arm64", "mac15", "mac15-arm64", "win64"];
 const HOSTS = ["ubuntu22.04-x64", "ubuntu24.04-x64", "ubuntu26.04-x64", "ubuntu22.04-arm64", "ubuntu24.04-arm64", "ubuntu26.04-arm64", "debian12-x64", "debian12-arm64", "debian13-x64", "debian13-arm64", "mac14", "mac14-arm64", "mac15", "mac15-arm64", "mac26", "mac26-arm64", "win64"];
 const envFor = (build, browsers) => ({ ...process.env, PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: build, PLAYWRIGHT_BROWSERS_PATH: browsers });
-// On a real Windows machine `install chromium` also installs winldd (Playwright adds it when the system itself is Windows,
-// which an override does not change). `install winldd` is refused, so its archive (one program, no links) is fetched and
-// unpacked here; the dry run still names it, which gives its folder, its path and its URL.
-const EXTRA = { win64: ["winldd"] };
-const namesFor = build => ["chromium", ...(EXTRA[build] ?? [])];
+// On a real Windows machine `install chromium` also installs winldd: Playwright adds it when the process itself runs on
+// Windows, which an override does not change, and it refuses `winldd` as a name elsewhere. So its archive (one program, no
+// links) is fetched here by the path Playwright uses for it (builds/winldd/<revision>/winldd-win64.zip, the path a Windows
+// dry run prints) and unpacked; the plugin on a real Windows machine then checks that this key is the one it gets.
+const revision = name => JSON.parse(readFileSync(join(home, "node_modules", "playwright-core", "browsers.json"), "utf8")).browsers.find(b => b.name === name).revision;
+const EXTRA = { win64: [{ name: "winldd", key: `builds/winldd/${revision("winldd")}/winldd-win64.zip` }] };
 const run = (cmd, args) => {
   const p = spawnSync(cmd, args, { stdio: ["ignore", process.stderr, process.stderr] });
   if (p.status !== 0) throw new Error(`${cmd} ${args.join(" ")} failed`);
@@ -32,19 +33,22 @@ for (const build of BUILDS) {
   console.error(`== ${build}`);
   const p = spawnSync(process.execPath, [cli, "install", "chromium"], { env: envFor(build, browsers), stdio: ["ignore", process.stderr, process.stderr] });
   if (p.status !== 0) throw new Error(`install for ${build} failed`);
-  for (const { dir, url } of EXTRA[build] ? downloads(cli, envFor(build, browsers), EXTRA[build]) : []) {
-    run("curl", ["-fsSL", "-o", `${dir}.zip`, url]);
+  for (const { name, key } of EXTRA[build] ?? []) {
+    const dir = join(browsers, `${name}-extra`);
+    run("curl", ["-fsSL", "-o", `${dir}.zip`, `https://cdn.playwright.dev/${key}`]);
     run("python3", ["-m", "zipfile", "-e", `${dir}.zip`, dir]);
     rmSync(`${dir}.zip`);
+    digests[key] = treeDigest(dir);
+    console.error(`${key} ${digests[key]}`);
   }
-  for (const { dir, key } of downloads(cli, envFor(build, browsers), namesFor(build))) {
+  for (const { dir, key } of downloads(cli, envFor(build, browsers))) {
     const digest = treeDigest(dir);
     if (digests[key] && digests[key] !== digest) throw new Error(`${key}: two different digests`);
     digests[key] = digest;
     console.error(`${key} ${digest}`);
   }
 }
-const missing = HOSTS.flatMap(host => downloads(cli, envFor(host, join(scratch, "dry")), namesFor(host)).map(d => d.key)).filter(key => !digests[key]);
+const missing = HOSTS.flatMap(host => downloads(cli, envFor(host, join(scratch, "dry"))).map(d => d.key)).filter(key => !digests[key]);
 if (missing.length) throw new Error(`not covered: ${[...new Set(missing)].join(", ")}`);
 const version = JSON.parse(readFileSync(join(home, "node_modules", "playwright-core", "package.json"), "utf8")).version;
 const sorted = Object.fromEntries(Object.entries(digests).sort(([a], [b]) => (a < b ? -1 : 1)));

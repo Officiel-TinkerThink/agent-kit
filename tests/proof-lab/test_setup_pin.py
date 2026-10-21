@@ -56,7 +56,8 @@ def make_plugin(root, pin_text):
 
 
 def run(script, env_home, extra_env=None, args=("--check-only",)):
-    env = {k: v for k, v in os.environ.items() if k not in ("PROOF_LAB_HOME", "PROOF_LAB_RECEIPTS")}
+    env = {k: v for k, v in os.environ.items() if k not in ("PROOF_LAB_HOME", "PROOF_LAB_RECEIPTS", "PROOF_LAB_DATA", "PROOF_LAB_REPO")}
+    env["PROOF_LAB_DATA"] = str(script.parent.parent / "data")  # never the real home folder
     if env_home is not None:
         env["PROOF_LAB_HOME"] = env_home
     env.update(extra_env or {})
@@ -86,7 +87,7 @@ with tempfile.TemporaryDirectory() as tmp:
     (home / "dirty.txt").unlink()
 
     code, out, err = run(script, None)
-    check("unset PROOF_LAB_HOME is refused", code == 2 and "not set" in err, f"exit {code} err {err!r}")
+    check("unset PROOF_LAB_HOME with no managed checkout: --check-only says to run setup", code == 2 and "run node setup.mjs once" in err, f"exit {code} err {err!r}")
 
     code, out, err = run(script, "relative/path")
     check("a relative PROOF_LAB_HOME is refused", code == 2 and "absolute" in err, f"exit {code} err {err!r}")
@@ -120,5 +121,42 @@ with tempfile.TemporaryDirectory() as tmp:
     check("--run refuses a checkout with no node_modules before it runs", code == 2 and "has no node_modules" in err and "ran" not in out, f"exit {code} out {out!r} err {err!r}")
     code, out, err = run(bare_script, str(bare))
     check("setup without --run does not refuse a checkout with no node_modules", "has no node_modules" not in err, f"exit {code} err {err!r}")
+
+    # Managed checkout: PROOF_LAB_HOME unset, the plugin fetches the pin from the repository (a local folder stands in for GitHub).
+    remote, _ = make_checkout(tmp / "remote", deps=False)
+    # One local dependency, so npm ci creates node_modules like the real playwright dependency does; no network is used.
+    (remote / "dep").mkdir()
+    (remote / "dep" / "package.json").write_text('{"name": "dep", "version": "1.0.0"}\n', encoding="utf-8")
+    (remote / "package.json").write_text('{"name": "proof-lab", "version": "0.0.0", "dependencies": {"dep": "file:./dep"}}\n', encoding="utf-8")
+    subprocess.run("npm install --ignore-scripts --no-audit --no-fund", cwd=remote, shell=True, check=True, capture_output=True)
+    shutil.rmtree(remote / "node_modules")
+    git(remote, "add", "package.json", "package-lock.json", "dep")
+    git(remote, "commit", "-q", "-m", "lock")
+    remote_head = git(remote, "rev-parse", "HEAD")
+    mscript = make_plugin(tmp / "managed", f"{remote_head}\n")
+    data = mscript.parent.parent / "data" / "checkouts"
+    repo_env = {"PROOF_LAB_REPO": str(remote)}
+
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("unset PROOF_LAB_HOME: --run fetches the pin on first use, then runs", code == 0 and "ran --spec s.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
+    check("the managed checkout is at the pin and clean", git(data / remote_head, "rev-parse", "HEAD") == remote_head and git(data / remote_head, "status", "--porcelain") == "")
+
+    code, out, err = run(mscript, None, {"PROOF_LAB_REPO": str(tmp / "nowhere")}, args=("--run", "--spec", "s2.json"))
+    check("the second run reuses the checkout and does not fetch again", code == 0 and "ran --spec s2.json" in out and "setting up" not in err, f"exit {code} out {out!r} err {err!r}")
+
+    code, out, err = run(mscript, None, repo_env)
+    check("setup without --run on a ready managed checkout is ready", code == 0 and "ready: proof-lab" in out, f"exit {code} err {err!r}")
+
+    def leftovers(plugin):
+        folder = plugin.parent.parent / "data" / "checkouts"
+        return list(folder.glob("*")) if folder.exists() else []
+
+    fresh = make_plugin(tmp / "fresh", f"{remote_head}\n")
+    code, out, err = run(fresh, None, {"PROOF_LAB_REPO": str(tmp / "nowhere")}, args=("--run", "--spec", "s.json"))
+    check("an unreachable repository is refused with a hint and leaves no half-made checkout", code == 2 and "could not set up" in err and "PROOF_LAB_HOME" in err and "ran" not in out and leftovers(fresh) == [], f"exit {code} err {err!r} left {leftovers(fresh)}")
+
+    missing = make_plugin(tmp / "missing", "1" * 40 + "\n")
+    code, out, err = run(missing, None, repo_env, args=("--run", "--spec", "s.json"))
+    check("a pin the repository does not have is refused and leaves nothing behind", code == 2 and "could not set up" in err and leftovers(missing) == [], f"exit {code} err {err!r} left {leftovers(missing)}")
 
 sys.exit(1 if failed else 0)

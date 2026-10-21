@@ -13,7 +13,7 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
 }
 # $rawU: the input as written (JSON escapes kept), newlines as chains, ${CLAUDE_PLUGIN_ROOT} written as ROOT.
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
-$rawU = $inputText -replace '\r|\n', ';' -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', 'ROOT'
+$rawU = $inputText -replace '\r|\n', ';' -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
 # The command value: the text after the one `command:` key (case-sensitive). $cmdD decoded, $cmdU as written.
 $cmdD = ($raw -creplace '^.*?"command"\s*:', '') -replace '"\s*[,}].*$', ''
@@ -40,8 +40,8 @@ function NodeIn([string]$s) {
   [regex]::IsMatch((View $s), $nodeWord, 'IgnoreCase')
 }
 $arg = '[-A-Za-z0-9_./:=@%+]+'
-$setupPath = 'ROOT/([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*setup[.]mjs'
-$provePath = '((ROOT|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+$setupPath = '@PLUGIN_ROOT@/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+$provePath = '((@PLUGIN_ROOT@|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 # Case-sensitive on purpose: prove.js reads --verify case-sensitively, so the guard must not accept --VERIFY.
 $closed = '^\s*node\s+(' + $setupPath + '(\s+' + $arg + ')*|' + $provePath + '(\s+' + $arg + ')*\s+--verify(\s+' + $arg + ')*)\s*$'
 $chain = '[;&|`]|[$][(]|[<>][(]'
@@ -64,7 +64,7 @@ if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, $suspectCha
 if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, 'src/[^\s]*[$]')) {
   Block "a node command names its program in src/ with a variable; $runProg"
 }
-$suspectWords = @($cmdU -split '\s+' | Where-Object { $_ -match $suspectChars -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
+$suspectWords = @(("$cmdU $cmdD" -split '\s+') | Where-Object { $_ -match $suspectChars -and [regex]::IsMatch((View $_), $stem, 'IgnoreCase') })
 if ($suspectWords.Count -gt 0) {
   Block "a glob, brace or backslash in a word that names a runner or a script; $runProg"
 }

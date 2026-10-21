@@ -15,7 +15,7 @@ esac
 # RAWU: the input as the harness wrote it (JSON escapes kept), newlines as chains, the sanctioned ${CLAUDE_PLUGIN_ROOT}
 # written as ROOT. RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only
 # add a chain, never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
-RAWU=$(printf '%s' "$INPUT" | tr '\n\r' ';;' | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/ROOT/g')
+RAWU=$(printf '%s' "$INPUT" | tr '\n\r' ';;' | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
 # The command value: the text after the one `command:` key. CMD_D is decoded, CMD_U is as written.
 CMD_D=$(printf '%s' "${RAW#*\"command\"}" | sed 's/^[[:space:]]*://; s/"[[:space:]]*[,}].*$//')
@@ -33,8 +33,8 @@ NODE_WORD='(^|[^[:alnum:]_])node([^[:alnum:]_]|$)'
 SUSPECT_CHARS='[*?[{\\]'
 STEM='(^|[^[:alnum:]_])(run|prove|setup|lab)([^[:alnum:]_]|$)|[.]m?js'
 ARG='[-A-Za-z0-9_./:=@%+]+'
-SETUP='ROOT/([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*setup[.]mjs'
-PROVE='((ROOT|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
+SETUP='@PLUGIN_ROOT@/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+PROVE='((@PLUGIN_ROOT@|[$][{]?[A-Za-z_]+[}]?)/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 CLOSED="^[[:space:]]*node[[:space:]]+(${SETUP}([[:space:]]+${ARG})*|${PROVE}([[:space:]]+${ARG})*[[:space:]]+--verify([[:space:]]+${ARG})*)[[:space:]]*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
@@ -63,7 +63,7 @@ fi
 if { node_in "$CMD_D" || node_in "$CMD_U"; } && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- 'src/[^[:space:]]*[$]'; then
   block "a node command names its program in src/ with a variable; $RUN_PROG"
 fi
-if [ -n "$(printf '%s' "$CMD_U" | tr -s ' \t' '\n\n' | while IFS= read -r w; do suspect_word "$w" && echo hit; done)" ]; then
+if [ -n "$(printf '%s\n%s\n' "$CMD_U" "$CMD_D" | tr -s ' \t' '\n\n' | while IFS= read -r w; do suspect_word "$w" && echo hit; done)" ]; then
   block "a glob, brace or backslash in a word that names a runner or a script; $RUN_PROG"
 fi
 RAW_N=$(runner_count "$RAW")

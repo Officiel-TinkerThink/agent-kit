@@ -120,6 +120,15 @@ BLOCKED = [
     "node ./scripts/setup.mjs --run --spec s.json",
     "node ../scratch/setup.mjs --run --spec run-spec.json",
     "node $HOME/x/setup.mjs --run --spec s.json",
+    # the glob is the last word of the command: the POSIX loop must read the unterminated final word (review cycle 7, defect F1)
+    "cat ./src/*.js",
+    "./src/run-s*.js",
+    # a tab (JSON \t in the input) splits the word; the decoded text is checked as well (review cycle 7, spec F3)
+    "cat x\tsetup* y",
+    # a parent segment after the plugin root is not the plugin's own setup (review cycle 7, security F1)
+    'node "${CLAUDE_PLUGIN_ROOT}/../x/setup.mjs" --run --spec s.json',
+    # a literal ROOT is not the sanctioned placeholder (review cycle 7, spec F2)
+    "node ROOT/scripts/setup.mjs --run --spec s.json",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',
@@ -162,7 +171,11 @@ paths = [("posix", run_posix), ("powershell", run_powershell), ("router", run_ro
 import os
 only = os.environ.get("PROOF_LAB_GUARD_PATHS")
 if only:
-    paths = [p for p in paths if p[0] in only.split(",")]
+    wanted = [name.strip() for name in only.split(",") if name.strip()]
+    unknown = [name for name in wanted if name not in dict(paths)]
+    if unknown or not wanted:
+        sys.exit(f"PROOF_LAB_GUARD_PATHS names no known path: {unknown or only!r}; use posix, powershell, router")
+    paths = [p for p in paths if p[0] in wanted]
 if shutil.which("sh") is None:
     print("skip proof-lab guard: sh is not on PATH (Git Bash on Windows)")
     sys.exit(0)

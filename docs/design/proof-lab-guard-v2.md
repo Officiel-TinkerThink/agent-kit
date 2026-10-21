@@ -32,9 +32,9 @@ Views. The shell view drops `\ $ * ? [ ] { } ( )`, backtick and quotes, and a ru
 ## Decisions
 
 - **Windows paths are refused.** A backslash path (`node D:\core\…\prove.js --verify`) names a runner and is not a closed form, so it is blocked. Use forward slashes; Git Bash accepts them.
-- **The sanctioned plugin root is `${CLAUDE_PLUGIN_ROOT}`.** It is rewritten to `ROOT` before the checks, so the closed form matches it and the brace rule does not block it.
-- **`setup.mjs` must be the plugin's own.** A relative or other `setup.mjs` path is refused, because only the plugin's setup runs the pin check.
-- **Unknown field order is fail-closed.** A `description` containing `command:` makes the count two, so the closed form fails; a runner in that field then blocks the call.
+- **The sanctioned plugin root is `${CLAUDE_PLUGIN_ROOT}`.** It is rewritten to `@PLUGIN_ROOT@` before the checks, so the closed form matches it and the brace rule does not block it. A literal `ROOT/` typed by the agent is not the placeholder and does not match the setup form.
+- **`setup.mjs` must be the plugin's own.** A relative or other `setup.mjs` path is refused, because only the plugin's setup runs the pin check. Each directory segment after the placeholder starts with a letter, digit or underscore, so `${CLAUDE_PLUGIN_ROOT}/../x/setup.mjs` is refused (review cycle 7, security F1, confirmed).
+- **Unknown field order is fail-closed.** A `description` containing `"command":` is not counted, so the real key is the only one judged; a duplicate `"command":` key is counted, and the closed form fails then. Known gap: a duplicate key hides a glob from the node checks (review cycle 7, history F1, confirmed at 50; in Notes, not fixed).
 - **Spellings.** `prove.mjs` and `prove-all.js` are not runner names (a runner is `prove` or `prove.js`).
 - **Over-block accepted.** A `grep` for the word `node` with a `*` in another word is blocked by rule 4. Fail-closed; the Glob tool lists files instead.
 

@@ -11,6 +11,11 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
   [Console]::Error.WriteLine('BLOCKED: proof-lab guard error (the hook input is not one JSON object)')
   exit 2
 }
+# @PLUGIN_ROOT@ is reserved: only the rewrite below may produce it, so a typed copy is refused (review cycle 8, security F1).
+if ($inputText.Contains('@PLUGIN_ROOT@')) {
+  [Console]::Error.WriteLine('BLOCKED (intentional guard, not a hook failure): @PLUGIN_ROOT@ is reserved for the sanctioned ${CLAUDE_PLUGIN_ROOT} placeholder')
+  exit 2
+}
 # $rawU: the input as written (JSON escapes kept), newlines as chains, ${CLAUDE_PLUGIN_ROOT} written as ROOT.
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
 $rawU = $inputText -replace '\r|\n', ';' -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
@@ -51,6 +56,10 @@ function Block([string]$reason) {
   exit 2
 }
 $runProg = 'run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run, which checks the pin and a clean checkout before the run.'
+if ($rawU.Contains("'@PLUGIN_ROOT@")) {
+  [Console]::Error.WriteLine('BLOCKED (intentional guard, not a hook failure): the placeholder is single-quoted, so the shell does not expand it; run proof-lab through node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run')
+  exit 2
+}
 if (Hit $raw 'PROOF_LAB_KEY') {
   Block 'the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file.'
 }
@@ -72,6 +81,7 @@ $rawN = RunnerCount $raw
 if ($rawN -eq 0) { exit 0 }
 $commandKeys = ([regex]::Matches($raw, '"command"\s*:')).Count
 $isClosed = (-not [regex]::IsMatch($raw, $chain)) -and ($commandKeys -eq 1) -and
-  [regex]::IsMatch($value, $closed) -and ((RunnerCount $value) -eq $rawN)
+  [regex]::IsMatch($value, $closed) -and ((RunnerCount $value) -eq $rawN) -and
+  (([regex]::Matches($value, '@PLUGIN_ROOT@')).Count -le ([regex]::Matches($rawU, '@PLUGIN_ROOT@')).Count)
 if ($isClosed) { exit 0 }
 Block $runProg

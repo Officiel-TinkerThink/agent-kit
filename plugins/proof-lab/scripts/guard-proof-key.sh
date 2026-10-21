@@ -15,6 +15,10 @@ esac
 # RAWU: the input as the harness wrote it (JSON escapes kept), newlines as chains, the sanctioned ${CLAUDE_PLUGIN_ROOT}
 # written as ROOT. RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only
 # add a chain, never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
+# @PLUGIN_ROOT@ is reserved: only the rewrite below may produce it, so a typed copy is refused (review cycle 8, security F1).
+case "$INPUT" in
+  *@PLUGIN_ROOT@*) printf '%s\n' "BLOCKED (intentional guard, not a hook failure): @PLUGIN_ROOT@ is reserved for the sanctioned \${CLAUDE_PLUGIN_ROOT} placeholder" >&2; exit 2 ;;
+esac
 RAWU=$(printf '%s' "$INPUT" | tr '\n\r' ';;' | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
 # The command value: the text after the one `command:` key. CMD_D is decoded, CMD_U is as written.
@@ -44,12 +48,17 @@ block() {
 }
 hit() { view "$1" | grep -Eqi -- "$2"; }
 runner_count() { view "$1" | grep -Eoi -- "$RUNNER" | wc -l | tr -d ' '; }
+# Placeholder count: the closed form may use only placeholders the rewrite made, never one the shell joins from quoted pieces.
+ph_count() { printf '%s' "$1" | grep -o -- '@PLUGIN_ROOT@' | wc -l | tr -d ' '; }
 node_in() { view "$1" | grep -Eqi -- "$NODE_WORD"; }
 suspect_word() {
   printf '%s\n' "$1" | grep -q -- "$SUSPECT_CHARS" || return 1
   view "$1" | grep -Eqi -- "$STEM"
 }
 
+case "$RAWU" in
+  *"'@PLUGIN_ROOT@"*) printf '%s\n' "BLOCKED (intentional guard, not a hook failure): the placeholder is single-quoted, so the shell does not expand it; run proof-lab through node \"\${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs\" --run" >&2; exit 2 ;;
+esac
 if hit "$RAW" 'PROOF_LAB_KEY'; then
   block "the signing key must not be set in the environment (PROOF_LAB_KEY). Pass it with --key-file <path> to a 0600 file."
 fi
@@ -72,7 +81,8 @@ RAW_N=$(runner_count "$RAW")
 if ! printf '%s' "$RAW" | grep -Eq -- "$CHAIN" \
   && [ "$(printf '%s' "$RAW" | grep -o '"command"[[:space:]]*:' | wc -l | tr -d ' ')" = 1 ] \
   && printf '%s' "$VALUE" | grep -Eq -- "$CLOSED" \
-  && [ "$(runner_count "$VALUE")" = "$RAW_N" ]; then
+  && [ "$(runner_count "$VALUE")" = "$RAW_N" ] \
+  && [ "$(ph_count "$VALUE")" -le "$(ph_count "$RAWU")" ]; then
   exit 0
 fi
 block "$RUN_PROG"

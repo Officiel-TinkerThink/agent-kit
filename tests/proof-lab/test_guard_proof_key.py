@@ -129,6 +129,13 @@ BLOCKED = [
     'node "${CLAUDE_PLUGIN_ROOT}/../x/setup.mjs" --run --spec s.json',
     # a literal ROOT is not the sanctioned placeholder (review cycle 7, spec F2)
     "node ROOT/scripts/setup.mjs --run --spec s.json",
+    # the rewritten marker is reserved: a typed copy is refused, so only ${CLAUDE_PLUGIN_ROOT} reaches the closed form (review cycle 8, security F1 and spec F1)
+    "node @PLUGIN_ROOT@/scripts/setup.mjs --run --spec s.json",
+    'node "@PLUGIN_ROOT@/scripts/setup.mjs" --run --spec s.json',
+    # the shell joins quoted pieces into the marker: the placeholder count of the value must not exceed the rewritten input (review cycle 8, security out-of-scope)
+    "node @PLU''GIN_ROOT@/scripts/setup.mjs --run --spec s.json",
+    # a single-quoted placeholder is not expanded by the shell, so it is refused
+    "node '${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs' --run --spec s.json",
 ]
 ALLOWED = [
     'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json --key-file /keys/k.txt',

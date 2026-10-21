@@ -1,6 +1,6 @@
 {
   "name": "code-review",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Focused Haiku 5.5 code-review subagents (spec compliance, behavioural defects, architecture, vulnerabilities, simplicity) plus an independent finding validator, and a /code-review:review skill that fans them out in parallel and keeps only validated findings.",
   "author": {
     "name": "Unidentified"

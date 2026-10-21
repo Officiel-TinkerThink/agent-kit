@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs inside the container started by proof-lab-e2e.sh. $1 is "user" or "root".
+# Runs inside the container started by proof-lab-e2e.sh. $1 is "user", "root" or "untrusted".
 mode="$1"
 fail=0
 ok() { echo "ok   $1"; }
@@ -17,6 +17,15 @@ if [ "$mode" = user ]; then
   if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab'; then ok "setup is ready once the libraries are installed"; else bad "not ready (exit $code): $out"; fi
   home=$(ls -d /home/tester/pl/checkouts/*)
   out=$(run "cd $home && node demo/run-demo.mjs" 2>&1); code=$?
+elif [ "$mode" = untrusted ]; then
+  # Root pointed at a checkout that a normal user owns: the browser step must do nothing as root (no apt, no browser start).
+  useradd -m tester
+  su tester -c "export PROOF_LAB_DATA=/home/tester/pl; $setup" >/dev/null 2>&1
+  # git refuses a repository that another user owns unless root says it is safe; the test says so, to reach the browser step.
+  git config --global --add safe.directory "*"
+  out=$(PROOF_LAB_DATA=/home/tester/pl $setup 2>&1); code=$?
+  if [ "$code" -eq 0 ] && echo "$out" | grep -q 'browser step is skipped' && ! dpkg -s libnss3 >/dev/null 2>&1; then ok "root on a user-owned checkout skips the browser step and installs nothing"; else bad "untrusted root case wrong (exit $code, libnss3 present: $(dpkg -s libnss3 >/dev/null 2>&1 && echo yes || echo no)): $(echo "$out" | tail -4)"; fi
+  exit "$fail"
 else
   out=$(PROOF_LAB_DATA=/root/pl $setup 2>&1); code=$?
   if [ "$code" -eq 0 ] && echo "$out" | grep -q '^ready: proof-lab'; then ok "root: setup installs the libraries itself and is ready"; else bad "root not ready (exit $code): $out"; fi

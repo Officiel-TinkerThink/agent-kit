@@ -189,7 +189,7 @@ function main(argv) {
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
-      machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+      if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }

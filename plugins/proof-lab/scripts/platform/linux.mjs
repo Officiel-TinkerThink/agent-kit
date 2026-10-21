@@ -3,10 +3,11 @@
 //   - installs the libraries (apt, through Playwright's install-deps) when the plugin runs as root on its own checkout and
 //     root owns every file it would run, or
 //   - refuses with the exact command, when the plugin runs as a normal user.
-// Root never runs a file that a normal user can change: as root, on a checkout root does not own, the adapter does nothing.
+// In this browser step root never runs a file that a normal user can change: as root, on a checkout root does not own, the
+// adapter does nothing. (setup.mjs itself still runs npm ci and the spec as root in a checkout you name with PROOF_LAB_HOME.)
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const START = "import { chromium } from 'playwright'; const b = await chromium.launch({ headless: true }); await b.close();";
 const PROBES_AFTER_INSTALL = 12; // apt allows one install at a time; another run may be installing, so look for about two minutes
@@ -16,21 +17,37 @@ const PAUSE_MS = 10_000;
 export const shQuote = text => `'${String(text).replace(/'/g, "'\\''")}'`;
 
 // True when root owns the folder and everything under it, none of it can be changed by group or others, and nothing is a link.
-function rootOwnsTree(path) {
+// `skip` names entries of the top folder that are left out (node_modules/.bin holds links that this step never runs).
+function rootOwnsTree(path, skip = []) {
   const info = lstatSync(path);
   if (info.isSymbolicLink() || info.uid !== 0 || (info.mode & 0o022) !== 0) return false;
-  return !info.isDirectory() || readdirSync(path).every(name => rootOwnsTree(join(path, name)));
+  return !info.isDirectory() || readdirSync(path).filter(name => !skip.includes(name)).every(name => rootOwnsTree(join(path, name)));
+}
+
+// The checkout folder itself: owned by root, not writable by group or others, not a link.
+function rootOwnsDirectory(path) {
+  const info = lstatSync(path);
+  return !info.isSymbolicLink() && info.uid === 0 && (info.mode & 0o022) === 0;
+}
+
+// True when every folder above `path`, up to /, is owned by root and cannot be changed by group or others, so nobody can
+// swap the checkout for another one between the check and the use.
+function rootOwnsAncestors(path) {
+  for (let dir = dirname(path); ; dir = dirname(dir)) {
+    const info = lstatSync(dir);
+    if (info.uid !== 0 || (info.mode & 0o022) !== 0) return false;
+    if (dirname(dir) === dir) return true;
+  }
 }
 
 // The calls that touch the machine are in `real`, so a test can replace them.
 const real = {
   exists: existsSync,
   isRoot: () => process.getuid?.() === 0,
-  // The files root would run: the checkout and its node_modules folder, and the whole of the two Playwright packages.
+  // The files root would run: the checkout, every folder above it, and all of node_modules. The path must contain no link.
   trustedTree: home => {
     try {
-      return [home, join(home, "node_modules")].every(p => { const i = lstatSync(p); return !i.isSymbolicLink() && i.uid === 0 && (i.mode & 0o022) === 0; })
-        && ["playwright", "playwright-core"].every(name => rootOwnsTree(join(home, "node_modules", name)));
+      return realpathSync(home) === home && rootOwnsAncestors(home) && rootOwnsDirectory(home) && rootOwnsTree(join(home, "node_modules"), [".bin"]);
     } catch {
       return false;
     }

@@ -21,14 +21,14 @@ Nothing else. On the first run `setup.mjs` fetches the pinned proof-lab commit i
 
 Chromium needs system libraries that a minimal Ubuntu (a server, a container) does not have. The plugin starts the browser once and tells you if it cannot:
 
-- **As root** (a container, or a root shell) on the plugin's own checkout: the plugin installs the libraries itself with `apt`, but only when root owns the checkout and the Playwright packages and nobody else can write to them. On a checkout you named with `PROOF_LAB_HOME`, or one root does not own, it does nothing as root and warns, so root never runs a file a normal user can change.
+- **As root** (a container, or a root shell) on the plugin's own checkout: the plugin installs the libraries itself with `apt`, but only when root owns the checkout and the Playwright packages and nobody else can write to them. On a checkout you named with `PROOF_LAB_HOME`, or one root does not own, the browser step does nothing as root and warns, so that step never runs a file a normal user can change. (If you run `setup.mjs` as root on a checkout you named, its `npm ci` and the spec run as root from that checkout: point root only at trees you trust.)
 - **As a normal user:** it refuses once and prints the exact command, which looks like `sudo node "<proof-lab folder>/node_modules/playwright/cli.js" install-deps chromium`. Run it, then run the plugin again. The plugin starts the browser on every run (about a second), so a browser that breaks later is noticed too.
 
-Check it on a clean Ubuntu 24.04 container (from a Linux shell or WSL with Docker; needs the network): `sh tests/linux/proof-lab-e2e.sh`. It runs the whole proof-lab demo as a normal user and as root.
+Check it on a clean Ubuntu 24.04 container (from a Linux shell or WSL with Docker; needs the network): `sh tests/linux/proof-lab-e2e.sh`. It runs the whole proof-lab demo as a normal user and as root, and checks that root does nothing in the browser step on a checkout a normal user owns.
 
 ## How it adapts to the machine
 
-`scripts/setup.mjs` does not look at the operating system. It asks `scripts/platform/index.mjs` for the adapter that matches the machine it runs on (`linux.mjs`, `win32.mjs`, `darwin.mjs`, or a no-op for any other system). An adapter answers the same questions for its system: how npm is started, and whether the browser can start. Supporting a new system means adding one file there. A test fails if any other file names an operating system.
+`scripts/setup.mjs` does not look at the operating system. It asks `scripts/platform/index.mjs` for the adapter that matches the machine it runs on (`linux.mjs`, `win32.mjs`, `darwin.mjs`, or a no-op for any other system). An adapter answers the same questions for its system: how npm is started, and whether the browser can start. Supporting a new system means adding one file there. A test fails if any other JavaScript file in `scripts/` names an operating system (the shell entry point `run.sh` and the guard scripts are the existing per-system routers).
 
 ## Limits
 

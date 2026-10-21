@@ -4,11 +4,12 @@
 //     root owns every file it would run, or
 //   - refuses with the exact command, when the plugin runs as a normal user.
 // In this browser step root never runs a file that a normal user can change: as root, on a checkout root does not own, the
-// adapter does nothing. (setup.mjs itself still runs npm ci and the spec as root from whichever checkout it uses.)
+// adapter does nothing. setup.mjs also warns, through rootRisk, that its npm ci and the spec run as root from that checkout.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, join, parse } from "node:path";
+import { existsSync } from "node:fs";
+import { join, parse } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isRoot, rootRisk, trustedTree } from "./posix.mjs";
 
 // The probe imports Playwright by absolute path (argument 1) and runs from the filesystem root, so Node never looks at
 // files directly inside the checkout (a package.json there could change what a bare "playwright" import means).
@@ -19,42 +20,11 @@ const PAUSE_MS = 10_000;
 // A path for a shell command line: in single quotes, so nothing in it is expanded when the user pastes the command.
 export const shQuote = text => `'${String(text).replace(/'/g, "'\\''")}'`;
 
-// True when root owns the folder and everything under it, none of it can be changed by group or others, and nothing is a link.
-// `skip` names entries of the top folder that are left out (node_modules/.bin holds links that this step never runs).
-function rootOwnsTree(path, skip = []) {
-  const info = lstatSync(path);
-  if (info.isSymbolicLink() || info.uid !== 0 || (info.mode & 0o022) !== 0) return false;
-  return !info.isDirectory() || readdirSync(path).filter(name => !skip.includes(name)).every(name => rootOwnsTree(join(path, name)));
-}
-
-// The checkout folder itself: owned by root, not writable by group or others, not a link.
-function rootOwnsDirectory(path) {
-  const info = lstatSync(path);
-  return !info.isSymbolicLink() && info.uid === 0 && (info.mode & 0o022) === 0;
-}
-
-// True when every folder above `path`, up to /, is owned by root and cannot be changed by group or others, so nobody can
-// swap the checkout for another one between the check and the use.
-function rootOwnsAncestors(path) {
-  for (let dir = dirname(path); ; dir = dirname(dir)) {
-    const info = lstatSync(dir);
-    if (info.uid !== 0 || (info.mode & 0o022) !== 0) return false;
-    if (dirname(dir) === dir) return true;
-  }
-}
-
 // The calls that touch the machine are in `real`, so a test can replace them.
 const real = {
   exists: existsSync,
-  isRoot: () => process.getuid?.() === 0,
-  // The files root would run: the checkout, every folder above it, and all of node_modules. The path must contain no link.
-  trustedTree: home => {
-    try {
-      return realpathSync(home) === home && rootOwnsAncestors(home) && rootOwnsDirectory(home) && rootOwnsTree(join(home, "node_modules"), [".bin"]);
-    } catch {
-      return false;
-    }
-  },
+  isRoot,
+  trustedTree,
   starts: home => {
     const entry = pathToFileURL(join(home, "node_modules", "playwright", "index.mjs")).href;
     return spawnSync(process.execPath, ["--input-type=module", "-e", START, entry], { cwd: parse(home).root, stdio: "ignore", timeout: 60_000 }).status === 0;
@@ -90,4 +60,4 @@ export function ensureBrowser(ctx, deps = real) {
   }
 }
 
-export default { name: "linux", npmNeedsShell: false, ensureBrowser };
+export default { name: "linux", npmNeedsShell: false, rootRisk, ensureBrowser };

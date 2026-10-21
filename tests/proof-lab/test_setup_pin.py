@@ -53,7 +53,8 @@ def make_checkout(root, name="proof-lab", deps=True):
 def make_plugin(root, pin_text):
     plugin = root / "plugin"
     (plugin / "scripts").mkdir(parents=True)
-    shutil.copy(SETUP, plugin / "scripts" / "setup.mjs")
+    for module in SETUP.parent.glob("*.mjs"):  # setup.mjs and the modules it imports
+        shutil.copy(module, plugin / "scripts" / module.name)
     shutil.copytree(SETUP.parent / "platform", plugin / "scripts" / "platform")  # setup.mjs imports the machine adapters
     (plugin / "proof-lab.pin").write_text(pin_text, encoding="utf-8")
     return plugin / "scripts" / "setup.mjs"

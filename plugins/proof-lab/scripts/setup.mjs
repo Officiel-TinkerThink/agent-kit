@@ -10,10 +10,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyBrowsers } from "./browser-pin.mjs";
+import { withInstallLock } from "./install-lock.mjs";
 import { forThisMachine } from "./platform/index.mjs";
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PIN_FILE = join(PLUGIN, "proof-lab.pin");
+const BROWSER_PINS = join(PLUGIN, "browsers.sha256.json");
 const MIN_NODE = 24;
 // The repository the pin is fetched from. PROOF_LAB_REPO replaces it (tests); the pin check holds for any source.
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
@@ -53,9 +56,11 @@ function proofLabName(home) {
   }
 }
 
+const dataFolder = env => env.PROOF_LAB_DATA ?? join(homedir(), ".proof-lab");
+
 // Where the plugin keeps its own checkout when PROOF_LAB_HOME is not set: one folder per pin, so a new pin is a new checkout.
 export function managedHome(env, pin) {
-  return join(env.PROOF_LAB_DATA ?? join(homedir(), ".proof-lab"), "checkouts", pin);
+  return join(dataFolder(env), "checkouts", pin);
 }
 
 // The repository address without any user:password part, for messages.
@@ -142,30 +147,6 @@ function markInstalled(folder) {
   writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
 }
 
-// One repair at a time: the lock is a folder (mkdir is atomic). A run that finds it held waits for it to go, then looks
-// again, because the holder has usually finished the install. A lock older than a whole install belongs to a killed run.
-function withInstallLock(home, work) {
-  const lock = `${home}.lock`;
-  const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  for (;;) {
-    try {
-      mkdirSync(lock);
-      break;
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      try {
-        if (Date.now() - statSync(lock).mtimeMs > STEP_TIMEOUT_MS + 60_000) rmSync(lock, { recursive: true, force: true });
-      } catch {}
-      pause(2000);
-    }
-    }
-  try {
-    work();
-  } finally {
-    rmSync(lock, { recursive: true, force: true });
-  }
-}
-
 // The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
 // npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
 function installDependencies(home, own) {
@@ -185,16 +166,28 @@ function main(argv) {
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
+    // Root on a checkout a normal user can change: warned, not refused, and the browser step does not run from that checkout.
+    const risk = checkOnly ? "" : machine.rootRisk({ home, own: ownCheckout });
+    if (risk) console.error(`warning: ${risk}`);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
-    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
+    // A lock counts as old only after a whole step timeout and a minute more, so a live repair (one npm ci) keeps its lock.
+    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, STEP_TIMEOUT_MS + 60_000, () => { if (!whole()) installDependencies(home, true); });
+    // The downloaded browser is checked against its pinned digest before anything starts it.
+    const browserStep = () => {
+      if (checkOnly || risk) return;
+      const cli = join(home, "node_modules", "playwright", "cli.js");
+      const data = dataFolder(process.env);
+      if (existsSync(cli)) verifyBrowsers({ cli, pins: JSON.parse(readFileSync(BROWSER_PINS, "utf8")).digests, record: isAbsolute(data) ? join(data, "browsers-checked.json") : null, refuse });
+      machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+    };
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
-      if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+      browserStep();
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
     if (!checkOnly && !ownCheckout) installDependencies(home, false);
-    if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+    browserStep();
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

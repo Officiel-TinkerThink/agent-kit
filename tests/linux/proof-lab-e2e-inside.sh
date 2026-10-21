@@ -9,7 +9,7 @@ if [ "$mode" = user ]; then
   useradd -m tester
   run() { su tester -c "PROOF_LAB_DATA=/home/tester/pl $1"; }
   out=$(run "$setup" 2>&1); code=$?
-  if [ "$code" -eq 2 ] && echo "$out" | grep -q 'sudo node ".*install-deps chromium"'; then ok "a normal user without the libraries is refused with the exact apt command"; else bad "no hint (exit $code): $out"; fi
+  if [ "$code" -eq 2 ] && echo "$out" | grep -q 'sudo node ".*cli.js" install-deps chromium'; then ok "a normal user without the libraries is refused with the exact apt command"; else bad "no hint (exit $code): $out"; fi
   cli=$(echo "$out" | sed -n 's/.*sudo node "\([^"]*\)" install-deps.*/\1/p' | head -1)
   node "$cli" install-deps chromium >/dev/null 2>&1 || bad "the printed command failed"
   out=$(run "$setup" 2>&1); code=$?

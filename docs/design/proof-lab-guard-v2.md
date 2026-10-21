@@ -49,6 +49,7 @@ Views. The shell view drops `\ $ * ? [ ] { } ( )`, backtick and quotes, and a ru
 - A proof-lab CLI short alias or prefix of `--key` (backlog item 8).
 - Hook field order is unverified (backlog item 12); v2 is correct for every order, at the cost of over-blocking when `command:` appears twice.
 - A brace that builds a runner name from parts with no run, prove, setup, lab or script word (for example `./src/{ru,n}`-style fragments with no `.js`) is not caught; the `.js` and stem words cover the forms found in review.
+- The same holds for a glob or extglob group whose letters carry no stem word (`npm run pro*`, `!(…)`): it runs only if the filesystem has a match, and the final security review (7e4539b) found nothing else in scope.
 
 ## Tests
 

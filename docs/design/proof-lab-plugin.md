@@ -79,5 +79,5 @@ Bumping `proof-lab.pin` is its own pull request. Before it merges:
 
 ## Open items to revisit
 
-- Add a git remote to proof-lab, then the setup can clone the pin instead of requiring a local checkout.
+- proof-lab now has a remote (https://github.com/Officiel-TinkerThink/proof-lab, private). Next: let the setup clone the pin instead of requiring a local checkout.
 - Decide whether `proof-runner` should run through `verification-runner` instead of its own agent file.

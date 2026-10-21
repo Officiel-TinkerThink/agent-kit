@@ -14,7 +14,7 @@ Each input is one hook JSON object. The guard reads the command value of the `co
 2. **Key inline.** A proof-lab name (`PROOF_LAB`, `run-spec`, `prove`, `lab.js`, `setup.mjs`) plus `--key` (not `--key-file`; `--key=` is blocked) in either view is blocked.
 3. **Runner.** If either view names a runner (`run-spec`, `prove`, `npm run prove`, `lab run`, or `setup.mjs --run`), the call is allowed only when all of these hold:
    - the input has exactly one `command:` key;
-   - nothing in the input is chained (`; & | ` $( <( >(`, a newline, or the JSON `\n` escape);
+   - nothing in the input is chained (`; & | ` $( <( >(`, or the JSON `\n` escape, which is a newline in the command);
    - the command string exactly as written in the JSON (nothing rewritten, decoded or quote-stripped) is one closed form:
      - `node ${CLAUDE_PLUGIN_ROOT}/<path>/setup.mjs <args>`: the plugin's own setup, the only path that runs the pin check; the root is the literal placeholder or the plugin's own absolute root (below); or
      - `node [<prefix>/]<path>/prove.js <args> --verify <args>`: read-only, so any plain path is accepted (the prefix is `${CLAUDE_PLUGIN_ROOT}/` or `$NAME/`, and only inside the quoted path, because the shell word-splits an unquoted variable; review cycle 11, security F1);
@@ -28,7 +28,7 @@ Each input is one hook JSON object. The guard reads the command value of the `co
    - a word with a glob, brace or backslash that names a runner stem (`run`, `prove`, `setup`, `lab`) or a script (`.js`, `.mjs`) is blocked, with or without `node`.
    `ls node_modules/*` is not a node command (`node` must be a whole word), and `cat src/*.py` is allowed.
 
-Views. The shell view drops `\ $ * ? [ ] { } ( )`, backtick and quotes, and a runner name is searched in it. The path view reads each backslash as `/`. A name in either view counts. The JSON escapes `\"`, `\n`, `\t`, `\r` are decoded first, and a raw newline is a chain. Decoding only adds chains, so chains are judged on the decoded text.
+Views. The shell view drops `\ $ * ? [ ] { } ( )`, backtick and quotes, and a runner name is searched in it. The path view reads each backslash as `/`. A name in either view counts. The JSON escapes `\"`, `\n`, `\t`, `\r` are decoded first; a decoded `\n` is a chain. A raw newline is JSON whitespace, because a newline inside a JSON string is always written as the `\n` escape; Claude Code ends the hook input with one, and treating it as a chain refused every sanctioned run on the PowerShell twin (found in real use, 2026-10-21). Decoding only adds chains, so chains are judged on the decoded text.
 
 ## Decisions
 

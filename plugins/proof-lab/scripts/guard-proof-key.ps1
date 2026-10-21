@@ -11,10 +11,12 @@ if ($inputText.Trim() -notmatch '^\{[\s\S]*\}$') {
   [Console]::Error.WriteLine('BLOCKED: proof-lab guard error (the hook input is not one JSON object)')
   exit 2
 }
-# $rawW: the input as written, newlines as chains, nothing rewritten; the closed form is judged on it.
+# $rawW: the input as written, raw newlines as spaces, nothing rewritten; the closed form is judged on it.
 # $rawU: $rawW with ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # $raw: $rawU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding only adds chains.
-$rawW = $inputText -replace '\r|\n', ';'
+# A raw newline is JSON whitespace (a newline inside a string is always the \n escape, which is decoded to a chain below);
+# Claude Code ends the hook input with one (found in real use, 2026-10-21).
+$rawW = $inputText -replace '\r|\n', ' '
 $rawU = $rawW -replace '[$]\{CLAUDE_PLUGIN_ROOT\}', '@PLUGIN_ROOT@'
 $raw = $rawU -replace '\\"', '' -replace '\\n', ';' -replace '\\[tr]', ' '
 # The command value: the text after the first "command" key and its colon (case-sensitive). $cmdD decoded, $cmdU as
@@ -50,13 +52,20 @@ $arg = '[-A-Za-z0-9_./:=@%+~]+'
 # text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
 $q = '\\"'
 # The plugin's own root. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} in agent and skill text (forward slashes on
-# Windows), so the agent types the absolute root, and it exports the same root to hook processes. Taken from that
-# environment variable, else from this script's location; with neither, only the literal placeholder matches.
-$rootDir = $env:CLAUDE_PLUGIN_ROOT
-if (-not $rootDir -and $PSScriptRoot) { $rootDir = Split-Path $PSScriptRoot -Parent }
+# Windows), so the agent types the absolute root. The root is taken from this script's own location only, never from
+# the environment, so no outside value can widen it (review cycle 13, security F1). It must have at least two path
+# segments, or only the literal placeholder matches; unquoted, it is accepted only when the shell cannot split it.
+$rootNorm = ''
+if ($PSScriptRoot) { $rootNorm = ((Split-Path $PSScriptRoot -Parent) -replace '\\', '/').TrimEnd('/') }
 $rootAlt = ''
-if ($rootDir) { $rootAlt = '|' + [regex]::Escape(($rootDir -replace '\\', '/').TrimEnd('/')) }
-$setupPath = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootAlt + ')/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+$rootBareAlt = ''
+if ($rootNorm -cmatch '^([A-Za-z]:)?(/[^/]+){2,}$') {
+  $rootAlt = '|' + [regex]::Escape($rootNorm)
+  if ($rootNorm -cmatch '^[A-Za-z0-9_./:~-]+$') { $rootBareAlt = $rootAlt }
+}
+$setupTail = '/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+$setupPath = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootAlt + ')' + $setupTail
+$setupBare = '([$][{]CLAUDE_PLUGIN_ROOT[}]' + $rootBareAlt + ')' + $setupTail
 # An argument is plain text, bare or in one pair of double quotes (agents quote paths).
 $argQ = '(' + $q + $arg + $q + '|' + $arg + ')'
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
@@ -67,7 +76,7 @@ $provePath = '([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]j
 # Separators are space and tab only, the characters bash splits words on (.NET \s also matches Unicode spaces such as
 # U+00A0, which bash keeps inside a word; review cycle 10, security F1).
 $sp = '[ \t]'
-$closed = '^' + $sp + '*node' + $sp + '+((' + $q + $setupPath + $q + '|' + $setupPath + ')(' + $sp + '+' + $argQ + ')*|(' + $q + $provePath + $q + '|' + $proveBare + ')(' + $sp + '+' + $argQ + ')*' + $sp + '+--verify(' + $sp + '+' + $argQ + ')*)' + $sp + '*$'
+$closed = '^' + $sp + '*node' + $sp + '+((' + $q + $setupPath + $q + '|' + $setupBare + ')(' + $sp + '+' + $argQ + ')*|(' + $q + $provePath + $q + '|' + $proveBare + ')(' + $sp + '+' + $argQ + ')*' + $sp + '+--verify(' + $sp + '+' + $argQ + ')*)' + $sp + '*$'
 $chain = '[;&|`]|[$][(]|[<>][(]'
 
 function Block([string]$reason) {

@@ -190,6 +190,17 @@ RAW_ALLOWED = [
     # a node word in a description field is not a node command (cycle-6 defect F2)
     ("node word only in the description", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "node {a,b} files", "command": "ls -la"}})),
+    # the hook input exactly as Claude Code sent it for the proof-runner agent (captured 2026-10-21): compact JSON, agent
+    # fields, and a trailing newline, which is JSON whitespace, not a chain (the PowerShell twin refused every run before)
+    ("real proof-runner hook input with a trailing newline", json.dumps({
+        "session_id": "80009d16-a871-4d51-bb6b-bdecac6c6b1a", "transcript_path": "C:\\Users\\u\\.claude\\projects\\p\\s.jsonl",
+        "cwd": "D:\\core\\projects\\proof-lab", "prompt_id": "5e5265e6", "permission_mode": "default",
+        "agent_id": "a047b7bd68bf7ff7a", "agent_type": "proof-lab:proof-runner", "effort": {"level": "low"},
+        "hook_event_name": "PreToolUse", "tool_name": "Bash",
+        "tool_input": {"command": f'node "{PLUGIN.as_posix()}/scripts/setup.mjs" --run --spec D:/core/projects/proof-lab/demo/specs/06-error-invalid-spec.json'
+                       " --key-file C:/Users/WAHYU~1.SIN/AppData/Local/Temp/proof-lab-demo-x/demo.key --json",
+                       "description": "Run proof-lab spec 06 with the demo key file"},
+        "tool_use_id": "toolu_01QjVcenCxrhhpkSWrDFdTuw"}, separators=(",", ":")) + "\n"),
     # a description whose value is the word "command" is not the key: the cut needs the colon on both twins (backlog item 21)
     ("description equal to the word command", json.dumps({"tool_name": "Bash", "tool_input": {
         "description": "command", "command": 'node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs" --run --spec s.json'}})),

@@ -12,11 +12,13 @@ case "$(printf '%s' "$INPUT" | tr -d ' \t\r\n')" in
   \{*\}) ;;
   *) printf '%s\n' "BLOCKED: proof-lab guard error (the hook input is not one JSON object)" >&2; exit 2 ;;
 esac
-# RAWW: the input as the harness wrote it, newlines as chains, nothing rewritten; the closed form is judged on it.
+# RAWW: the input as the harness wrote it, raw newlines as spaces, nothing rewritten; the closed form is judged on it.
 # RAWU: RAWW with the sanctioned ${CLAUDE_PLUGIN_ROOT} written as @PLUGIN_ROOT@, so the brace rule does not block it.
 # RAW: RAWU with the JSON escapes decoded (\" dropped, \n a chain, \t and \r spaces). Decoding can only add a chain,
 # never hide one, so chains are judged on RAW; node and glob words are judged on both texts.
-RAWW=$(printf '%s' "$INPUT" | tr '\n\r' ';;')
+# A raw newline is JSON whitespace (a newline inside a string is always the \n escape, which is decoded to a chain below);
+# Claude Code ends the hook input with one (found in real use, 2026-10-21).
+RAWW=$(printf '%s' "$INPUT" | tr '\n\r' '  ')
 RAWU=$(printf '%s' "$RAWW" | sed 's/[$]{CLAUDE_PLUGIN_ROOT}/@PLUGIN_ROOT@/g')
 RAW=$(printf '%s' "$RAWU" | sed 's/\\"//g; s/\\n/;/g; s/\\[tr]/ /g')
 # cut_cmd: the text after the first "command" key and its colon (awk's match finds the leftmost one).
@@ -44,11 +46,19 @@ ARG='[-A-Za-z0-9_./:=@%+~]+'
 # text is matched as written (review cycles 7 to 9 found four ways around a match on rewritten or quote-stripped text).
 Q='\\"'
 # The plugin's own root. Claude Code substitutes ${CLAUDE_PLUGIN_ROOT} in agent and skill text (forward slashes on
-# Windows), so the agent types the absolute root, and it exports the same root to hook processes. Taken from that
-# environment variable, else from this script's location; with neither, only the literal placeholder matches.
-ROOT_DIR=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })}
-ROOT_RE=$(printf '%s' "$ROOT_DIR" | tr '\\' '/' | sed 's#/*$##; s/[][\.*^$+?(){}|]/\\&/g')
-SETUP="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_RE:+|$ROOT_RE})/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs"
+# Windows), so the agent types the absolute root. The root is taken from this script's own location only, never from
+# the environment, so no outside value can widen it (review cycle 13, security F1). It must have at least two path
+# segments, or only the literal placeholder matches; unquoted, it is accepted only when the shell cannot split it.
+ROOT_DIR=$(cd "$(dirname -- "$0")/.." 2>/dev/null && { pwd -W 2>/dev/null || pwd; })
+ROOT_N=$(printf '%s' "$ROOT_DIR" | tr '\\' '/' | sed 's#/*$##')
+ROOT_RE=; ROOT_BARE_RE=
+if printf '%s' "$ROOT_N" | grep -Eq '^([A-Za-z]:)?(/[^/]+){2,}$'; then
+  ROOT_RE=$(printf '%s' "$ROOT_N" | sed 's/[][\.*^$+?(){}|]/\\&/g')
+  printf '%s' "$ROOT_N" | grep -Eq '^[A-Za-z0-9_./:~-]+$' && ROOT_BARE_RE=$ROOT_RE
+fi
+SETUP_TAIL='/([A-Za-z0-9_][A-Za-z0-9_.-]*/)*setup[.]mjs'
+SETUP="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_RE:+|$ROOT_RE})${SETUP_TAIL}"
+SETUP_BARE="([\$][{]CLAUDE_PLUGIN_ROOT[}]${ROOT_BARE_RE:+|$ROOT_BARE_RE})${SETUP_TAIL}"
 # A variable prefix is accepted only inside the quoted path: unquoted, the shell word-splits its value (review cycle 11,
 # security F1), so the bare prove path is plain segments only.
 PROVE_BARE='([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
@@ -57,7 +67,7 @@ PROVE='([$][{]?[A-Za-z_]+[}]?/)?([A-Za-z0-9_.][A-Za-z0-9_.-]*/)*prove[.]js'
 SP="[ $(printf '\t')]"
 # An argument is plain text, bare or in one pair of double quotes (agents quote paths).
 ARGQ="(${Q}${ARG}${Q}|${ARG})"
-CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP})(${SP}+${ARGQ})*|(${Q}${PROVE}${Q}|${PROVE_BARE})(${SP}+${ARGQ})*${SP}+--verify(${SP}+${ARGQ})*)${SP}*\$"
+CLOSED="^${SP}*node${SP}+((${Q}${SETUP}${Q}|${SETUP_BARE})(${SP}+${ARGQ})*|(${Q}${PROVE}${Q}|${PROVE_BARE})(${SP}+${ARGQ})*${SP}+--verify(${SP}+${ARGQ})*)${SP}*\$"
 CHAIN='[;&|`]|[$][(]|[<>][(]'
 
 block() {

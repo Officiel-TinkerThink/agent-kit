@@ -54,9 +54,16 @@ def plain_scalar_errors(md):
         if kv is None:
             continue
         value = kv.group(2).strip()
-        if value[:1] in ("'", '"', "[", "{", "|", ">"):
-            continue
-        if ": " in value or " #" in value or value.endswith(":"):
+        if value[:1] == '"':
+            ok = re.fullmatch(r'"(?:[^"\\]|\\.)*"', value) is not None
+        elif value[:1] == "'":
+            ok = re.fullmatch(r"'(?:[^']|'')*'", value) is not None
+        elif value[:1] in ("[", "{", "|", ">"):
+            ok = True
+        else:
+            # a plain scalar: no ": " key, no " #" comment, and no leading indicator such as @ or a backtick
+            ok = not (": " in value or " #" in value or value.endswith(":") or value[:1] in ("@", "`", "%", "&", "*", "!"))
+        if not ok:
             bad.append(kv.group(1))
     return bad
 

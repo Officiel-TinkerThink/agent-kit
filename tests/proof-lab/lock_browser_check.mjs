@@ -1,0 +1,227 @@
+// Run by test_lock_and_browsers.py: prints one JSON line per check, {"name": ..., "ok": true|false, "detail": ...}.
+// The install lock (owner token, gone owners, put-back) and the browser digest check, each on temporary folders.
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { hostname, tmpdir } from "node:os";
+import { join } from "node:path";
+import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
+import { clear, identify, withInstallLock } from "../../plugins/proof-lab/scripts/install-lock.mjs";
+import { rootRisk } from "../../plugins/proof-lab/scripts/platform/posix.mjs";
+
+const out = (name, ok, detail = "") => console.log(JSON.stringify({ name, ok: Boolean(ok), detail: String(detail) }));
+const base = mkdtempSync(join(tmpdir(), "pl-lock-"));
+let n = 0;
+const fresh = () => {
+  const home = join(base, `h${n++}`);
+  mkdirSync(home);
+  return { home, lock: `${home}.lock` };
+};
+const hold = (lock, owner) => {
+  mkdirSync(lock);
+  if (owner) writeFileSync(join(lock, "owner.json"), JSON.stringify(owner));
+};
+const MAX = 60_000;
+const timed = fn => {
+  const t = Date.now();
+  const value = fn();
+  return { value, ms: Date.now() - t };
+};
+// A process that removes the lock after `ms`, and is its live owner until then.
+const remover = (lock, ms) => spawn(process.execPath, ["-e", `setTimeout(() => require("fs").rmSync(${JSON.stringify(lock)}, { recursive: true, force: true }), ${ms})`], { stdio: "ignore" });
+
+try {
+  // --- the install lock
+  let { home, lock } = fresh();
+  let during = null;
+  let r = withInstallLock(home, MAX, () => {
+    during = JSON.parse(readFileSync(join(lock, "owner.json"), "utf8"));
+    return 7;
+  });
+  out("lock: the work runs under a lock that names this run, and the lock is gone after", r === 7 && during.pid === process.pid && during.host === hostname() && typeof during.token === "string" && !existsSync(lock), JSON.stringify(during));
+
+  ({ home, lock } = fresh());
+  const dead = spawnSync(process.execPath, ["-e", "0"]).pid;
+  hold(lock, { token: "t-dead", pid: dead, host: hostname() });
+  let t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: a lock whose process has ended on this host is cleared at once", t.value === "ran" && t.ms < 1500 && !existsSync(lock), `${t.ms} ms`);
+
+  ({ home, lock } = fresh());
+  hold(lock, { token: "t-same-pid", pid: process.pid, host: hostname() });
+  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: a lock with this process's id but another token (a reused id) is cleared at once", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
+
+  ({ home, lock } = fresh());
+  let child = remover(lock, 2500);
+  hold(lock, { token: "t-live", pid: child.pid, host: hostname() });
+  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: a lock whose process still runs is waited for, not cleared", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+
+  ({ home, lock } = fresh());
+  child = remover(lock, 2500);
+  hold(lock, { token: "t-slept", pid: child.pid, host: hostname() });
+  utimesSync(lock, 1_000_000_000, 1_000_000_000);
+  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: an old lock whose process still runs on this host is waited for (a repair that slept keeps its lock)", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+
+  ({ home, lock } = fresh());
+  child = remover(lock, 2500);
+  hold(lock, { token: "t-elsewhere", pid: 1, host: `${hostname()}-other` });
+  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: a young lock from another host is waited for (its process cannot be asked)", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+  child.kill();
+
+  ({ home, lock } = fresh());
+  hold(lock, { token: "t-old", pid: 1, host: `${hostname()}-other` });
+  utimesSync(lock, 1_000_000_000, 1_000_000_000);
+  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  out("lock: a lock older than the longest repair is cleared", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
+
+  ({ home, lock } = fresh());
+  withInstallLock(home, MAX, () => {
+    rmSync(lock, { recursive: true, force: true }); // cleared as gone meanwhile, and taken by another run
+    hold(lock, { token: "t-other", pid: process.pid, host: hostname() });
+  });
+  let owner = existsSync(lock) ? JSON.parse(readFileSync(join(lock, "owner.json"), "utf8")).token : null;
+  out("lock: a run never removes a lock that another run holds by then", owner === "t-other", String(owner));
+  rmSync(lock, { recursive: true, force: true });
+
+  ({ home, lock } = fresh());
+  hold(lock, { token: "t-judged", pid: 1, host: hostname() });
+  const judged = identify(lock);
+  rmSync(lock, { recursive: true, force: true }); // between the look and the rename another run cleared it and took the path
+  hold(lock, { token: "t-new", pid: process.pid, host: hostname() });
+  clear(lock, judged, "t-clearer");
+  owner = existsSync(lock) ? JSON.parse(readFileSync(join(lock, "owner.json"), "utf8")).token : null;
+  out("lock: a lock that changed between the look and the rename is put back, not removed", owner === "t-new" && !existsSync(`${lock}.stale-t-clearer`), String(owner));
+  rmSync(lock, { recursive: true, force: true });
+
+  ({ home, lock } = fresh());
+  hold(lock, { token: "t-judged", pid: 1, host: hostname() });
+  clear(lock, identify(lock), "t-clearer");
+  out("lock: the lock that was judged gone is removed", !existsSync(lock) && !existsSync(`${lock}.stale-t-clearer`));
+
+  ({ home, lock } = fresh());
+  mkdirSync(`${lock}.stale-left`);
+  utimesSync(`${lock}.stale-left`, 1_000_000_000, 1_000_000_000);
+  mkdirSync(`${lock}.stale-young`);
+  withInstallLock(home, MAX, () => {});
+  out("lock: an old folder that a killed clear left beside the lock is removed, a young one is kept", !existsSync(`${lock}.stale-left`) && existsSync(`${lock}.stale-young`));
+
+  // --- the root warning (the machine calls replaced)
+  out("root warning: none for a normal user", rootRisk({ home: "/h" }, { isRoot: () => false, trustedTree: () => false }) === "");
+  out("root warning: none for root on a checkout only root can change", rootRisk({ home: "/h" }, { isRoot: () => true, trustedTree: () => true }) === "");
+  const warning = rootRisk({ home: "/h/lab" }, { isRoot: () => true, trustedTree: () => false });
+  out("root warning: root on a checkout a normal user can change is warned, naming the checkout and what runs as root", warning.includes("/h/lab") && warning.includes("npm ci and the spec run as root") && warning.includes("browser step is skipped"), warning);
+
+  // --- the browser digest check
+  const browsers = join(base, "browsers");
+  const shell = join(browsers, "shell-1");
+  const chrome = join(browsers, "chrome-1");
+  mkdirSync(join(shell, "bin"), { recursive: true });
+  writeFileSync(join(shell, "bin", "shell"), "shell bytes");
+  writeFileSync(join(shell, "INSTALLATION_COMPLETE"), "");
+  const d0 = treeDigest(shell);
+  writeFileSync(join(shell, "DEPENDENCIES_VALIDATED"), "");
+  writeFileSync(join(shell, "INSTALLATION_COMPLETE"), "rewritten");
+  out("digest: Playwright's own marker files are left out", treeDigest(shell) === d0);
+  writeFileSync(join(shell, "bin", "INSTALLATION_COMPLETE"), "");
+  out("digest: a file with a marker's name deeper in the folder is counted", treeDigest(shell) !== d0);
+  rmSync(join(shell, "bin", "INSTALLATION_COMPLETE"));
+  writeFileSync(join(shell, "bin", "debug.log"), "written by the browser when it ran");
+  out("digest: the debug.log that the browser writes beside its program is left out", treeDigest(shell) === d0);
+  rmSync(join(shell, "bin", "debug.log"));
+  mkdirSync(join(shell, "bin", "debug.log"));
+  out("digest: a folder named debug.log is counted (only the log file is left out)", treeDigest(shell) !== d0);
+  rmSync(join(shell, "bin", "debug.log"), { recursive: true });
+  writeFileSync(join(shell, "bin", "shell"), "shell bytez");
+  out("digest: a changed byte changes the digest", treeDigest(shell) !== d0);
+  writeFileSync(join(shell, "bin", "shell"), "shell bytes");
+  mkdirSync(join(shell, "empty"));
+  out("digest: an added folder changes the digest", treeDigest(shell) !== d0);
+  rmSync(join(shell, "empty"), { recursive: true });
+  let linked = true;
+  try {
+    symlinkSync("bin/shell", join(shell, "link"));
+  } catch {
+    linked = false; // making a link needs a right that this machine does not give
+  }
+  if (linked) {
+    const withLink = treeDigest(shell);
+    rmSync(join(shell, "link"));
+    symlinkSync("bin/other", join(shell, "link"));
+    out("digest: a link counts by where it points", treeDigest(shell) !== withLink && withLink !== d0);
+    rmSync(join(shell, "link"));
+  }
+  out("digest: the same folder gives the same digest", treeDigest(shell) === d0);
+
+  // A stand-in for playwright/cli.js: prints what `install --dry-run chromium` prints, for the folders above.
+  const dry = [
+    "Chrome for Testing 1 (playwright chromium v1)",
+    `  Install location:    ${chrome}`,
+    "  Download url:        https://cdn.example/builds/cft/1/x64/chrome.zip",
+    "",
+    "FFmpeg (playwright ffmpeg v1)",
+    `  Install location:    ${join(browsers, "ffmpeg-1")}`,
+    "  Download url:        https://cdn.example/dbazure/download/playwright/builds/ffmpeg/1/ffmpeg.zip",
+    "  Download fallback 1: https://mirror.example/builds/ffmpeg/1/ffmpeg.zip",
+    "",
+    "Chrome Headless Shell 1 (playwright chromium-headless-shell v1)",
+    `  Install location:    ${shell}`,
+    "  Download url:        https://cdn.example/builds/cft/1/x64/shell.zip",
+    "",
+    "System thing",
+    "  Install location:    <system>",
+    "",
+  ].join("\n");
+  const cli = join(base, "cli.js");
+  writeFileSync(cli, `if (process.env.FAKE_FAIL) { console.error("broken"); process.exit(1); }\nprocess.stdout.write(${JSON.stringify(dry)});\n`);
+  const listed = downloads(cli);
+  out("downloads: each folder with its archive path from builds/ on, fallbacks and <system> left out", JSON.stringify(listed) === JSON.stringify([
+    { dir: chrome, key: "builds/cft/1/x64/chrome.zip" },
+    { dir: join(browsers, "ffmpeg-1"), key: "builds/ffmpeg/1/ffmpeg.zip" },
+    { dir: shell, key: "builds/cft/1/x64/shell.zip" },
+  ]), JSON.stringify(listed));
+  let threw = null;
+  try {
+    downloads(cli, { ...process.env, FAKE_FAIL: "1" });
+  } catch (error) {
+    threw = error.message;
+  }
+  out("downloads: a dry run that fails is an error, not an empty list", threw && threw.includes("broken"), String(threw));
+
+  const refusal = fn => {
+    try {
+      fn();
+      return null;
+    } catch (error) {
+      return error.message;
+    }
+  };
+  const refuse = m => {
+    throw new Error(m);
+  };
+  const record = join(base, "data", "checked.json");
+  const pins = { "builds/cft/1/x64/shell.zip": d0 };
+  out("verify: an installed folder that matches its digest passes; folders not installed are skipped", refusal(() => verifyBrowsers({ cli, pins, record, refuse })) === null && existsSync(record));
+  writeFileSync(join(shell, "bin", "shell"), "changed later, marker kept");
+  out("verify: a folder already checked since its last install is not hashed again", refusal(() => verifyBrowsers({ cli, pins, record, refuse })) === null);
+  utimesSync(join(shell, "INSTALLATION_COMPLETE"), new Date(), new Date(Date.now() + 5000));
+  let m = refusal(() => verifyBrowsers({ cli, pins, record, refuse }));
+  out("verify: a folder installed again is checked again, and a mismatch is refused with the reinstall command", m && m.includes("does not match") && m.includes("install --force chromium"), String(m));
+  writeFileSync(join(shell, "bin", "shell"), "shell bytes");
+  const passes = refusal(() => verifyBrowsers({ cli, pins, record, refuse })) === null;
+  writeFileSync(join(shell, "bin", "shell"), "changed after the check");
+  m = refusal(() => verifyBrowsers({ cli, pins, record: null, refuse }));
+  out("verify: without a record every call checks", passes && m && m.includes("does not match"), String(m));
+  writeFileSync(join(shell, "bin", "shell"), "shell bytes");
+  rmSync(join(shell, "INSTALLATION_COMPLETE"));
+  writeFileSync(join(shell, "bin", "shell"), "no marker, changed");
+  m = refusal(() => verifyBrowsers({ cli, pins, record, refuse }));
+  out("verify: a folder without Playwright's marker is checked on every call", m && m.includes("does not match"), String(m));
+  writeFileSync(join(shell, "bin", "shell"), "shell bytes");
+  mkdirSync(chrome);
+  m = refusal(() => verifyBrowsers({ cli, pins, record, refuse }));
+  out("verify: an installed folder with no pinned digest is refused", m && m.includes("builds/cft/1/x64/chrome.zip") && m.includes("no digest"), String(m));
+} finally {
+  rmSync(base, { recursive: true, force: true });
+}

@@ -22,7 +22,7 @@ function readOwner(lock) {
 }
 
 // What identifies one lock folder: its file id and change time (a new folder at the same path has others) and its owner.
-function identify(lock) {
+export function identify(lock) {
   const info = statSync(lock);
   return { id: `${info.ino}:${info.mtimeMs}`, owner: readOwner(lock), ageMs: Date.now() - info.mtimeMs };
 }
@@ -36,13 +36,16 @@ function running(pid) {
   }
 }
 
+// An owner on this host is asked directly, whatever the lock's age: a repair that slept with the laptop still holds its lock.
+// Only an owner that cannot be asked (another host, or no owner file) is judged by the lock's age.
 function gone(seen, maxAgeMs) {
   const owner = seen.owner;
-  if (owner && owner.host === hostname() && Number.isInteger(owner.pid) && (owner.pid === process.pid || !running(owner.pid))) return true;
+  if (owner && owner.host === hostname() && Number.isInteger(owner.pid)) return owner.pid === process.pid || !running(owner.pid);
   return seen.ageMs > maxAgeMs;
 }
 
-function clear(lock, seen, token) {
+// Exported for the tests: the put-back path needs a lock that changes between the look and the rename.
+export function clear(lock, seen, token) {
   const aside = `${lock}.stale-${token}`;
   try {
     renameSync(lock, aside);
@@ -78,6 +81,8 @@ function removeAsides(lock, maxAgeMs) {
 export function withInstallLock(home, maxAgeMs, work) {
   const lock = `${home}.lock`;
   const token = randomUUID();
+  const started = Date.now();
+  let told = false;
   for (;;) {
     try {
       mkdirSync(lock);
@@ -93,6 +98,11 @@ export function withInstallLock(home, maxAgeMs, work) {
         clear(lock, seen, token);
         pause(200); // a rename that a virus scanner blocks for a moment is not tried again in a tight loop
       } else {
+        if (!told && Date.now() - started > maxAgeMs) {
+          // A live process holds it this long: a slow install, or the lock's process id now belongs to another program.
+          console.error(`still waiting for ${lock}, held by process ${seen.owner?.pid ?? "unknown"}: if no proof-lab install is running, remove that folder`);
+          told = true;
+        }
         pause(WAIT_MS);
       }
       continue;

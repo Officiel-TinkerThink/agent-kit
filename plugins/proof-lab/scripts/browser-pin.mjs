@@ -9,14 +9,16 @@ import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, parse } from "node:path";
 
-// Files that Playwright writes into a browser folder itself, after the download: they are not part of the archive.
+// Files that are written into a browser folder after the download, so they are not part of the archive: Playwright's own
+// markers at the top, and the debug.log that Chrome writes beside its program when it runs (a log; nothing loads it).
 const OWN_FILES = new Set(["INSTALLATION_COMPLETE", "DEPENDENCIES_VALIDATED"]);
+const RUN_FILES = new Set(["debug.log"]);
 const DONE = "INSTALLATION_COMPLETE";
 
 // The folders and archives that `install chromium` uses on this machine, as Playwright itself reports them (--dry-run
 // downloads nothing). Runs from the filesystem root, so no file inside the checkout can change how Node starts.
-export function downloads(cli, env = process.env) {
-  const p = spawnSync(process.execPath, [cli, "install", "--dry-run", "chromium"], { cwd: parse(cli).root, env, encoding: "utf8", timeout: 60_000 });
+export function downloads(cli, env = process.env, names = ["chromium"]) {
+  const p = spawnSync(process.execPath, [cli, "install", "--dry-run", ...names], { cwd: parse(cli).root, env, encoding: "utf8", timeout: 60_000 });
   if (p.status !== 0) throw new Error(`playwright install --dry-run failed: ${String(p.stderr || p.error?.message || "").split("\n")[0]}`);
   const found = [];
   let dir = null;
@@ -42,6 +44,7 @@ export function treeDigest(root) {
       if (!rel && OWN_FILES.has(name)) continue;
       const path = rel ? `${rel}/${name}` : name;
       const info = lstatSync(join(root, path));
+      if (RUN_FILES.has(name) && info.isFile()) continue;
       if (info.isSymbolicLink()) {
         all.update(`L ${path} ${readlinkSync(join(root, path))}\n`);
       } else if (info.isDirectory()) {

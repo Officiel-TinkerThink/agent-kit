@@ -15,22 +15,25 @@ const cli = join(home, "node_modules", "playwright", "cli.js");
 const BUILDS = ["ubuntu24.04-x64", "ubuntu24.04-arm64", "mac15", "mac15-arm64", "win64"];
 const HOSTS = ["ubuntu22.04-x64", "ubuntu24.04-x64", "ubuntu26.04-x64", "ubuntu22.04-arm64", "ubuntu24.04-arm64", "ubuntu26.04-arm64", "debian12-x64", "debian12-arm64", "debian13-x64", "debian13-arm64", "mac14", "mac14-arm64", "mac15", "mac15-arm64", "mac26", "mac26-arm64", "win64"];
 const envFor = (build, browsers) => ({ ...process.env, PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: build, PLAYWRIGHT_BROWSERS_PATH: browsers });
+// On a real Windows machine `install chromium` also installs winldd (Playwright adds it when the system itself is Windows,
+// which an override does not change), so the Windows build installs it by name here.
+const namesFor = build => (build === "win64" ? ["chromium", "winldd"] : ["chromium"]);
 
 const digests = {};
 for (const build of BUILDS) {
   const browsers = join(scratch, build);
   mkdirSync(browsers, { recursive: true });
   console.error(`== ${build}`);
-  const p = spawnSync(process.execPath, [cli, "install", "chromium"], { env: envFor(build, browsers), stdio: ["ignore", process.stderr, process.stderr] });
+  const p = spawnSync(process.execPath, [cli, "install", ...namesFor(build)], { env: envFor(build, browsers), stdio: ["ignore", process.stderr, process.stderr] });
   if (p.status !== 0) throw new Error(`install for ${build} failed`);
-  for (const { dir, key } of downloads(cli, envFor(build, browsers))) {
+  for (const { dir, key } of downloads(cli, envFor(build, browsers), namesFor(build))) {
     const digest = treeDigest(dir);
     if (digests[key] && digests[key] !== digest) throw new Error(`${key}: two different digests`);
     digests[key] = digest;
     console.error(`${key} ${digest}`);
   }
 }
-const missing = HOSTS.flatMap(host => downloads(cli, envFor(host, join(scratch, "dry"))).map(d => d.key)).filter(key => !digests[key]);
+const missing = HOSTS.flatMap(host => downloads(cli, envFor(host, join(scratch, "dry")), namesFor(host)).map(d => d.key)).filter(key => !digests[key]);
 if (missing.length) throw new Error(`not covered: ${[...new Set(missing)].join(", ")}`);
 const version = JSON.parse(readFileSync(join(home, "node_modules", "playwright-core", "package.json"), "utf8")).version;
 const sorted = Object.fromEntries(Object.entries(digests).sort(([a], [b]) => (a < b ? -1 : 1)));

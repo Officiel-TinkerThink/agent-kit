@@ -10,13 +10,15 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { forThisMachine } from "./platform/index.mjs";
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PIN_FILE = join(PLUGIN, "proof-lab.pin");
 const MIN_NODE = 24;
 // The repository the pin is fetched from. PROOF_LAB_REPO replaces it (tests); the pin check holds for any source.
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
-const sh = process.platform === "win32";
+const machine = forThisMachine(); // the adapter for the operating system this runs on; no other code looks at the system
+const sh = machine.npmNeedsShell;
 const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
 const BROWSER_TIMEOUT_MS = 30 * 60 * 1000; // the Chromium download is the one large step
 const DEPS_DONE = ".proof-lab-installed"; // written inside node_modules after a whole install; a killed install lacks it
@@ -187,10 +189,12 @@ function main(argv) {
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
+      if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
     if (!checkOnly && !ownCheckout) installDependencies(home, false);
+    if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

@@ -9,7 +9,7 @@ A pull request **adds its changelog line** under `## [Unreleased]` in `CHANGELOG
 ## Opening a pull request
 
 1. Branch from `main`. One topic per PR.
-2. Make the change. Add or update tests; run the suites that cover what you touched (`python tests/run_all.py`, or one file such as `python tests/haiku-delegation/test_changelog.py`).
+2. Make the change. Add or update tests; run the suites that cover what you touched (`python tests/run_all.py`, or one file such as `python tests/haiku-delegation/test_changelog.py`). CI (`.github/workflows/ci.yml`) runs the whole suite on Windows and on Ubuntu, and proof-lab's end-to-end check, on every pull request; a PR is merged only when all three pass.
 3. Add the changelog line (rules below).
 4. If you edited the root `SUBAGENTS.md`, copy it to `plugins/haiku-delegation/templates/SUBAGENTS.md` too. If you edited the root `AGENTS.md`, copy it to `plugins/haiku-delegation/templates/AGENTS.md` too. A test fails when either pair differs.
 5. Open the PR with the template filled in: what and why, how it was verified (commands and results, not "tested"), the changelog line, and a link to the change-control record when the team has one.

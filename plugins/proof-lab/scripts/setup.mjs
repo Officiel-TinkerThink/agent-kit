@@ -155,15 +155,23 @@ export function check(env, pinText) {
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
 }
 
-// The identity of a folder this run made. A folder at the same path that another run removed and something re-made since (a run
-// that was suspended, its npm writing on) has another one.
+// The identity of a folder this run made, or null when it is gone. A folder at the same path that another run removed and
+// something re-made since (a run that was suspended, its npm writing on) has another one.
 function madeId(folder) {
-  return statSync(folder, { bigint: true }).ino;
+  try {
+    return statSync(folder, { bigint: true }).ino;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
 }
+
+// Told when another run removed an install folder as old while this run was suspended in it.
+const removedMeanwhile = folder => refuse(`${folder} was removed by another proof-lab run while this one was paused in it: run again to install`);
 
 // Marks an install whole, only in the folder this run made: never in one re-made at its path after it was removed.
 function markInstalled(folder, made) {
-  if (madeId(folder) !== made) throw new Error(`proof-lab: ${folder} was removed while it was installed`);
+  if (madeId(folder) !== made) removedMeanwhile(folder);
   mkdirSync(join(folder, "node_modules"), { recursive: true });
   writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
 }
@@ -220,7 +228,7 @@ function installOwn(home, whole) {
     if (whole()) return; // another run put a whole install in place meanwhile
     const aside = existsSync(modules) && move(modules, old);
     try {
-      move(join(deps, "node_modules"), modules);
+      if (!move(join(deps, "node_modules"), modules) && !whole()) removedMeanwhile(deps);
     } catch (error) {
       if (aside) move(old, modules);
       throw error;

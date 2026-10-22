@@ -35,6 +35,10 @@ def main():
         data = json.loads(hooks.read_text(encoding='utf-8'))
         cmds = [h['command'] for evt in data['hooks'].values() for grp in evt for h in grp['hooks']]
         check(f'{p.name}: hooks go through run.sh', cmds and all('scripts/run.sh' in c and 'powershell.exe' not in c for c in cmds), str(cmds))
+        check(f'{p.name}: hooks read their input with a time limit (run.sh --hook)', all('scripts/run.sh\\" --hook ' in c or 'scripts/run.sh" --hook ' in c for c in cmds), str(cmds))
+        # a hook that fails or times out decided nothing; only a guard whose every call is in scope may block on that
+        blocking = [h['command'] for evt in data['hooks'].values() for grp in evt for h in grp['hooks'] if h.get('onFailure') == 'block']
+        check(f'{p.name}: only guard-browser blocks when the hook fails', all('scripts/guard-browser' in c for c in blocking), str(blocking))
         # every script a hook names (no extension) must exist as a PowerShell and as a shell version, and lib.sh must be identical everywhere
         for c in cmds:
             m = re.findall(r'scripts/([A-Za-z0-9_-]+)(?:\\"|"|$)', c.replace('\\"', '"'))
@@ -67,6 +71,8 @@ def main():
         p = subprocess.run([SH, str(guards / 'run.sh'), str(ps1), '-A', 'hello'], input='piped', capture_output=True, text=True, timeout=120)
         check('launcher passes args and stdin through', 'A=hello IN=piped' in p.stdout, p.stdout + p.stderr)
         check('launcher returns the script exit code', p.returncode == 7, str(p.returncode))
+        p = subprocess.run([SH, str(guards / 'run.sh'), '--hook', str(ps1), '-A', 'hello'], input='{"k":1}', capture_output=True, text=True, timeout=120)
+        check('launcher --hook passes args, stdin and the exit code through', 'A=hello IN={"k":1}' in p.stdout and p.returncode == 7, p.stdout + p.stderr)
         # a script with no shell version: clear message, exit 2 (a guard that cannot run blocks instead of being skipped)
         p = subprocess.run([SH, str(guards / 'run.sh'), str(pathlib.Path(td) / 'nothere')], capture_output=True, text=True, timeout=60)
         check('missing script version: exit 2', p.returncode == 2, str(p.returncode))

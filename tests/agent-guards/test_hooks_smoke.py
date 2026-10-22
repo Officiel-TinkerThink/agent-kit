@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SH = shutil.which('sh')
@@ -56,6 +57,29 @@ def main():
             check('git guard blocks a write command (exit 2)', p.returncode == 2, f'rc={p.returncode} {p.stderr[:200]}')
             p = run_hook('agent-guards', git_guard, {'agent_type': 'changelog-summarizer', 'tool_name': 'Bash', 'tool_input': {'command': 'git log --oneline -5'}}, env)
             check('git guard allows a read-only command (exit 0)', p.returncode == 0, f'rc={p.returncode} {p.stderr[:200]}')
+            # input that cannot be read names no caller, and only changelog-summarizer is in scope: allowed
+            git_cmd = git_guard.replace('${CLAUDE_PLUGIN_ROOT}', str(ROOT / 'plugins' / 'agent-guards'))
+            p = subprocess.run([SH, '-c', git_cmd], input='not json', capture_output=True, text=True, timeout=120, env=env)
+            check('git guard allows unparseable input (exit 0)', p.returncode == 0, f'rc={p.returncode} {p.stderr[:200]}')
+            # the harness may write the input and leave stdin open: the hook must still decide, well inside its 30 s timeout
+            # (before the fix it waited for the end of input until the harness killed it, and onFailure blocked the call)
+            payload = json.dumps({'agent_type': 'changelog-summarizer', 'tool_name': 'Bash', 'tool_input': {'command': 'git push origin main'}})
+            proc = subprocess.Popen([SH, '-c', git_cmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+            proc.stdin.write(payload)
+            proc.stdin.flush()
+            start = time.monotonic()
+            try:
+                proc.wait(timeout=25)
+                elapsed = time.monotonic() - start
+                err = proc.stderr.read()
+                check('git guard decides with stdin left open (exit 2, under 25 s)', proc.returncode == 2 and 'BLOCKED' in err, f'rc={proc.returncode} {elapsed:.1f}s {err[:200]}')
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                check('git guard decides with stdin left open (exit 2, under 25 s)', False, 'still running after 25 s')
+            finally:
+                proc.stdin.close()
+            log = pathlib.Path(td, 'kit', 'hook-errors.log')
+            check('an open hook stdin is traced in hook-errors.log', log.is_file() and 'hook input not closed' in log.read_text(encoding='utf-8'), str(log))
             # a hook with unparseable input must not crash the launcher chain for other agents
             p = run_hook('agent-guards', hook_commands('agent-guards', 'PreToolUse', 'guard-monitor-patterns')[0], {'agent_type': 'x', 'tool_name': 'Bash', 'tool_input': {'command': 'echo hi'}}, env)
             check('monitor guard lets a normal command through', p.returncode == 0, f'rc={p.returncode} {p.stderr[:200]}')

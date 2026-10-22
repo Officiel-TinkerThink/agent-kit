@@ -3,7 +3,8 @@
 # no Windows PowerShell is on PATH (Linux, macOS, or a shell without powershell.exe). A call that needs PowerShell cannot
 # run there, so it is blocked here and the message names the POSIX alternative.
 # Scope: accidental use. A call hidden inside eval, a base64 string or a script file is not seen.
-# Unparseable hook input is blocked (fail-closed), as in the other guards.
+# Unparseable hook input is allowed (fail-open): this guard only steers away from a command that cannot run here, so
+# an unread call is not a risk; the shell reports the missing command itself.
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$KIT_SCRIPT_DIR/lib.sh"
 
@@ -21,7 +22,7 @@ RE
 )
 
 INPUT=$(cat)
-json_ok "$INPUT" || { printf '%s\n' "BLOCKED: guard error" >&2; exit 2; }
+json_ok "$INPUT" || exit 0
 
 TOOL=$(json_get "$INPUT" tool_name)
 case "$TOOL" in

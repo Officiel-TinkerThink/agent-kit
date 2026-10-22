@@ -35,6 +35,10 @@ def main():
         data = json.loads(hooks.read_text(encoding='utf-8'))
         cmds = [h['command'] for evt in data['hooks'].values() for grp in evt for h in grp['hooks']]
         check(f'{p.name}: hooks go through run.sh', cmds and all('scripts/run.sh' in c and 'powershell.exe' not in c for c in cmds), str(cmds))
+        check(f'{p.name}: hooks read their input with a time limit (run.sh --hook)', all('scripts/run.sh\\" --hook ' in c or 'scripts/run.sh" --hook ' in c for c in cmds), str(cmds))
+        # a hook that fails or times out decided nothing; only a guard whose every call is in scope may block on that
+        blocking = [h['command'] for evt in data['hooks'].values() for grp in evt for h in grp['hooks'] if h.get('onFailure') == 'block']
+        check(f'{p.name}: only guard-browser blocks when the hook fails', all('scripts/guard-browser' in c for c in blocking), str(blocking))
         # every script a hook names (no extension) must exist as a PowerShell and as a shell version, and lib.sh must be identical everywhere
         for c in cmds:
             m = re.findall(r'scripts/([A-Za-z0-9_-]+)(?:\\"|"|$)', c.replace('\\"', '"'))
@@ -67,6 +71,16 @@ def main():
         p = subprocess.run([SH, str(guards / 'run.sh'), str(ps1), '-A', 'hello'], input='piped', capture_output=True, text=True, timeout=120)
         check('launcher passes args and stdin through', 'A=hello IN=piped' in p.stdout, p.stdout + p.stderr)
         check('launcher returns the script exit code', p.returncode == 7, str(p.returncode))
+        p = subprocess.run([SH, str(guards / 'run.sh'), '--hook', str(ps1), '-A', 'hello'], input='{"k":1}', capture_output=True, text=True, timeout=120)
+        check('launcher --hook passes args, stdin and the exit code through', 'A=hello IN={"k":1}' in p.stdout and p.returncode == 7, p.stdout + p.stderr)
+        # --hook execs the script with the input file already removed: no copy of the input (command text, file content) is
+        # left behind if the script is killed, and its signals and exit status are its own
+        hook_tmp = pathlib.Path(td) / 'hooktmp'
+        hook_tmp.mkdir()
+        (pathlib.Path(td) / 'seen.ps1').write_text('$in = [Console]::In.ReadToEnd()\nWrite-Output ("LEFT=" + @(Get-ChildItem -LiteralPath $env:TMPDIR -Filter "agent-kit-hook*").Count + " IN=" + $in.Trim())\nexit 0\n', encoding='utf-8')
+        (pathlib.Path(td) / 'seen.sh').write_text('in=$(cat)\nprintf "LEFT=%s IN=%s\\n" "$(ls "$TMPDIR" | grep -c agent-kit-hook)" "$in"\n', encoding='utf-8', newline='\n')
+        p = subprocess.run([SH, str(guards / 'run.sh'), '--hook', str(pathlib.Path(td) / 'seen')], input='{"k":2}', capture_output=True, text=True, timeout=120, env=dict(os.environ, TMPDIR=hook_tmp.as_posix()))
+        check('launcher --hook removes the input copy before the script runs, which still reads it', 'LEFT=0 IN={"k":2}' in p.stdout and p.returncode == 0 and not any(hook_tmp.iterdir()), p.stdout + p.stderr)
         # a script with no shell version: clear message, exit 2 (a guard that cannot run blocks instead of being skipped)
         p = subprocess.run([SH, str(guards / 'run.sh'), str(pathlib.Path(td) / 'nothere')], capture_output=True, text=True, timeout=60)
         check('missing script version: exit 2', p.returncode == 2, str(p.returncode))

@@ -45,7 +45,7 @@ def run_powershell(stdin_text):
 def run_router(stdin_text):
     # The exact shape of the hook command in hooks/hooks.json, as hooks/hooks.json runs it; the guard takes the plugin root from its own location.
     return subprocess.run(
-        ["sh", str(SCRIPTS / "run.sh"), str(SCRIPTS / "guard-proof-key")],
+        ["sh", str(SCRIPTS / "run.sh"), "--hook", str(SCRIPTS / "guard-proof-key")],
         input=stdin_text, capture_output=True, text=True, encoding="utf-8", timeout=60,
     )
 

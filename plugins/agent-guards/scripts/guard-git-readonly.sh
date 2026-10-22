@@ -1,7 +1,8 @@
 #!/bin/sh
 # PreToolUse hook (Bash), registered by the agent-guards plugin. Applies ONLY to the changelog-summarizer subagent:
 # allow a single read-only git command (optionally `git -C <path> ...`); block everything else.
-# POSIX sh port of guard-git-readonly.ps1. Unparseable hook input is blocked (fail-closed), as in the .ps1.
+# POSIX sh port of guard-git-readonly.ps1. Unparseable hook input fails open, as in the .ps1: the caller is unknown,
+# and every other agent is out of scope.
 KIT_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$KIT_SCRIPT_DIR/lib.sh"
 
@@ -19,7 +20,7 @@ json_ok() {
 }
 
 INPUT=$(cat)
-json_ok "$INPUT" || { printf '%s\n' "BLOCKED: guard error" >&2; exit 2; }
+json_ok "$INPUT" || exit 0
 
 TYPE=$(json_get "$INPUT" agent_type)
 agent_is "$TYPE" changelog-summarizer || exit 0

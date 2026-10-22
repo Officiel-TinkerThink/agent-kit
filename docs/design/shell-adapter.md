@@ -56,6 +56,12 @@ These apply to every suite and every guard touched by the migration.
    - Not verified: the exact `tool_name` string in hook input (documentation gives no literal example), and the Claude Code version that introduced the `PowerShell` tool.
 5. **No `pwsh` on Linux, ever.** Linux runs only the native `.sh` implementations. No `pwsh` executor, shim or emulator is installed or invented on Linux (the former `tests/linux/pwsh` shim was removed).
 
+## Hook input and hook failures (2026-10-22)
+
+- **`run.sh --hook` reads the hook input with a time limit.** Every `hooks.json` command passes `--hook`. The launcher copies stdin to a temporary file for at most 5 seconds (a background `cat` and a timer, not `timeout(1)`, which under Git Bash can resolve to the Windows `timeout.exe`) and gives the script that file as stdin. A script that reads to the end of its input (`[Console]::In.ReadToEnd()`, `$(cat)`) therefore always returns. Before, a pipe the harness left open kept the guard waiting until the 30-second hook timeout killed it (measured: 40 s with stdin held open 40 s). What arrived in time is passed on; a limit that expires is traced in `hook-errors.log`. Skills and tools call `run.sh` without `--hook` and keep reading their whole input.
+- **A guard blocks only a call it has identified as in scope.** Input it cannot read, or a caller it does not apply to, is allowed. A guard for one agent (`guard-verification-runner`, `guard-git-readonly`, `guard-annotator`) fails closed only once it knows the caller is that agent.
+- **`onFailure: block` only where every call is in scope.** A hook that times out or crashes decided nothing, and with `onFailure: block` Claude Code refuses the call anyway, for every agent and the main thread. Only `guard-browser` keeps it: its matcher is the browser tools, and every browser call is in its scope. `guard-proof-key` has no `onFailure` and keeps its own fail-closed rule for unreadable input, because every Bash call is in its scope (`docs/design/proof-lab-guard-v2.md`). `tests/agent-guards/test_launcher.py` checks both rules for all `hooks.json` files.
+
 Implementation status: implemented in `plugins/*/scripts/run.sh` (routing, the `AGENT_KIT_SHELL` override, `powershell.exe`-only on Windows, the fail-closed audit line) and in `guard-shell-os` (item 6). Tested by `tests/agent-guards/test_shell_os.py` and the full suite on Windows and on Linux (Docker). Not yet built: the shared case tables of item 4 for the parity suites (listed in the PR body as the parity gap).
 
 ## Out of scope

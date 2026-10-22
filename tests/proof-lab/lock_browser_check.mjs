@@ -27,6 +27,9 @@ const timed = fn => {
   const value = fn();
   return { value, ms: Date.now() - t };
 };
+// Waits for a killed child to end and be reaped. The event loop must run for that: until() blocks it, so on Linux the child
+// would stay a zombie whose process id still looks alive.
+const exited = child => (child.exitCode !== null || child.signalCode !== null ? Promise.resolve() : new Promise(done => child.once("exit", done)));
 const until = (ok, ms = 20_000) => {
   const end = Date.now() + ms;
   while (!ok() && Date.now() < end) pause(50);
@@ -113,7 +116,7 @@ try {
   const back = statSync(lock).mtimeMs;
   out("lock: a holder keeps its lock fresh after another run moved it aside and put it back", until(() => statSync(lock).mtimeMs > back, 5000));
   child.kill("SIGKILL");
-  until(() => child.exitCode !== null || child.signalCode !== null, 5000);
+  await exited(child);
 
   // A holder that is killed: its thread ends with it, so nobody keeps the lock fresh any more.
   ({ home, lock } = fresh());
@@ -122,7 +125,7 @@ try {
   const first = statSync(lock).mtimeMs;
   const beating = until(() => statSync(lock).mtimeMs > first, 10_000);
   child.kill("SIGKILL");
-  until(() => child.exitCode !== null || child.signalCode !== null, 5000);
+  await exited(child);
   const after = statSync(lock).mtimeMs;
   pause(1500);
   out("lock: a killed holder's lock stops being kept fresh", beating && statSync(lock).mtimeMs === after, `kept fresh before: ${beating}`);

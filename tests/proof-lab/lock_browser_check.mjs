@@ -135,6 +135,15 @@ try {
       mkdirSync(shared, { mode: 0o777 });
       chmodSync(shared, 0o777);
       out("root: a folder not made yet under a folder others can write is changeable", othersCanChange(join(shared, "x")) === true);
+      // A root-owned link whose target goes through a second link that sits in a folder others can write: that user can
+      // repoint the second link, so the path is changeable even though both ends are root's.
+      symlinkSync(tree, join(shared, "relay"));
+      symlinkSync(join(shared, "relay"), join(top, "chain"));
+      out("root: a link chain through a folder others can write is changeable", othersCanChange(join(top, "chain", "bin")) === true);
+      const deep = join(top, "deep");
+      mkdirSync(deep);
+      symlinkSync(shared, join(deep, "via"));
+      out("root: a path that passes through a folder others can write between two links is changeable", othersCanChange(join(deep, "via", "relay", "bin")) === true);
       chmodSync(join(tree, "bin", "chrome"), 0o666);
       out("root: a file in the folder that others can write makes it changeable", othersCanChange(tree) === true);
     } finally {

@@ -1,6 +1,6 @@
 // What the POSIX systems share (Linux, macOS, the BSDs): user ids, and the rule that root runs only files that root alone
 // can change. A file a normal user can change, run as root, gives that user root.
-import { lstatSync, readdirSync, readlinkSync, realpathSync } from "node:fs";
+import { lstatSync, readdirSync, readlinkSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 export const isRoot = () => process.getuid?.() === 0;
@@ -27,21 +27,45 @@ function rootOwnsTree(path, skip = [], within = null) {
   return !info.isDirectory() || readdirSync(path).filter(name => !skip.includes(name)).every(name => rootOwnsTree(join(path, name), [], within));
 }
 
-const above = path => {
-  const all = [];
-  for (let dir = dirname(path); ; dir = dirname(dir)) {
-    all.push(dir);
-    if (dirname(dir) === dir) return all;
-  }
-};
+const MAX_LINKS = 40; // the system gives up on longer chains too
 
-// True when nobody but root can swap `path` for another one between the check and the use: every folder above it, both as
-// written and with its links resolved, is root's and closed to group and others, and every link on the way is root's (a
-// link can be replaced only by whoever can change the folder it is in, which is checked too; on macOS /var is such a link).
-// Folders not made yet are left out: root makes them, under a folder that passed.
+// Where `path` leads, with every real folder the system passes through on the way pushed onto `folders`: links are followed
+// the way the system follows them, so the folder that holds each link on the way, and every folder its target leads
+// through, are in the list. A part not made yet is followed as written.
+function walk(path, folders, links = { n: 0 }) {
+  let at = "/";
+  for (const name of path.split("/").filter(Boolean)) {
+    if (name === ".") continue;
+    if (name === "..") {
+      at = dirname(at); // `at` is a real folder, so this is its real parent
+      continue;
+    }
+    folders.push(at);
+    const next = join(at, name);
+    let info = null;
+    try {
+      info = lstatSync(next);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (info?.isSymbolicLink()) {
+      if (++links.n > MAX_LINKS) throw new Error(`too many links on the way to ${path}`);
+      at = walk(resolve(at, readlinkSync(next)), folders, links);
+    } else {
+      at = next;
+    }
+  }
+  return at;
+}
+
+// True when nobody but root can swap `path` for another one between the check and the use: every real folder the system
+// passes through to reach it is root's and closed to group and others. A link on the way can then be replaced only by root
+// (it can be replaced only by whoever can change the folder it is in; on macOS /var is such a link). Folders not made yet
+// are left out: root makes them, under a folder that passed.
 function rootOwnsAncestors(path) {
-  const real = realpathSync(above(path).find(present));
-  return [...above(path), real, ...above(real)].every(dir => {
+  const folders = [];
+  folders.push(walk(dirname(path), folders));
+  return folders.every(dir => {
     let info;
     try {
       info = lstatSync(dir);
@@ -49,7 +73,7 @@ function rootOwnsAncestors(path) {
       if (error.code === "ENOENT") return true;
       throw error;
     }
-    return info.uid === 0 && (info.isSymbolicLink() || (info.mode & 0o022) === 0);
+    return info.uid === 0 && (info.mode & 0o022) === 0;
   });
 }
 

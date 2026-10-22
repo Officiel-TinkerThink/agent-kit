@@ -32,8 +32,13 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
+      # From Git Bash, as locally. The default step shell is PowerShell 7, whose module path a child powershell.exe would
+      # inherit, so Windows PowerShell 5.1 cmdlets (Get-FileHash) do not load; without PSModulePath 5.1 uses its own.
       - name: Run every suite
-        run: python tests/run_all.py -j 4
+        shell: bash
+        run: |
+          unset PSModulePath
+          python tests/run_all.py -j 4
 
   ubuntu:
     name: Ubuntu suite (Docker)

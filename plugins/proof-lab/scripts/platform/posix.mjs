@@ -27,20 +27,30 @@ function rootOwnsTree(path, skip = [], within = null) {
   return !info.isDirectory() || readdirSync(path).filter(name => !skip.includes(name)).every(name => rootOwnsTree(join(path, name), [], within));
 }
 
-// True when every folder above `path`, up to /, is owned by root, cannot be changed by group or others and is not a link,
-// so nobody can swap the path for another one between the check and the use. Folders not made yet are left out: root makes
-// them, under a folder that passed.
-function rootOwnsAncestors(path) {
+const above = path => {
+  const all = [];
   for (let dir = dirname(path); ; dir = dirname(dir)) {
-    let info = null;
+    all.push(dir);
+    if (dirname(dir) === dir) return all;
+  }
+};
+
+// True when nobody but root can swap `path` for another one between the check and the use: every folder above it, both as
+// written and with its links resolved, is root's and closed to group and others, and every link on the way is root's (a
+// link can be replaced only by whoever can change the folder it is in, which is checked too; on macOS /var is such a link).
+// Folders not made yet are left out: root makes them, under a folder that passed.
+function rootOwnsAncestors(path) {
+  const real = realpathSync(above(path).find(present));
+  return [...above(path), real, ...above(real)].every(dir => {
+    let info;
     try {
       info = lstatSync(dir);
     } catch (error) {
-      if (error.code !== "ENOENT") throw error;
+      if (error.code === "ENOENT") return true;
+      throw error;
     }
-    if (info && (info.isSymbolicLink() || info.uid !== 0 || (info.mode & 0o022) !== 0)) return false;
-    if (dirname(dir) === dir) return true;
-  }
+    return info.uid === 0 && (info.isSymbolicLink() || (info.mode & 0o022) === 0);
+  });
 }
 
 // The files root would run or write in a checkout: the checkout with its .git (git reads its config) and its receipts (a
@@ -51,7 +61,7 @@ export function trustedTree(home) {
   try {
     if (!present(home)) return rootOwnsAncestors(home);
     const modules = join(home, "node_modules");
-    return realpathSync(home) === home && rootOwnsAncestors(home) && rootOwnsTree(home, ["node_modules"]) && (!present(modules) || rootOwnsTree(modules, [".bin"]));
+    return rootOwnsAncestors(home) && rootOwnsTree(home, ["node_modules"]) && (!present(modules) || rootOwnsTree(modules, [".bin"]));
   } catch {
     return false;
   }
@@ -70,8 +80,7 @@ export function rootRisk(ctx, deps = { isRoot, trustedTree }) {
 export function othersCanChange(path, deps = { isRoot }) {
   if (!deps.isRoot()) return false;
   try {
-    if (!present(path)) return !rootOwnsAncestors(path);
-    return !(realpathSync(path) === path && rootOwnsAncestors(path) && rootOwnsTree(path, [], path));
+    return !(rootOwnsAncestors(path) && (!present(path) || rootOwnsTree(path, [], path)));
   } catch {
     return true;
   }

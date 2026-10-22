@@ -42,6 +42,10 @@ else
   out=$(PROOF_LAB_DATA=/root/pl PLAYWRIGHT_BROWSERS_PATH=/home/tester/pw $setup 2>&1); code=$?
   if [ "$code" -eq 2 ] && echo "$out" | grep -q 'can be changed by a user with fewer rights'; then ok "root: browsers in a user-owned folder are refused"; else bad "user-owned browsers not refused (exit $code): $(echo "$out" | tail -3)"; fi
   rm -rf /home/tester/pw
+  # Receipts sent into a folder that normal user owns: warned, and the run goes on.
+  su tester -c "mkdir /home/tester/r"
+  out=$(PROOF_LAB_DATA=/root/pl PROOF_LAB_RECEIPTS=/home/tester/r $setup 2>&1); code=$?
+  if [ "$code" -eq 0 ] && echo "$out" | grep -q '^warning: PROOF_LAB_RECEIPTS names /home/tester/r'; then ok "root: receipts in a user-owned folder are warned about"; else bad "no receipts warning (exit $code): $(echo "$out" | tail -3)"; fi
   # A browser folder changed after the check, and installed again as far as Playwright's marker says: refused.
   shell=$(ls -d /root/.cache/ms-playwright/chromium_headless_shell-*)
   cp -a "$shell" /tmp/shell-copy

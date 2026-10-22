@@ -36,5 +36,5 @@ Playwright checks only the size of the browser it downloads. The plugin compares
 
 ## Limits
 
-- As root on a checkout a normal user can change, the plugin warns and goes on: `npm ci` and the spec run as root from that checkout, and the browser step (the check above and the system libraries) is skipped. Run it as the checkout's owner instead.
+- As root on a checkout a normal user can change, the plugin warns and goes on: `npm ci` and the spec run as root from that checkout, and the browser step (the check above and the system libraries) is skipped. Run it as the checkout's owner instead. The same warning is given when `PROOF_LAB_RECEIPTS` names a folder a normal user can change.
 - The guard checks the Bash command an agent types. It does not parse code run by an interpreter. See `docs/design/proof-lab-guard-v2.md`.

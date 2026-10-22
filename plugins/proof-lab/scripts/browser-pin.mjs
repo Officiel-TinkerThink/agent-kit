@@ -77,8 +77,9 @@ export function verifyBrowsers({ cli, pins, record, refuse, othersCanChange = ()
   const seen = record ? readRecord(record) : {};
   let changed = false;
   for (const { dir, key } of downloads(cli, env)) {
-    if (!existsSync(dir)) continue; // not installed: nothing of it can start
+    // Asked first: a folder not installed yet, under a folder that someone else can change, could be made there before a start.
     if (othersCanChange(dir)) refuse(`${dir} (or a folder above it) can be changed by a user with fewer rights than this run, which would then start a program that user can change. Install the browsers into a folder only this run's user can change (PLAYWRIGHT_BROWSERS_PATH), or run proof-lab as that user`);
+    if (!existsSync(dir)) continue; // not installed: nothing of it can start
     const want = pins[key];
     if (!want) refuse(`the browser archive ${key} has no digest in browsers.sha256.json, so ${dir} cannot be checked: this plugin version does not know the Playwright build for this machine`);
     let done = null;

@@ -179,6 +179,9 @@ function main(argv) {
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
     rootRisk(home);
+    // Receipts sent elsewhere, into a folder that a user with fewer rights can change: that user then decides, with a link,
+    // where this run writes its receipt files. Warned like the checkout.
+    if (!checkOnly && process.env.PROOF_LAB_RECEIPTS && machine.othersCanChange(resolve(home, receipts))) console.error(`warning: PROOF_LAB_RECEIPTS names ${receipts}, which a user with fewer rights than this run can change, so a link there can send this run's receipt files elsewhere. Point it at a folder only this run's user can change.`);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
     // A lock counts as old only after a whole step timeout and a minute more, so a live repair (one npm ci) keeps its lock.
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, STEP_TIMEOUT_MS + 60_000, () => { if (!whole()) installDependencies(home, true); });

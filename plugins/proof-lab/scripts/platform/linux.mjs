@@ -37,7 +37,11 @@ export function ensureBrowser(ctx, deps = real) {
   const cli = join(ctx.home, "node_modules", "playwright", "cli.js");
   if (!deps.exists(cli)) return; // not a Playwright checkout (a test stand-in): nothing to start
   const root = deps.isRoot();
-  if (root && !(ctx.own && deps.trustedTree(ctx.home))) {
+  if (root && !ctx.own) {
+    console.error(`Running as root on a checkout named with PROOF_LAB_HOME: the plugin starts Chromium and installs its system libraries only on its own checkout. If Chromium fails to start, install them with: node ${shQuote(cli)} install-deps chromium`);
+    return;
+  }
+  if (root && !deps.trustedTree(ctx.home)) {
     console.error("Running as root on a checkout that root does not own: the browser step is skipped, so no file a normal user can change runs as root. If Chromium fails to start, install its libraries from a checkout you trust.");
     return;
   }

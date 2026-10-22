@@ -1,7 +1,7 @@
 // Run by test_lock_and_browsers.py: prints one JSON line per check, {"name": ..., "ok": true|false, "detail": ...}.
 // The install lock (owner token, gone owners, put-back) and the browser digest check, each on temporary folders.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
@@ -113,6 +113,34 @@ try {
   const warning = rootRisk({ home: "/h/lab" }, { isRoot: () => true, trustedTree: () => false });
   out("root warning: root on a checkout a normal user can change is warned, naming the checkout and what runs as root", warning.includes("/h/lab") && warning.includes("npm ci and the spec run as root") && warning.includes("browser step is skipped"), warning);
   out("others can change: never for a normal user", othersCanChange("/anything", { isRoot: () => false }) === false);
+  // The real file checks, where this runs as root (the Ubuntu container): a tree under /root, which only root can change.
+  if (process.getuid?.() === 0) {
+    const top = mkdtempSync("/root/pl-trust-");
+    try {
+      const tree = join(top, "browser");
+      mkdirSync(join(tree, "bin"), { recursive: true });
+      writeFileSync(join(tree, "bin", "chrome"), "x");
+      out("root: a root-only folder is not changeable by others", othersCanChange(tree) === false);
+      out("root: a folder not made yet under a root-only folder is not either", othersCanChange(join(top, "later", "x")) === false);
+      symlinkSync("bin/chrome", join(tree, "inside"));
+      out("root: a link that points inside the folder is allowed", othersCanChange(tree) === false);
+      symlinkSync("/tmp", join(tree, "outside"));
+      out("root: a link that points outside the folder is not", othersCanChange(tree) === true);
+      rmSync(join(tree, "outside"));
+      symlinkSync(tree, join(top, "alias"));
+      out("root: a root-owned link above the path, in a root-only folder, is allowed (macOS /var)", othersCanChange(join(top, "alias", "bin")) === false);
+      symlinkSync("/tmp", join(top, "open"));
+      out("root: a link above the path that leads into a folder others can change is not", othersCanChange(join(top, "open", "x")) === true);
+      const shared = join(top, "shared");
+      mkdirSync(shared, { mode: 0o777 });
+      chmodSync(shared, 0o777);
+      out("root: a folder not made yet under a folder others can write is changeable", othersCanChange(join(shared, "x")) === true);
+      chmodSync(join(tree, "bin", "chrome"), 0o666);
+      out("root: a file in the folder that others can write makes it changeable", othersCanChange(tree) === true);
+    } finally {
+      rmSync(top, { recursive: true, force: true });
+    }
+  }
 
   // --- the browser digest check
   const browsers = join(base, "browsers");
@@ -224,9 +252,10 @@ try {
   m = refusal(() => verifyBrowsers({ cli, pins, record, refuse }));
   out("verify: an installed folder with no pinned digest is refused", m && m.includes("builds/cft/1/x64/chrome.zip") && m.includes("no digest"), String(m));
   rmSync(chrome, { recursive: true });
-  const asked = [];
-  m = refusal(() => verifyBrowsers({ cli, pins, record: null, refuse, othersCanChange: dir => (asked.push(dir), true) }));
-  out("verify: a browser folder that a user with fewer rights can change is refused before it is used", m && m.includes(shell) && m.includes("fewer rights") && asked.join() === shell, `${m} / asked ${asked.join()}`);
+  m = refusal(() => verifyBrowsers({ cli, pins, record: null, refuse, othersCanChange: dir => dir === shell }));
+  out("verify: a browser folder that a user with fewer rights can change is refused before it is used", m && m.includes(shell) && m.includes("fewer rights"), String(m));
+  m = refusal(() => verifyBrowsers({ cli, pins, record: null, refuse, othersCanChange: dir => dir === chrome }));
+  out("verify: so is one not installed yet (it could be made there before a start)", m && m.includes(chrome) && m.includes("fewer rights"), String(m));
 } finally {
   rmSync(base, { recursive: true, force: true });
 }

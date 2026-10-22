@@ -1,0 +1,63 @@
+# The same three runs a change is checked with locally (CONTRIBUTING.md): the whole suite on Windows (Windows PowerShell 5.1
+# and Git Bash), the whole suite on Ubuntu 24.04 in the test image (POSIX sh only, no PowerShell: the runner's own pwsh is
+# kept out on purpose), and proof-lab's end-to-end check on a stock Ubuntu container (needs the network: it fetches the
+# pinned proof-lab commit and downloads Chromium). Actions are pinned to a commit; the comment names its release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows suite
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      # From Git Bash, as locally. The default step shell is PowerShell 7, whose module path a child powershell.exe would
+      # inherit, so Windows PowerShell 5.1 cmdlets (Get-FileHash) do not load; without PSModulePath 5.1 uses its own.
+      - name: Run every suite
+        shell: bash
+        run: |
+          unset PSModulePath
+          python tests/run_all.py -j 4
+
+  ubuntu:
+    name: Ubuntu suite (Docker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run every suite in the test image
+        run: sh tests/linux/run-in-docker.sh -j 4
+
+  proof-lab-e2e:
+    name: proof-lab end-to-end (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run as a normal user, as root and on a checkout a normal user owns
+        run: sh tests/linux/proof-lab-e2e.sh

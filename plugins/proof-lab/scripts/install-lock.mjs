@@ -1,16 +1,20 @@
-// One repair at a time. The lock is a folder (mkdir is atomic) that holds owner.json: a random token, the process id and the
-// host name of the run that made it. A run removes only a lock that it owns, or one whose owner is gone:
+// One repair at a time. The lock is a folder that holds owner.json: a random token, the process id and the host name of the
+// run that made it. It is made beside the lock with its owner file already in it and renamed into place, so a lock is never
+// without its owner: a rename onto a lock with a file in it fails on every system (it replaces only an empty folder, which no
+// run makes; an empty lock left by an older plugin is waited for and cleared by its age, like a lock without an owner file).
+// A run removes only a lock that it owns, or one whose owner is gone:
 //   - gone: the process no longer runs on this host, or the lock is older than the longest repair (maxAgeMs);
 //   - a gone lock is first renamed aside (a rename is atomic, so of two runs clearing it only one succeeds) and removed only
 //     when what was moved is the lock that was judged gone; a lock that another run made in the meantime is put back.
 // A run that finds a live lock waits for it to go, then looks again: the holder has usually finished the install.
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 const OWNER = "owner.json";
 const WAIT_MS = 2000;
+const TRIES = 25; // renames a virus scanner blocks for a moment, 200 ms apart
 const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 function readOwner(lock) {
@@ -60,18 +64,26 @@ export function clear(lock, seen, token) {
     rmSync(aside, { recursive: true, force: true });
     return;
   }
-  try {
-    renameSync(aside, lock); // not the lock that was judged: give it back to its owner
-  } catch {
-    rmSync(aside, { recursive: true, force: true }); // a newer lock is in place; this one is no longer anyone's
+  // Not the lock that was judged: give it back to its owner. Removed only when a newer lock holds the path (its run has lost
+  // the lock either way); a put-back that keeps failing on a free path leaves it aside, for removeAsides once it is old.
+  for (let tries = 0; tries < TRIES; tries++) {
+    try {
+      renameSync(aside, lock);
+      return;
+    } catch {}
+    if (existsSync(lock)) {
+      rmSync(aside, { recursive: true, force: true });
+      return;
+    }
+    pause(200);
   }
 }
 
-// Folders that a run killed between its rename and its remove left beside the lock.
+// Folders that a run killed between its rename and its remove (or before it renamed its new lock into place) left beside the lock.
 function removeAsides(lock, maxAgeMs) {
-  const prefix = `${basename(lock)}.stale-`;
+  const prefixes = [`${basename(lock)}.stale-`, `${basename(lock)}.new-`];
   for (const name of readdirSync(dirname(lock))) {
-    if (!name.startsWith(prefix)) continue;
+    if (!prefixes.some(prefix => name.startsWith(prefix))) continue;
     try {
       if (Date.now() - statSync(join(dirname(lock), name)).mtimeMs > maxAgeMs) rmSync(join(dirname(lock), name), { recursive: true, force: true });
     } catch {}
@@ -82,38 +94,14 @@ export function withInstallLock(home, maxAgeMs, work) {
   const lock = `${home}.lock`;
   const token = randomUUID();
   const started = Date.now();
-  let told = false;
-  for (;;) {
-    try {
-      mkdirSync(lock);
-    } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      let seen = null;
-      try {
-        seen = identify(lock);
-      } catch {
-        continue; // released between mkdir and stat: try again at once
-      }
-      if (gone(seen, maxAgeMs)) {
-        clear(lock, seen, token);
-        pause(200); // a rename that a virus scanner blocks for a moment is not tried again in a tight loop
-      } else {
-        if (!told && Date.now() - started > maxAgeMs) {
-          // A live process holds it this long: a slow install, or the lock's process id now belongs to another program.
-          console.error(`still waiting for ${lock}, held by process ${seen.owner?.pid ?? "unknown"}: if no proof-lab install is running, remove that folder`);
-          told = true;
-        }
-        pause(WAIT_MS);
-      }
-      continue;
-    }
-    try {
-      writeFileSync(join(lock, OWNER), JSON.stringify({ token, pid: process.pid, host: hostname() }));
-    } catch (error) {
-      rmSync(lock, { recursive: true, force: true });
-      throw error;
-    }
-    break;
+  const made = `${lock}.new-${token}`;
+  mkdirSync(made);
+  try {
+    writeFileSync(join(made, OWNER), JSON.stringify({ token, pid: process.pid, host: hostname() }));
+    take(lock, made, token, maxAgeMs, started);
+  } catch (error) {
+    rmSync(made, { recursive: true, force: true });
+    throw error;
   }
   try {
     removeAsides(lock, maxAgeMs);
@@ -121,5 +109,43 @@ export function withInstallLock(home, maxAgeMs, work) {
   } finally {
     // Only this run's own lock: if it was cleared as gone and another run holds the path now, that lock is left alone.
     if (readOwner(lock)?.token === token) rmSync(lock, { recursive: true, force: true });
+  }
+}
+
+// Renames the new lock `made` into place once the path is free, clearing a lock whose owner is gone and waiting for a live one.
+function take(lock, made, token, maxAgeMs, started) {
+  let told = false;
+  let blocked = 0;
+  for (;;) {
+    if (!existsSync(lock)) {
+      try {
+        renameSync(made, lock);
+        return;
+      } catch (error) {
+        if (!existsSync(lock)) {
+          // The path is still free: a virus scanner holding a file for a moment, or a folder this run cannot write to.
+          if (++blocked >= TRIES) throw error;
+          pause(200);
+          continue;
+        }
+      }
+    }
+    let seen = null;
+    try {
+      seen = identify(lock);
+    } catch {
+      continue; // released between the look and the stat: try again at once
+    }
+    if (gone(seen, maxAgeMs)) {
+      clear(lock, seen, token);
+      pause(200); // a rename that a virus scanner blocks for a moment is not tried again in a tight loop
+    } else {
+      if (!told && Date.now() - started > maxAgeMs) {
+        // A live process holds it this long: a slow install, or the lock's process id now belongs to another program.
+        console.error(`still waiting for ${lock}, held by process ${seen.owner?.pid ?? "unknown"}: if no proof-lab install is running, remove that folder`);
+        told = true;
+      }
+      pause(WAIT_MS);
+    }
   }
 }

@@ -168,13 +168,10 @@ function main(argv) {
       if (risk && risk !== warned) console.error(`warning: ${(warned = risk)}`);
       return risk;
     };
-    if (!process.env.PROOF_LAB_HOME && !checkOnly) {
-      const planned = preflight(process.env, pinText);
-      if (!existsSync(planned.home)) {
-        rootRisk(planned.home);
-        provision(process.env, planned.pin, planned.home);
-      }
-    }
+    // Before check(): it runs git in the checkout. A named checkout that is not there is refused by check(), not warned.
+    const planned = preflight(process.env, pinText);
+    if (!process.env.PROOF_LAB_HOME || existsSync(planned.home)) rootRisk(planned.home);
+    if (!process.env.PROOF_LAB_HOME && !checkOnly && !existsSync(planned.home)) provision(process.env, planned.pin, planned.home);
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;

@@ -25,6 +25,14 @@ elif [ "$mode" = untrusted ]; then
   git config --global --add safe.directory "*"
   out=$(PROOF_LAB_DATA=/home/tester/pl $setup 2>&1); code=$?
   if [ "$code" -eq 0 ] && echo "$out" | grep -q '^warning: running as root on .*npm ci and the spec run as root' && echo "$out" | grep -q 'browser step is skipped' && ! dpkg -s libnss3 >/dev/null 2>&1; then ok "root on a user-owned checkout is warned, skips the browser step and installs nothing"; else bad "untrusted root case wrong (exit $code, libnss3 present: $(dpkg -s libnss3 >/dev/null 2>&1 && echo yes || echo no)): $(echo "$out" | tail -4)"; fi
+  # The warning comes before git runs in that checkout: a changed file is refused by git's check, after the warning.
+  co=$(ls -d /home/tester/pl/checkouts/*/ | head -1)
+  su tester -c "echo >> ${co}package.json"
+  out=$(PROOF_LAB_DATA=/home/tester/pl $setup 2>&1); code=$?
+  first=$(echo "$out" | grep -n -m1 '^warning: running as root' | cut -d: -f1)
+  refused=$(echo "$out" | grep -n -m1 'has uncommitted changes' | cut -d: -f1)
+  if [ "$code" -eq 2 ] && [ -n "$first" ] && [ -n "$refused" ] && [ "$first" -lt "$refused" ]; then ok "root on a user-owned checkout is warned before git runs in it"; else bad "no warning before git's check (exit $code): $(echo "$out" | head -4)"; fi
+  su tester -c "git -C ${co} checkout -q -- package.json"
   # Root asked to fetch a new checkout into a folder that normal user owns: warned before anything is fetched or installed.
   # The repository is unreachable, so the run stops right after the warning and the first fetch.
   su tester -c "mkdir /home/tester/fresh"

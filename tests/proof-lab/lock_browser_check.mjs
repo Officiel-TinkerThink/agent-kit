@@ -1,9 +1,9 @@
 // Run by test_lock_and_browsers.py: prints one JSON line per check, {"name": ..., "ok": true|false, "detail": ...}.
 // The install lock (owner token, gone owners, put-back) and the browser digest check, each on temporary folders.
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
 import { clear, identify, withInstallLock } from "../../plugins/proof-lab/scripts/install-lock.mjs";
 import { othersCanChange, rootRisk } from "../../plugins/proof-lab/scripts/platform/posix.mjs";
@@ -100,12 +100,23 @@ try {
   clear(lock, identify(lock), "t-clearer");
   out("lock: the lock that was judged gone is removed", !existsSync(lock) && !existsSync(`${lock}.stale-t-clearer`));
 
+  // An empty lock (an older plugin, between its mkdir and its owner file) is waited for: the new lock is not renamed over it.
   ({ home, lock } = fresh());
-  mkdirSync(`${lock}.stale-left`);
-  utimesSync(`${lock}.stale-left`, 1_000_000_000, 1_000_000_000);
+  child = remover(lock, 2500);
+  hold(lock, null);
+  t = timed(() => withInstallLock(home, MAX, () => JSON.parse(readFileSync(join(lock, "owner.json"), "utf8")).pid));
+  out("lock: an empty lock is waited for, not replaced, and the lock this run takes already names it", t.value === process.pid && t.ms >= 2000, `${t.ms} ms`);
+  child.kill();
+
+  ({ home, lock } = fresh());
+  for (const name of ["stale-left", "new-left"]) {
+    mkdirSync(`${lock}.${name}`);
+    utimesSync(`${lock}.${name}`, 1_000_000_000, 1_000_000_000);
+  }
   mkdirSync(`${lock}.stale-young`);
   withInstallLock(home, MAX, () => {});
-  out("lock: an old folder that a killed clear left beside the lock is removed, a young one is kept", !existsSync(`${lock}.stale-left`) && existsSync(`${lock}.stale-young`));
+  out("lock: an old folder that a killed run left beside the lock is removed, a young one is kept", !existsSync(`${lock}.stale-left`) && !existsSync(`${lock}.new-left`) && existsSync(`${lock}.stale-young`));
+  out("lock: no new-lock folder is left beside the lock after a run", !readdirSync(dirname(lock)).some(name => name.startsWith(`${basename(lock)}.new-`)));
 
   // --- the root warning (the machine calls replaced)
   out("root warning: none for a normal user", rootRisk({ home: "/h" }, { isRoot: () => false, trustedTree: () => false }) === "");

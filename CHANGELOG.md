@@ -8,7 +8,7 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ### Security
 - `proof-lab` pins the browser it downloads. Playwright checks only the size of a browser download; the plugin now compares every browser folder it uses with `plugins/proof-lab/browsers.sha256.json` (all five builds: Linux x64 and arm64, macOS x64 and arm64, Windows x64) before the browser first starts, and refuses a mismatch with the reinstall command. As root it refuses browsers in a folder a normal user can change. `tests/linux/browser-digests.sh` remakes the table when Playwright moves.
-- `proof-lab`'s install lock has an owner: a lock whose process has ended is cleared at once, a live owner on the same machine is never cleared (also after a laptop sleep), and a run removes only its own lock or one whose owner is gone.
+- `proof-lab` repairs its own checkout beside it and moves the finished `node_modules` in whole, so an interrupted or doubled repair never leaves a broken install. The install lock has an owner and is kept fresh while it is held: a lock whose process has ended, or that nobody has kept fresh for 30 seconds (also when its process id now belongs to another program), is cleared without a manual step, and a run removes only its own lock or one whose owner is gone.
 - `proof-lab` warns when it runs as root on a checkout that a normal user can change (`npm ci` and the spec run as root from it), before it fetches or installs anything, and then skips the browser step.
 
 ## [0.3.3] - 2026-10-21

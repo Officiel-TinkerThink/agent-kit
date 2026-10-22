@@ -1,7 +1,7 @@
 // Run by test_lock_and_browsers.py: prints one JSON line per check, {"name": ..., "ok": true|false, "detail": ...}.
 // The install lock (owner token, gone owners, put-back) and the browser digest check, each on temporary folders.
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
@@ -20,20 +20,37 @@ const hold = (lock, owner) => {
   mkdirSync(lock);
   if (owner) writeFileSync(join(lock, "owner.json"), JSON.stringify(owner));
 };
-const MAX = 60_000;
+const LONG = { staleMs: 60_000 }; // a lock this young is live by its time alone
+const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const timed = fn => {
   const t = Date.now();
   const value = fn();
   return { value, ms: Date.now() - t };
 };
+const until = (ok, ms = 20_000) => {
+  const end = Date.now() + ms;
+  while (!ok() && Date.now() < end) pause(50);
+  return ok();
+};
 // A process that removes the lock after `ms`, and is its live owner until then.
 const remover = (lock, ms) => spawn(process.execPath, ["-e", `setTimeout(() => require("fs").rmSync(${JSON.stringify(lock)}, { recursive: true, force: true }), ${ms})`], { stdio: "ignore" });
+// Another run that holds the lock for `ms` the way setup does, keeping it fresh.
+const LOCK_MODULE = new URL("../../plugins/proof-lab/scripts/install-lock.mjs", import.meta.url).href;
+const FRESH = { staleMs: 3000, beatMs: 200 };
+const holder = (home, ms) => spawn(process.execPath, ["--input-type=module", "-e", `import { withInstallLock } from ${JSON.stringify(LOCK_MODULE)}; withInstallLock(${JSON.stringify(home)}, () => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${ms}), ${JSON.stringify(FRESH)});`], { stdio: "ignore" });
+const ownerOf = lock => {
+  try {
+    return JSON.parse(readFileSync(join(lock, "owner.json"), "utf8"));
+  } catch {
+    return null;
+  }
+};
 
 try {
   // --- the install lock
   let { home, lock } = fresh();
   let during = null;
-  let r = withInstallLock(home, MAX, () => {
+  let r = withInstallLock(home, () => {
     during = JSON.parse(readFileSync(join(lock, "owner.json"), "utf8"));
     return 7;
   });
@@ -42,42 +59,66 @@ try {
   ({ home, lock } = fresh());
   const dead = spawnSync(process.execPath, ["-e", "0"]).pid;
   hold(lock, { token: "t-dead", pid: dead, host: hostname() });
-  let t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  let t = timed(() => withInstallLock(home, () => "ran"));
   out("lock: a lock whose process has ended on this host is cleared at once", t.value === "ran" && t.ms < 1500 && !existsSync(lock), `${t.ms} ms`);
 
   ({ home, lock } = fresh());
   hold(lock, { token: "t-same-pid", pid: process.pid, host: hostname() });
-  t = timed(() => withInstallLock(home, MAX, () => "ran"));
+  t = timed(() => withInstallLock(home, () => "ran"));
   out("lock: a lock with this process's id but another token (a reused id) is cleared at once", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
 
   ({ home, lock } = fresh());
   let child = remover(lock, 2500);
   hold(lock, { token: "t-live", pid: child.pid, host: hostname() });
-  t = timed(() => withInstallLock(home, MAX, () => "ran"));
-  out("lock: a lock whose process still runs is waited for, not cleared", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+  t = timed(() => withInstallLock(home, () => "ran", LONG));
+  out("lock: a fresh lock whose process still runs is waited for, not cleared", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
 
+  // The process id now belongs to a program that is not proof-lab: it runs, but nobody keeps the lock fresh.
   ({ home, lock } = fresh());
-  child = remover(lock, 2500);
-  hold(lock, { token: "t-slept", pid: child.pid, host: hostname() });
+  child = remover(lock, 60_000);
+  hold(lock, { token: "t-reused", pid: child.pid, host: hostname() });
   utimesSync(lock, 1_000_000_000, 1_000_000_000);
-  t = timed(() => withInstallLock(home, MAX, () => "ran"));
-  out("lock: an old lock whose process still runs on this host is waited for (a repair that slept keeps its lock)", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+  t = timed(() => withInstallLock(home, () => "ran"));
+  out("lock: a stale lock whose process id runs another program is cleared at once, with no wait", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
+  child.kill();
 
   ({ home, lock } = fresh());
   child = remover(lock, 2500);
   hold(lock, { token: "t-elsewhere", pid: 1, host: `${hostname()}-other` });
-  t = timed(() => withInstallLock(home, MAX, () => "ran"));
-  out("lock: a young lock from another host is waited for (its process cannot be asked)", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
+  t = timed(() => withInstallLock(home, () => "ran", LONG));
+  out("lock: a fresh lock from another host is waited for", t.value === "ran" && t.ms >= 2000, `${t.ms} ms`);
   child.kill();
 
   ({ home, lock } = fresh());
   hold(lock, { token: "t-old", pid: 1, host: `${hostname()}-other` });
   utimesSync(lock, 1_000_000_000, 1_000_000_000);
-  t = timed(() => withInstallLock(home, MAX, () => "ran"));
-  out("lock: a lock older than the longest repair is cleared", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
+  t = timed(() => withInstallLock(home, () => "ran"));
+  out("lock: a stale lock from another host is cleared", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
+
+  // A real holder: its thread keeps the lock fresh past staleMs, so the next run waits for it, and then takes a young lock.
+  ({ home, lock } = fresh());
+  child = holder(home, 5000);
+  until(() => ownerOf(lock) !== null);
+  t = timed(() => withInstallLock(home, () => identify(lock).ageMs, FRESH));
+  out("lock: a holder keeps its lock fresh while it works: the next run waits past staleMs, then takes a young lock", t.ms >= FRESH.staleMs && t.value < FRESH.staleMs, `waited ${t.ms} ms, age ${t.value} ms`);
+  child.kill();
+
+  // A holder that is killed: its thread ends with it, so nobody keeps the lock fresh any more.
+  ({ home, lock } = fresh());
+  child = holder(home, 60_000);
+  until(() => ownerOf(lock) !== null);
+  const first = statSync(lock).mtimeMs;
+  const beating = until(() => statSync(lock).mtimeMs > first, 10_000);
+  child.kill("SIGKILL");
+  until(() => child.exitCode !== null || child.signalCode !== null, 5000);
+  const after = statSync(lock).mtimeMs;
+  pause(1500);
+  out("lock: a killed holder's lock stops being kept fresh", beating && statSync(lock).mtimeMs === after, `kept fresh before: ${beating}`);
+  t = timed(() => withInstallLock(home, () => "ran"));
+  out("lock: and the next run clears it at once", t.value === "ran" && t.ms < 1500, `${t.ms} ms`);
 
   ({ home, lock } = fresh());
-  withInstallLock(home, MAX, () => {
+  withInstallLock(home, () => {
     rmSync(lock, { recursive: true, force: true }); // cleared as gone meanwhile, and taken by another run
     hold(lock, { token: "t-other", pid: process.pid, host: hostname() });
   });
@@ -104,16 +145,8 @@ try {
   ({ home, lock } = fresh());
   child = remover(lock, 2500);
   hold(lock, null);
-  t = timed(() => withInstallLock(home, MAX, () => JSON.parse(readFileSync(join(lock, "owner.json"), "utf8")).pid));
+  t = timed(() => withInstallLock(home, () => JSON.parse(readFileSync(join(lock, "owner.json"), "utf8")).pid, LONG));
   out("lock: an empty lock is waited for, not replaced, and the lock this run takes already names it", t.value === process.pid && t.ms >= 2000, `${t.ms} ms`);
-  child.kill();
-
-  // A run that waited longer than the longest repair: the lock it takes is young (its age counts from the take, not the wait).
-  ({ home, lock } = fresh());
-  child = remover(lock, 2500);
-  hold(lock, { token: "t-long", pid: child.pid, host: hostname() });
-  t = timed(() => withInstallLock(home, 1000, () => identify(lock).ageMs));
-  out("lock: after a wait longer than the longest repair, the lock this run takes is young", t.ms >= 2000 && t.value < 1000, `waited ${t.ms} ms, age ${t.value} ms`);
   child.kill();
 
   ({ home, lock } = fresh());
@@ -122,7 +155,7 @@ try {
     utimesSync(`${lock}.${name}`, 1_000_000_000, 1_000_000_000);
   }
   mkdirSync(`${lock}.stale-young`);
-  withInstallLock(home, MAX, () => {});
+  withInstallLock(home, () => {});
   out("lock: an old folder that a killed run left beside the lock is removed, a young one is kept", !existsSync(`${lock}.stale-left`) && !existsSync(`${lock}.new-left`) && existsSync(`${lock}.stale-young`));
   out("lock: no new-lock folder is left beside the lock after a run", !readdirSync(dirname(lock)).some(name => name.startsWith(`${basename(lock)}.new-`)));
 

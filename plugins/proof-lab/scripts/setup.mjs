@@ -6,7 +6,8 @@
 // --run <args>: checks the same way, then runs src/run-spec.js with <args> and returns its exit code. Every proof run goes
 // through this, so a run never starts on a checkout that does not match the pin.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +26,7 @@ const sh = machine.npmNeedsShell;
 const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
 const BROWSER_TIMEOUT_MS = 30 * 60 * 1000; // the Chromium download is the one large step
 const DEPS_DONE = ".proof-lab-installed"; // written inside node_modules after a whole install; a killed install lacks it
-const STALE_TMP_MS = 60 * 60 * 1000; // an install folder this old belongs to a run that was killed
+const STALE_TMP_MS = 60 * 60 * 1000; // an install or dependency folder this old belongs to a run that was killed
 const firstLine = text => String(text).split("\n")[0].trim();
 
 class Refused extends Error {}
@@ -66,12 +67,13 @@ export function managedHome(env, pin) {
 // The repository address without any user:password part, for messages.
 const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
 
-// Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
+// Removes install and dependency folders that a killed run left beside the final path (the pid in the name is not reused by
+// the next run; a dependency folder has a random name).
 function removeStaleTemps(home) {
   const parent = dirname(home);
-  const prefix = `${basename(home)}.tmp-`;
+  const prefixes = [`${basename(home)}.tmp-`, `${basename(home)}.deps-`];
   for (const name of readdirSync(parent)) {
-    if (!name.startsWith(prefix)) continue;
+    if (!prefixes.some(prefix => name.startsWith(prefix))) continue;
     try {
       if (Date.now() - statSync(join(parent, name)).mtimeMs > STALE_TMP_MS) rmSync(join(parent, name), { recursive: true, force: true });
     } catch {}
@@ -147,11 +149,49 @@ function markInstalled(folder) {
   writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
 }
 
-// The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
-// npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
-function installDependencies(home, own) {
-  execFileSync("npm", own ? ["ci", "--ignore-scripts"] : ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
-  if (own) markInstalled(home);
+// A checkout the user named is installed in place, as the user would.
+function installDependencies(home) {
+  execFileSync("npm", ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+}
+
+// Moves from to to, trying again when a virus scanner holds a file for a moment. Returns false when from is gone or to is
+// there already (another run moved first), so the caller uses what is in place.
+function move(from, to) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      renameSync(from, to);
+      return true;
+    } catch (error) {
+      if (!existsSync(from) || existsSync(to)) return false;
+      if (attempt >= 4) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
+    }
+  }
+}
+
+// The plugin's own checkout is repaired beside it and moved in whole: npm ci (no lifecycle scripts, as on the first install)
+// runs in a folder of its own with a copy of the checkout's files, and the node_modules it makes, marked when whole, replaces
+// the checkout's in one rename. An install that is killed leaves the checkout as it was (removed later by removeStaleTemps),
+// and two installs that ever overlap (a laptop that slept through the lock's time) give one whole install, never a mix.
+function installOwn(home, whole) {
+  const deps = `${home}.deps-${randomUUID()}`;
+  const old = `${deps}-old`;
+  removeStaleTemps(home);
+  try {
+    for (const name of git(home, ["ls-files", "-z"]).split("\0").filter(Boolean)) {
+      mkdirSync(dirname(join(deps, name)), { recursive: true });
+      copyFileSync(join(home, name), join(deps, name));
+    }
+    execFileSync("npm", ["ci", "--ignore-scripts"], { cwd: deps, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+    markInstalled(deps);
+    if (whole()) return; // another run put a whole install in place meanwhile
+    const modules = join(home, "node_modules");
+    if (existsSync(modules)) move(modules, old);
+    move(join(deps, "node_modules"), modules);
+  } finally {
+    rmSync(deps, { recursive: true, force: true });
+    rmSync(old, { recursive: true, force: true });
+  }
 }
 
 function main(argv) {
@@ -180,8 +220,8 @@ function main(argv) {
     // where this run writes its receipt files. Warned like the checkout.
     if (!checkOnly && process.env.PROOF_LAB_RECEIPTS && machine.othersCanChange(resolve(home, receipts))) console.error(`warning: PROOF_LAB_RECEIPTS names ${receipts}, which a user with fewer rights than this run can change, so a link there can send this run's receipt files elsewhere. Point it at a folder only this run's user can change.`);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
-    // A lock counts as old only after a whole step timeout and a minute more, so a live repair (one npm ci) keeps its lock.
-    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, STEP_TIMEOUT_MS + 60_000, () => { if (!whole()) installDependencies(home, true); });
+    // The lock saves a second download while one repair runs; installOwn is whole on its own if two ever overlap.
+    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installOwn(home, whole); });
     // The downloaded browser is checked against its pinned digest before anything starts it.
     const browserStep = () => {
       if (checkOnly || rootRisk(home)) return;
@@ -198,7 +238,7 @@ function main(argv) {
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
-    if (!checkOnly && !ownCheckout) installDependencies(home, false);
+    if (!checkOnly && !ownCheckout) installDependencies(home);
     browserStep();
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;

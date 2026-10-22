@@ -17,8 +17,8 @@ const DONE = "INSTALLATION_COMPLETE";
 
 // The folders and archives that `install chromium` uses on this machine, as Playwright itself reports them (--dry-run
 // downloads nothing). Runs from the filesystem root, so no file inside the checkout can change how Node starts.
-export function downloads(cli, env = process.env, names = ["chromium"]) {
-  const p = spawnSync(process.execPath, [cli, "install", "--dry-run", ...names], { cwd: parse(cli).root, env, encoding: "utf8", timeout: 60_000 });
+export function downloads(cli, env = process.env) {
+  const p = spawnSync(process.execPath, [cli, "install", "--dry-run", "chromium"], { cwd: parse(cli).root, env, encoding: "utf8", timeout: 60_000 });
   if (p.status !== 0) throw new Error(`playwright install --dry-run failed: ${String(p.stderr?.trim() || p.stdout?.trim() || p.error?.message || `exit ${p.status}`).split("\n")[0]}`);
   const found = [];
   let dir = null;
@@ -59,21 +59,26 @@ export function treeDigest(root) {
   return all.digest("hex");
 }
 
-function readJson(path, fallback) {
+function readRecord(path) {
   try {
     return JSON.parse(readFileSync(path, "utf8"));
   } catch {
-    return fallback;
+    return {}; // none yet, or unreadable: every folder is checked
   }
 }
 
 // Checks every installed browser folder against `pins` ({ archive key: digest }). `record` is the file that remembers which
-// folders were checked (null: check every time). Throws through `refuse` when a folder does not match or has no digest.
-export function verifyBrowsers({ cli, pins, record, refuse, env = process.env }) {
-  const seen = record ? readJson(record, {}) : {};
+// folders were checked (null: check every time); the caller passes null when someone other than this run's user can
+// change it. `othersCanChange(dir)` is the machine adapter's: true when this run has more rights than a user who can change
+// the folder (root, and a normal user's folder), so it must not start a program from it. Throws through `refuse` when a
+// folder must not be used, does not match or has no digest. A browser changed after its check without a new install is not
+// hashed again: the pin is about the download, and whoever can change the folder could change it after any check.
+export function verifyBrowsers({ cli, pins, record, refuse, othersCanChange = () => false, env = process.env }) {
+  const seen = record ? readRecord(record) : {};
   let changed = false;
   for (const { dir, key } of downloads(cli, env)) {
     if (!existsSync(dir)) continue; // not installed: nothing of it can start
+    if (othersCanChange(dir)) refuse(`${dir} (or a folder above it) can be changed by a user with fewer rights than this run, which would then start a program that user can change. Install the browsers into a folder only this run's user can change (PLAYWRIGHT_BROWSERS_PATH), or run proof-lab as that user`);
     const want = pins[key];
     if (!want) refuse(`the browser archive ${key} has no digest in browsers.sha256.json, so ${dir} cannot be checked: this plugin version does not know the Playwright build for this machine`);
     let done = null;

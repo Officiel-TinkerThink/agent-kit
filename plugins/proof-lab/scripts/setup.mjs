@@ -159,25 +159,37 @@ function main(argv) {
   const checkOnly = argv.includes("--check-only");
   try {
     const pinText = readFileSync(PIN_FILE, "utf8");
+    // Root on a checkout a normal user can change: warned before anything runs from it (a checkout still to be fetched is
+    // judged by the folders above it), not refused, and the browser step does not run from it. Asked again after each step
+    // that changes the checkout; the same warning is printed once.
+    let warned = "";
+    const rootRisk = at => {
+      const risk = checkOnly ? "" : machine.rootRisk({ home: at });
+      if (risk && risk !== warned) console.error(`warning: ${(warned = risk)}`);
+      return risk;
+    };
     if (!process.env.PROOF_LAB_HOME && !checkOnly) {
       const planned = preflight(process.env, pinText);
-      if (!existsSync(planned.home)) provision(process.env, planned.pin, planned.home);
+      if (!existsSync(planned.home)) {
+        rootRisk(planned.home);
+        provision(process.env, planned.pin, planned.home);
+      }
     }
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
-    // Root on a checkout a normal user can change: warned, not refused, and the browser step does not run from that checkout.
-    const risk = checkOnly ? "" : machine.rootRisk({ home, own: ownCheckout });
-    if (risk) console.error(`warning: ${risk}`);
+    rootRisk(home);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
     // A lock counts as old only after a whole step timeout and a minute more, so a live repair (one npm ci) keeps its lock.
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, STEP_TIMEOUT_MS + 60_000, () => { if (!whole()) installDependencies(home, true); });
     // The downloaded browser is checked against its pinned digest before anything starts it.
     const browserStep = () => {
-      if (checkOnly || risk) return;
+      if (checkOnly || rootRisk(home)) return;
       const cli = join(home, "node_modules", "playwright", "cli.js");
       const data = dataFolder(process.env);
-      if (existsSync(cli)) verifyBrowsers({ cli, pins: JSON.parse(readFileSync(BROWSER_PINS, "utf8")).digests, record: isAbsolute(data) ? join(data, "browsers-checked.json") : null, refuse });
+      const record = isAbsolute(data) ? join(data, "browsers-checked.json") : null;
+      const { othersCanChange } = machine;
+      if (existsSync(cli)) verifyBrowsers({ cli, pins: JSON.parse(readFileSync(BROWSER_PINS, "utf8")).digests, record: record && !othersCanChange(record) ? record : null, refuse, othersCanChange });
       machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
     };
     if (runMode) {

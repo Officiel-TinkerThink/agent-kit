@@ -32,7 +32,7 @@ Check it on a clean Ubuntu 24.04 container (from a Linux shell or WSL with Docke
 
 ## The browser is pinned too
 
-Playwright checks only the size of the browser it downloads. The plugin compares every browser folder it uses with `browsers.sha256.json` (a digest per build: Linux x64 and arm64, macOS x64 and arm64, Windows x64) before the browser first starts, and again whenever Playwright installs it again. A folder that does not match is refused with the command that downloads it afresh. A browser that you installed yourself for the same Playwright version is the same download, so it passes.
+Playwright checks only the size of the browser it downloads. The plugin compares every browser folder it uses with `browsers.sha256.json` (a digest per build: Linux x64 and arm64, macOS x64 and arm64, Windows x64) before the browser first starts, and again whenever Playwright installs it again. A folder that does not match is refused with the command that downloads it afresh. A browser that you installed yourself for the same Playwright version is the same download, so it passes. As root, browsers in a folder that a normal user can change are refused.
 
 ## Limits
 

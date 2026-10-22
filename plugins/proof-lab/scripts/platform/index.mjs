@@ -4,17 +4,19 @@
 //   npmNeedsShell   whether npm must be started through a shell (npm is a .cmd file on Windows)
 //   rootRisk        a warning when this run has more rights than the people who can change the checkout (root on a tree a
 //                   normal user can change), or "". With a warning, setup skips the browser step.
-//     ctx: { home, own }
+//     ctx: { home }
+//   othersCanChange true when this run has more rights than a user who can change the path or a folder above it (root,
+//                   and a normal user's folder): no browser is started from such a folder and no record there is trusted
 //   ensureBrowser   makes sure Chromium can start; throws through ctx.refuse when it cannot
 //     ctx: { home, own, refuse, timeoutMs }  home: the proof-lab folder; own: the plugin's own checkout; timeoutMs: one step
 import darwin from "./darwin.mjs";
 import linux from "./linux.mjs";
-import { rootRisk } from "./posix.mjs";
+import { othersCanChange, rootRisk } from "./posix.mjs";
 import win32 from "./win32.mjs";
 
 // Systems with nothing to prepare: npm starts directly and the downloaded browser starts as it is. They are POSIX systems
 // (the BSDs, AIX, Solaris), so root is root there too.
-const generic = { name: "generic", npmNeedsShell: false, rootRisk, ensureBrowser() {} };
+const generic = { name: "generic", npmNeedsShell: false, rootRisk, othersCanChange, ensureBrowser() {} };
 const ADAPTERS = { darwin, linux, win32 };
 
 export function forThisMachine(platform = process.platform) {

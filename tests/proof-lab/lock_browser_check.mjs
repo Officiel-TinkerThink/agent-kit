@@ -6,7 +6,7 @@ import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
 import { clear, identify, withInstallLock } from "../../plugins/proof-lab/scripts/install-lock.mjs";
-import { rootRisk } from "../../plugins/proof-lab/scripts/platform/posix.mjs";
+import { othersCanChange, rootRisk } from "../../plugins/proof-lab/scripts/platform/posix.mjs";
 
 const out = (name, ok, detail = "") => console.log(JSON.stringify({ name, ok: Boolean(ok), detail: String(detail) }));
 const base = mkdtempSync(join(tmpdir(), "pl-lock-"));
@@ -112,6 +112,7 @@ try {
   out("root warning: none for root on a checkout only root can change", rootRisk({ home: "/h" }, { isRoot: () => true, trustedTree: () => true }) === "");
   const warning = rootRisk({ home: "/h/lab" }, { isRoot: () => true, trustedTree: () => false });
   out("root warning: root on a checkout a normal user can change is warned, naming the checkout and what runs as root", warning.includes("/h/lab") && warning.includes("npm ci and the spec run as root") && warning.includes("browser step is skipped"), warning);
+  out("others can change: never for a normal user", othersCanChange("/anything", { isRoot: () => false }) === false);
 
   // --- the browser digest check
   const browsers = join(base, "browsers");
@@ -222,6 +223,10 @@ try {
   mkdirSync(chrome);
   m = refusal(() => verifyBrowsers({ cli, pins, record, refuse }));
   out("verify: an installed folder with no pinned digest is refused", m && m.includes("builds/cft/1/x64/chrome.zip") && m.includes("no digest"), String(m));
+  rmSync(chrome, { recursive: true });
+  const asked = [];
+  m = refusal(() => verifyBrowsers({ cli, pins, record: null, refuse, othersCanChange: dir => (asked.push(dir), true) }));
+  out("verify: a browser folder that a user with fewer rights can change is refused before it is used", m && m.includes(shell) && m.includes("fewer rights") && asked.join() === shell, `${m} / asked ${asked.join()}`);
 } finally {
   rmSync(base, { recursive: true, force: true });
 }

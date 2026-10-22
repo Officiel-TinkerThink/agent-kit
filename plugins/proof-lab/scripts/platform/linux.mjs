@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, parse } from "node:path";
 import { pathToFileURL } from "node:url";
-import { isRoot, rootRisk, trustedTree } from "./posix.mjs";
+import { isRoot, othersCanChange, rootRisk, trustedTree } from "./posix.mjs";
 
 // The probe imports Playwright by absolute path (argument 1) and runs from the filesystem root, so Node never looks at
 // files directly inside the checkout (a package.json there could change what a bare "playwright" import means).
@@ -60,4 +60,4 @@ export function ensureBrowser(ctx, deps = real) {
   }
 }
 
-export default { name: "linux", npmNeedsShell: false, rootRisk, ensureBrowser };
+export default { name: "linux", npmNeedsShell: false, rootRisk, othersCanChange, ensureBrowser };

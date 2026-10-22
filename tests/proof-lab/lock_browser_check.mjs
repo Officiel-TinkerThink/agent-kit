@@ -127,6 +127,14 @@ try {
       symlinkSync("/tmp", join(tree, "outside"));
       out("root: a link that points outside the folder is not", othersCanChange(tree) === true);
       rmSync(join(tree, "outside"));
+      // bin/dots is "self/../../escape": read as text it stays inside the tree (tree/escape), but the system follows self to
+      // bin first, goes up twice from there and leaves the tree (top/escape).
+      symlinkSync(".", join(tree, "bin", "self"));
+      symlinkSync("self/../../escape", join(tree, "bin", "dots"));
+      out("root: a link inside the folder that leaves it through \"..\" after a link is not allowed", othersCanChange(tree) === true);
+      rmSync(join(tree, "bin", "dots"));
+      out("root: a link to the folder it is in is allowed", othersCanChange(tree) === false);
+      rmSync(join(tree, "bin", "self"));
       symlinkSync(tree, join(top, "alias"));
       out("root: a root-owned link above the path, in a root-only folder, is allowed (macOS /var)", othersCanChange(join(top, "alias", "bin")) === false);
       symlinkSync("/tmp", join(top, "open"));
@@ -144,6 +152,14 @@ try {
       mkdirSync(deep);
       symlinkSync(shared, join(deep, "via"));
       out("root: a path that passes through a folder others can write between two links is changeable", othersCanChange(join(deep, "via", "relay", "bin")) === true);
+      // A relative target "s/../t": the system follows s first and then goes up from where s leads (into shared), while a
+      // lexical reading would stay in top, where a root-only t also exists.
+      mkdirSync(join(shared, "sub"));
+      mkdirSync(join(shared, "t"));
+      mkdirSync(join(top, "t"));
+      symlinkSync(join(shared, "sub"), join(top, "s"));
+      symlinkSync("s/../t", join(top, "dotted"));
+      out("root: a \"..\" after a link in a link target is followed the way the system does", othersCanChange(join(top, "dotted", "x")) === true);
       chmodSync(join(tree, "bin", "chrome"), 0o666);
       out("root: a file in the folder that others can write makes it changeable", othersCanChange(tree) === true);
     } finally {

@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-22
+
 ### Fixed
 - Bash calls, for the main thread and for every agent, were sometimes refused with `PreToolUse:Bash hook error: [... guard-verification-runner]: timed out; blocking because onFailure is "block"` (seen on Windows). The guards read their input to the end, so a hook input the harness left open kept them waiting until the 30-second timeout; the POSIX guards on Linux read it the same way. Every hook now starts as `run.sh --hook`, which reads the input for at most 5 seconds and then hands it on, so the guard always decides (a limit that expires is noted in `hook-errors.log`).
 - `guard-git-readonly` (Windows and Linux) and `guard-shell-os` (Linux) blocked every Bash call, for every agent, when the hook input could not be read (`BLOCKED: guard error`). They now allow it. `guard-git-readonly` still blocks anything but a read-only git command for `changelog-summarizer`.

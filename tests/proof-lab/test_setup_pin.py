@@ -213,6 +213,10 @@ with tempfile.TemporaryDirectory() as tmp:
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s7.json"))
     check("a repair removes an old dependency folder a killed repair left, and keeps a recent one", code == 0 and marker.is_file() and not left.exists() and busy.exists(), f"exit {code} err {err!r}")
     shutil.rmtree(busy)
+    left.mkdir()
+    os.utime(left, (old_time, old_time))
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s7.json"))
+    check("a run that finds the checkout whole also removes an old dependency folder", code == 0 and marker.is_file() and not left.exists(), f"exit {code} err {err!r}")
 
     stale = data / (remote_head + ".tmp-99999")
     stale.mkdir()

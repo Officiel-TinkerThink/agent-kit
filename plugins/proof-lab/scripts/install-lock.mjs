@@ -55,8 +55,8 @@ function gone(seen, staleMs) {
   return seen.ageMs > staleMs;
 }
 
-// The thread that keeps a held lock fresh. It stops when the lock is gone or no longer this run's; a time it cannot set for a
-// moment (a virus scanner) is tried again on the next beat. It reads its modules with getBuiltinModule, which works whether
+// The thread that keeps a held lock fresh. It stops when the lock holds another run's owner, or when this run stops it; a lock
+// it cannot read or a time it cannot set for a moment (another run's clear, a virus scanner) is tried again on the next beat. It reads its modules with getBuiltinModule, which works whether
 // node runs the code as a script or as a module (a thread inherits node's flags, such as --input-type=module).
 const KEEP_FRESH = `
 const { readFileSync, utimesSync } = process.getBuiltinModule("node:fs");
@@ -71,7 +71,7 @@ const beat = setInterval(() => {
     // scanner) is looked at again on the next beat.
     return;
   }
-  if (owner.token !== token) return clearInterval(beat);
+  if (owner?.token !== token) return clearInterval(beat);
   try {
     const now = new Date();
     utimesSync(lock, now, now);
@@ -154,7 +154,12 @@ export function withInstallLock(home, work, { staleMs = STALE_MS, beatMs = BEAT_
   } finally {
     stop();
     // Only this run's own lock: if it was cleared as gone and another run holds the path now, that lock is left alone.
-    if (readOwner(lock)?.token === token) rmSync(lock, { recursive: true, force: true });
+    // A lock that cannot be removed now never fails the work: its process has ended by the next run, which clears it at once.
+    if (readOwner(lock)?.token === token) {
+      try {
+        rmSync(lock, { recursive: true, force: true, maxRetries: 4 });
+      } catch {}
+    }
   }
 }
 

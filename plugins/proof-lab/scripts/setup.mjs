@@ -7,7 +7,7 @@
 // through this, so a run never starts on a checkout that does not match the pin.
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -171,25 +171,28 @@ function move(from, to) {
 
 // The plugin's own checkout is repaired beside it and moved in whole: npm ci (no lifecycle scripts, as on the first install)
 // runs in a folder of its own with a copy of the checkout's regular tracked files, and the node_modules it makes, marked when
-// whole, replaces the checkout's: the old one is moved aside, the new one in, and the old one back if that fails. An install
-// that is killed leaves the checkout as it was, or, killed between the two renames, with no node_modules, which the next run
-// repairs (a folder left beside it is removed by removeStaleTemps); two installs that ever overlap (a laptop that slept
-// through the lock's time) give one whole install, never a mix.
+// whole, replaces the checkout's: the old one is moved aside into that folder, the new one in, and the old one back if that
+// fails (if even that fails, the old one goes with the folder: it was not whole, or no repair would run). An install that is
+// killed leaves the checkout as it was, or, killed between the two renames, with no node_modules, which the next run repairs;
+// the folder it leaves is removed by removeStaleTemps. Two installs that ever overlap (a laptop that slept through the lock's
+// time) give one whole install, never a mix.
 function installOwn(home, whole) {
   const deps = `${home}.deps-${randomUUID()}`;
-  const old = `${deps}-old`;
+  const old = join(deps, "node_modules-old");
   const modules = join(home, "node_modules");
-  removeStaleTemps(home);
+  const realHome = realpathSync(home);
   try {
     // An entry is "<mode> <object> <stage>\t<name>". Links and submodules are not copied; a name git would never write
-    // (absolute, or leading out of the folder) stops the repair rather than writing outside it.
+    // (absolute, or leading out of the folder), or a file reached through a link that leaves the checkout, stops the repair
+    // rather than writing outside the folder or reading outside the checkout.
     for (const entry of git(home, ["ls-files", "-s", "-z"]).split("\0").filter(Boolean)) {
       const name = entry.slice(entry.indexOf("\t") + 1);
       if (!/^100(644|755) /.test(entry)) continue;
+      const from = join(home, name);
       const to = resolve(deps, name);
-      if (isAbsolute(name) || !to.startsWith(deps + sep)) throw new Error(`proof-lab: a tracked file name leads outside the checkout: ${JSON.stringify(name)}`);
+      if (isAbsolute(name) || !to.startsWith(deps + sep) || !realpathSync(from).startsWith(realHome + sep)) throw new Error(`proof-lab: a tracked file name leads outside the checkout: ${JSON.stringify(name)}`);
       mkdirSync(dirname(to), { recursive: true });
-      copyFileSync(join(home, name), to);
+      copyFileSync(from, to);
     }
     execFileSync("npm", ["ci", "--ignore-scripts"], { cwd: deps, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
     markInstalled(deps);
@@ -203,11 +206,9 @@ function installOwn(home, whole) {
     }
   } finally {
     // A folder that cannot be removed now (a virus scanner) is removed by a later run; it never fails a finished repair.
-    for (const folder of [deps, old]) {
-      try {
-        rmSync(folder, { recursive: true, force: true, maxRetries: 4 });
-      } catch {}
-    }
+    try {
+      rmSync(deps, { recursive: true, force: true, maxRetries: 4 });
+    } catch {}
   }
 }
 
@@ -237,7 +238,10 @@ function main(argv) {
     // where this run writes its receipt files. Warned like the checkout.
     if (!checkOnly && process.env.PROOF_LAB_RECEIPTS && machine.othersCanChange(resolve(home, receipts))) console.error(`warning: PROOF_LAB_RECEIPTS names ${receipts}, which a user with fewer rights than this run can change, so a link there can send this run's receipt files elsewhere. Point it at a folder only this run's user can change.`);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
-    // The lock saves a second download while one repair runs; installOwn is whole on its own if two ever overlap.
+    // The lock saves a second download while one repair runs; installOwn is whole on its own if two ever overlap. Folders a
+    // killed run left are removed by any later run, also one that finds the checkout whole (a running repair's folder is young:
+    // each of its steps is shorter than the age).
+    if (ownCheckout && !checkOnly) removeStaleTemps(home);
     if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installOwn(home, whole); });
     // The downloaded browser is checked against its pinned digest before anything starts it.
     const browserStep = () => {

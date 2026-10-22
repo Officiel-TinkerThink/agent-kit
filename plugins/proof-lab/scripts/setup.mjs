@@ -68,14 +68,24 @@ export function managedHome(env, pin) {
 const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
 
 // Removes install and dependency folders that a killed run left beside the final path (the pid in the name is not reused by
-// the next run; a dependency folder has a random name).
+// the next run; a dependency folder has a random name). An old folder is renamed first and removed under its new name, so a
+// run that was only suspended finds its folder gone as a whole, never half removed (a removal can stop part way on Windows),
+// and fails instead of moving it in; a folder that cannot be renamed (its files still open) is left. A removal that stops part
+// way keeps the prefix, so a later run finishes it.
 function removeStaleTemps(home) {
   const parent = dirname(home);
   const prefixes = [`${basename(home)}.tmp-`, `${basename(home)}.deps-`];
-  for (const name of readdirSync(parent)) {
+  let names = [];
+  try {
+    names = readdirSync(parent);
+  } catch {}
+  for (const name of names) {
     if (!prefixes.some(prefix => name.startsWith(prefix))) continue;
     try {
-      if (Date.now() - statSync(join(parent, name)).mtimeMs > STALE_TMP_MS) rmSync(join(parent, name), { recursive: true, force: true });
+      if (Date.now() - statSync(join(parent, name)).mtimeMs <= STALE_TMP_MS) continue;
+      const doomed = join(parent, `${basename(home)}.deps-${randomUUID()}`);
+      renameSync(join(parent, name), doomed);
+      rmSync(doomed, { recursive: true, force: true });
     } catch {}
   }
 }

@@ -73,6 +73,14 @@ def main():
         check('launcher returns the script exit code', p.returncode == 7, str(p.returncode))
         p = subprocess.run([SH, str(guards / 'run.sh'), '--hook', str(ps1), '-A', 'hello'], input='{"k":1}', capture_output=True, text=True, timeout=120)
         check('launcher --hook passes args, stdin and the exit code through', 'A=hello IN={"k":1}' in p.stdout and p.returncode == 7, p.stdout + p.stderr)
+        # --hook execs the script with the input file already removed: no copy of the input (command text, file content) is
+        # left behind if the script is killed, and its signals and exit status are its own
+        hook_tmp = pathlib.Path(td) / 'hooktmp'
+        hook_tmp.mkdir()
+        (pathlib.Path(td) / 'seen.ps1').write_text('$in = [Console]::In.ReadToEnd()\nWrite-Output ("LEFT=" + @(Get-ChildItem -LiteralPath $env:TMPDIR -Filter "agent-kit-hook*").Count + " IN=" + $in.Trim())\nexit 0\n', encoding='utf-8')
+        (pathlib.Path(td) / 'seen.sh').write_text('in=$(cat)\nprintf "LEFT=%s IN=%s\\n" "$(ls "$TMPDIR" | grep -c agent-kit-hook)" "$in"\n', encoding='utf-8', newline='\n')
+        p = subprocess.run([SH, str(guards / 'run.sh'), '--hook', str(pathlib.Path(td) / 'seen')], input='{"k":2}', capture_output=True, text=True, timeout=120, env=dict(os.environ, TMPDIR=hook_tmp.as_posix()))
+        check('launcher --hook removes the input copy before the script runs, which still reads it', 'LEFT=0 IN={"k":2}' in p.stdout and p.returncode == 0 and not any(hook_tmp.iterdir()), p.stdout + p.stderr)
         # a script with no shell version: clear message, exit 2 (a guard that cannot run blocks instead of being skipped)
         p = subprocess.run([SH, str(guards / 'run.sh'), str(pathlib.Path(td) / 'nothere')], capture_output=True, text=True, timeout=60)
         check('missing script version: exit 2', p.returncode == 2, str(p.returncode))

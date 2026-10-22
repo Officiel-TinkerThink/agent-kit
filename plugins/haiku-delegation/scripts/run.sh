@@ -62,9 +62,15 @@ if [ "$hook" = 1 ] && hook_in=$(mktemp "${TMPDIR:-/tmp}/agent-kit-hook.XXXXXX" 2
   exec 3<&-
 fi
 
-# launch <command> [args...]: runs the implementation. With --hook its stdin is the input file, removed on exit.
+# launch <command> [args...]: execs the implementation. With --hook its stdin is the input file, opened and then removed
+# (the open file stays readable), so signals and the exit status are the implementation's own, as without --hook, and no
+# copy of the input is left behind when it is killed.
 launch() {
-  if [ -n "$hook_in" ]; then "$@" <"$hook_in"; exit $?; fi
+  if [ -n "$hook_in" ]; then
+    exec <"$hook_in"
+    rm -f "$hook_in"
+    trap - EXIT HUP INT TERM
+  fi
   exec "$@"
 }
 

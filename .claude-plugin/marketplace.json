@@ -12,37 +12,37 @@
       "name": "haiku-delegation",
       "source": "./plugins/haiku-delegation",
       "description": "Read-only Haiku 5.5 subagents with effort tiers and a delegation policy.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     {
       "name": "agent-guards",
       "source": "./plugins/agent-guards",
       "description": "Secret redaction, .env protection, bulk-read redirect, monitor guard, read-only git.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     {
       "name": "agent-eval",
       "source": "./plugins/agent-eval",
       "description": "Usage log, deterministic checks, annotator agent, operator judge and review CLIs.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     {
       "name": "verification-runner",
       "source": "./plugins/verification-runner",
       "description": "Test/lint/build runner (Claude Code permissions decide the commands) with safe-rm quarantine.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     {
       "name": "code-review",
       "source": "./plugins/code-review",
       "description": "Focused Haiku 5.5 reviewers (spec, defect, architecture, security, project rules, history, simplicity) with an independent finding validator and a /code-review:review skill.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     },
     {
       "name": "proof-lab",
       "source": "./plugins/proof-lab",
       "description": "Prove a feature works in the real app: a spec run, a signed receipt, and a guard on the signing key. Uses a proof-lab checkout pinned by commit.",
-      "version": "0.3.3"
+      "version": "0.3.4"
     }
   ]
 }

@@ -70,8 +70,8 @@ const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/
 // Removes install and dependency folders that a killed run left beside the final path (the pid in the name is not reused by
 // the next run; a dependency folder has a random name). An old folder is renamed first and removed under its new name, so a
 // run that was only suspended finds its folder gone as a whole, never half removed (a removal can stop part way on Windows),
-// and fails instead of moving it in; a folder that cannot be renamed (its files still open) is left. A removal that stops part
-// way keeps the prefix, so a later run finishes it.
+// and fails instead of moving it in (markInstalled); a folder that cannot be renamed (its files still open) is left. A removal
+// that stops part way keeps the prefix, so a later run finishes it once the folder is an hour old again.
 function removeStaleTemps(home) {
   const parent = dirname(home);
   const prefixes = [`${basename(home)}.tmp-`, `${basename(home)}.deps-`];
@@ -112,6 +112,7 @@ export function provision(env, pin, home) {
   removeStaleTemps(home);
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp);
+  const made = madeId(tmp);
   try {
     const run = (cmd, args, cwd, timeout = STEP_TIMEOUT_MS) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm", timeout });
     console.error(`setting up proof-lab ${pin} in ${home} (first use only)`);
@@ -123,7 +124,7 @@ export function provision(env, pin, home) {
     run("npm", ["ci", "--ignore-scripts"], tmp);
     const playwright = join(tmp, "node_modules", "playwright", "cli.js");
     if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp, BROWSER_TIMEOUT_MS);
-    markInstalled(tmp);
+    markInstalled(tmp, made);
     moveIntoPlace(tmp, home);
   } catch (error) {
     if (error instanceof Refused) throw error;
@@ -154,7 +155,15 @@ export function check(env, pinText) {
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
 }
 
-function markInstalled(folder) {
+// The identity of a folder this run made. A folder at the same path that another run removed and something re-made since (a run
+// that was suspended, its npm writing on) has another one.
+function madeId(folder) {
+  return statSync(folder, { bigint: true }).ino;
+}
+
+// Marks an install whole, only in the folder this run made: never in one re-made at its path after it was removed.
+function markInstalled(folder, made) {
+  if (madeId(folder) !== made) throw new Error(`proof-lab: ${folder} was removed while it was installed`);
   mkdirSync(join(folder, "node_modules"), { recursive: true });
   writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
 }
@@ -192,6 +201,8 @@ function installOwn(home, whole) {
   const modules = join(home, "node_modules");
   const realHome = realpathSync(home);
   try {
+    mkdirSync(deps);
+    const made = madeId(deps);
     // An entry is "<mode> <object> <stage>\t<name>". Links and submodules are not copied; a name git would never write
     // (absolute, or leading out of the folder), or a file reached through a link that leaves the checkout, stops the repair
     // rather than writing outside the folder or reading outside the checkout.
@@ -205,7 +216,7 @@ function installOwn(home, whole) {
       copyFileSync(from, to);
     }
     execFileSync("npm", ["ci", "--ignore-scripts"], { cwd: deps, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
-    markInstalled(deps);
+    markInstalled(deps, made);
     if (whole()) return; // another run put a whole install in place meanwhile
     const aside = existsSync(modules) && move(modules, old);
     try {

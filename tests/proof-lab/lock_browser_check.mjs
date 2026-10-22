@@ -1,7 +1,7 @@
 // Run by test_lock_and_browsers.py: prints one JSON line per check, {"name": ..., "ok": true|false, "detail": ...}.
 // The install lock (owner token, gone owners, put-back) and the browser digest check, each on temporary folders.
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { downloads, treeDigest, verifyBrowsers } from "../../plugins/proof-lab/scripts/browser-pin.mjs";
@@ -102,6 +102,18 @@ try {
   t = timed(() => withInstallLock(home, () => identify(lock).ageMs, FRESH));
   out("lock: a holder keeps its lock fresh while it works: the next run waits past staleMs, then takes a young lock", t.ms >= FRESH.staleMs && t.value < FRESH.staleMs, `waited ${t.ms} ms, age ${t.value} ms`);
   child.kill();
+
+  // Another run's clear moves a live holder's lock aside and puts it back: the holder goes on keeping it fresh.
+  ({ home, lock } = fresh());
+  child = holder(home, 60_000);
+  until(() => ownerOf(lock) !== null);
+  renameSync(lock, `${lock}.stale-t-look`);
+  pause(3 * FRESH.beatMs);
+  renameSync(`${lock}.stale-t-look`, lock);
+  const back = statSync(lock).mtimeMs;
+  out("lock: a holder keeps its lock fresh after another run moved it aside and put it back", until(() => statSync(lock).mtimeMs > back, 5000));
+  child.kill("SIGKILL");
+  until(() => child.exitCode !== null || child.signalCode !== null, 5000);
 
   // A holder that is killed: its thread ends with it, so nobody keeps the lock fresh any more.
   ({ home, lock } = fresh());

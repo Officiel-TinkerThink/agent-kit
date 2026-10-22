@@ -66,8 +66,9 @@ const beat = setInterval(() => {
   let owner = null;
   try {
     owner = JSON.parse(readFileSync(join(lock, "owner.json"), "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") clearInterval(beat);
+  } catch {
+    // A lock that cannot be read now (another run's clear in progress, which puts back a lock it did not judge, or a virus
+    // scanner) is looked at again on the next beat.
     return;
   }
   if (owner.token !== token) return clearInterval(beat);

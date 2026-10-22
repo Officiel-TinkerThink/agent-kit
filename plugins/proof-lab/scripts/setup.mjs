@@ -9,7 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyBrowsers } from "./browser-pin.mjs";
 import { withInstallLock } from "./install-lock.mjs";
@@ -170,27 +170,44 @@ function move(from, to) {
 }
 
 // The plugin's own checkout is repaired beside it and moved in whole: npm ci (no lifecycle scripts, as on the first install)
-// runs in a folder of its own with a copy of the checkout's files, and the node_modules it makes, marked when whole, replaces
-// the checkout's in one rename. An install that is killed leaves the checkout as it was (removed later by removeStaleTemps),
-// and two installs that ever overlap (a laptop that slept through the lock's time) give one whole install, never a mix.
+// runs in a folder of its own with a copy of the checkout's regular tracked files, and the node_modules it makes, marked when
+// whole, replaces the checkout's: the old one is moved aside, the new one in, and the old one back if that fails. An install
+// that is killed leaves the checkout as it was, or, killed between the two renames, with no node_modules, which the next run
+// repairs (a folder left beside it is removed by removeStaleTemps); two installs that ever overlap (a laptop that slept
+// through the lock's time) give one whole install, never a mix.
 function installOwn(home, whole) {
   const deps = `${home}.deps-${randomUUID()}`;
   const old = `${deps}-old`;
+  const modules = join(home, "node_modules");
   removeStaleTemps(home);
   try {
-    for (const name of git(home, ["ls-files", "-z"]).split("\0").filter(Boolean)) {
-      mkdirSync(dirname(join(deps, name)), { recursive: true });
-      copyFileSync(join(home, name), join(deps, name));
+    // An entry is "<mode> <object> <stage>\t<name>". Links and submodules are not copied; a name git would never write
+    // (absolute, or leading out of the folder) stops the repair rather than writing outside it.
+    for (const entry of git(home, ["ls-files", "-s", "-z"]).split("\0").filter(Boolean)) {
+      const name = entry.slice(entry.indexOf("\t") + 1);
+      if (!/^100(644|755) /.test(entry)) continue;
+      const to = resolve(deps, name);
+      if (isAbsolute(name) || !to.startsWith(deps + sep)) throw new Error(`proof-lab: a tracked file name leads outside the checkout: ${JSON.stringify(name)}`);
+      mkdirSync(dirname(to), { recursive: true });
+      copyFileSync(join(home, name), to);
     }
     execFileSync("npm", ["ci", "--ignore-scripts"], { cwd: deps, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
     markInstalled(deps);
     if (whole()) return; // another run put a whole install in place meanwhile
-    const modules = join(home, "node_modules");
-    if (existsSync(modules)) move(modules, old);
-    move(join(deps, "node_modules"), modules);
+    const aside = existsSync(modules) && move(modules, old);
+    try {
+      move(join(deps, "node_modules"), modules);
+    } catch (error) {
+      if (aside) move(old, modules);
+      throw error;
+    }
   } finally {
-    rmSync(deps, { recursive: true, force: true });
-    rmSync(old, { recursive: true, force: true });
+    // A folder that cannot be removed now (a virus scanner) is removed by a later run; it never fails a finished repair.
+    for (const folder of [deps, old]) {
+      try {
+        rmSync(folder, { recursive: true, force: true, maxRetries: 4 });
+      } catch {}
+    }
   }
 }
 

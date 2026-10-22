@@ -108,6 +108,14 @@ try {
   out("lock: an empty lock is waited for, not replaced, and the lock this run takes already names it", t.value === process.pid && t.ms >= 2000, `${t.ms} ms`);
   child.kill();
 
+  // A run that waited longer than the longest repair: the lock it takes is young (its age counts from the take, not the wait).
+  ({ home, lock } = fresh());
+  child = remover(lock, 2500);
+  hold(lock, { token: "t-long", pid: child.pid, host: hostname() });
+  t = timed(() => withInstallLock(home, 1000, () => identify(lock).ageMs));
+  out("lock: after a wait longer than the longest repair, the lock this run takes is young", t.ms >= 2000 && t.value < 1000, `waited ${t.ms} ms, age ${t.value} ms`);
+  child.kill();
+
   ({ home, lock } = fresh());
   for (const name of ["stale-left", "new-left"]) {
     mkdirSync(`${lock}.${name}`);

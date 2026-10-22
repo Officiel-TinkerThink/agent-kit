@@ -8,7 +8,7 @@
 //     when what was moved is the lock that was judged gone; a lock that another run made in the meantime is put back.
 // A run that finds a live lock waits for it to go, then looks again: the holder has usually finished the install.
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -85,7 +85,8 @@ function removeAsides(lock, maxAgeMs) {
   for (const name of readdirSync(dirname(lock))) {
     if (!prefixes.some(prefix => name.startsWith(prefix))) continue;
     try {
-      if (Date.now() - statSync(join(dirname(lock), name)).mtimeMs > maxAgeMs) rmSync(join(dirname(lock), name), { recursive: true, force: true });
+      const info = lstatSync(join(dirname(lock), name)); // a link is not followed, and not removed: no run makes one here
+      if (info.isDirectory() && Date.now() - info.mtimeMs > maxAgeMs) rmSync(join(dirname(lock), name), { recursive: true, force: true });
     } catch {}
   }
 }
@@ -95,9 +96,7 @@ export function withInstallLock(home, maxAgeMs, work) {
   const token = randomUUID();
   const started = Date.now();
   const made = `${lock}.new-${token}`;
-  mkdirSync(made);
   try {
-    writeFileSync(join(made, OWNER), JSON.stringify({ token, pid: process.pid, host: hostname() }));
     take(lock, made, token, maxAgeMs, started);
   } catch (error) {
     rmSync(made, { recursive: true, force: true });
@@ -112,11 +111,23 @@ export function withInstallLock(home, maxAgeMs, work) {
   }
 }
 
+// This run's new lock, whole and with a fresh time on every look: a run that took the lock meanwhile removes one older than the
+// longest repair, and once it is in place its age is counted from that time.
+function ready(made, token) {
+  if (!existsSync(join(made, OWNER))) {
+    mkdirSync(made, { recursive: true });
+    writeFileSync(join(made, OWNER), JSON.stringify({ token, pid: process.pid, host: hostname() }));
+  }
+  const now = new Date();
+  utimesSync(made, now, now);
+}
+
 // Renames the new lock `made` into place once the path is free, clearing a lock whose owner is gone and waiting for a live one.
 function take(lock, made, token, maxAgeMs, started) {
   let told = false;
   let blocked = 0;
   for (;;) {
+    ready(made, token);
     if (!existsSync(lock)) {
       try {
         renameSync(made, lock);
@@ -130,6 +141,7 @@ function take(lock, made, token, maxAgeMs, started) {
         }
       }
     }
+    blocked = 0; // counted only while the path stays free
     let seen = null;
     try {
       seen = identify(lock);

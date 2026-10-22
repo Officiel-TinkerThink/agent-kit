@@ -112,14 +112,20 @@ export function withInstallLock(home, maxAgeMs, work) {
 }
 
 // This run's new lock, whole and with a fresh time on every look: a run that took the lock meanwhile removes one older than the
-// longest repair, and once it is in place its age is counted from that time.
+// longest repair, and once it is in place its age is counted from that time. Returns false when the time could not be set (a
+// virus scanner holding the folder for a moment, or the folder removed just now): the next look tries again.
 function ready(made, token) {
   if (!existsSync(join(made, OWNER))) {
     mkdirSync(made, { recursive: true });
     writeFileSync(join(made, OWNER), JSON.stringify({ token, pid: process.pid, host: hostname() }));
   }
-  const now = new Date();
-  utimesSync(made, now, now);
+  try {
+    const now = new Date();
+    utimesSync(made, now, now);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Renames the new lock `made` into place once the path is free, clearing a lock whose owner is gone and waiting for a live one.
@@ -127,8 +133,14 @@ function take(lock, made, token, maxAgeMs, started) {
   let told = false;
   let blocked = 0;
   for (;;) {
-    ready(made, token);
+    const fresh = ready(made, token);
     if (!existsSync(lock)) {
+      // Taken only with a fresh time, so the lock is not judged old the moment it is in place.
+      if (!fresh) {
+        if (++blocked >= TRIES) throw new Error(`could not set the time of ${made}`);
+        pause(200);
+        continue;
+      }
       try {
         renameSync(made, lock);
         return;

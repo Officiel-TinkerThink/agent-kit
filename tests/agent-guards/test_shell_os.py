@@ -39,7 +39,7 @@ GUARD_CASES = [
     ("the word powershell in echo is allowed", bash("echo powershell"), 0),
     ("a file named powershell.txt is allowed", bash("cat powershell.txt"), 0),
     ("Read tool is not touched", json.dumps({"tool_name": "Read", "tool_input": {"file_path": "x"}}), 0),
-    ("unparseable input is allowed (fail-open)", "not json", 0),
+    ("unparseable input is blocked (fail-closed)", "not json", 2),
 ]
 
 for name, payload, expected in GUARD_CASES:

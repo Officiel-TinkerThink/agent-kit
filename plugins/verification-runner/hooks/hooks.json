@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" --hook \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context\"",
             "timeout": 60
           }
         ],
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" --hook \"${CLAUDE_PLUGIN_ROOT}/scripts/inject-context\"",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/inject-context\"",
             "timeout": 60
           }
         ]
@@ -29,8 +29,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" --hook \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-verification-runner\"",
-            "timeout": 30
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" \"${CLAUDE_PLUGIN_ROOT}/scripts/guard-verification-runner\"",
+            "timeout": 30,
+            "onFailure": "block"
           }
         ],
         "matcher": "Bash|Monitor"

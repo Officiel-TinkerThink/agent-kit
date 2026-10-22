@@ -6,14 +6,18 @@
 // --run <args>: checks the same way, then runs src/run-spec.js with <args> and returns its exit code. Every proof run goes
 // through this, so a run never starts on a checkout that does not match the pin.
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyBrowsers } from "./browser-pin.mjs";
+import { withInstallLock } from "./install-lock.mjs";
 import { forThisMachine } from "./platform/index.mjs";
 
 const PLUGIN = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PIN_FILE = join(PLUGIN, "proof-lab.pin");
+const BROWSER_PINS = join(PLUGIN, "browsers.sha256.json");
 const MIN_NODE = 24;
 // The repository the pin is fetched from. PROOF_LAB_REPO replaces it (tests); the pin check holds for any source.
 const DEFAULT_REPO = "https://github.com/Officiel-TinkerThink/proof-lab.git";
@@ -22,7 +26,7 @@ const sh = machine.npmNeedsShell;
 const STEP_TIMEOUT_MS = 10 * 60 * 1000; // one git or npm step; a stalled network ends in a refusal, not a hang
 const BROWSER_TIMEOUT_MS = 30 * 60 * 1000; // the Chromium download is the one large step
 const DEPS_DONE = ".proof-lab-installed"; // written inside node_modules after a whole install; a killed install lacks it
-const STALE_TMP_MS = 60 * 60 * 1000; // an install folder this old belongs to a run that was killed
+const STALE_TMP_MS = 60 * 60 * 1000; // an install or dependency folder this old belongs to a run that was killed
 const firstLine = text => String(text).split("\n")[0].trim();
 
 class Refused extends Error {}
@@ -53,22 +57,35 @@ function proofLabName(home) {
   }
 }
 
+const dataFolder = env => env.PROOF_LAB_DATA ?? join(homedir(), ".proof-lab");
+
 // Where the plugin keeps its own checkout when PROOF_LAB_HOME is not set: one folder per pin, so a new pin is a new checkout.
 export function managedHome(env, pin) {
-  return join(env.PROOF_LAB_DATA ?? join(homedir(), ".proof-lab"), "checkouts", pin);
+  return join(dataFolder(env), "checkouts", pin);
 }
 
 // The repository address without any user:password part, for messages.
 const shownRepo = repo => String(repo).replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/]*@/i, "$1");
 
-// Removes install folders that a killed run left beside the final path (the pid in the name is not reused by the next run).
+// Removes install and dependency folders that a killed run left beside the final path (the pid in the name is not reused by
+// the next run; a dependency folder has a random name). An old folder is renamed first and removed under its new name, so a
+// run that was only suspended finds its folder gone as a whole, never half removed (a removal can stop part way on Windows),
+// and fails instead of moving it in (markInstalled); a folder that cannot be renamed (its files still open) is left. A removal
+// that stops part way keeps the prefix, so a later run finishes it once the folder is an hour old again.
 function removeStaleTemps(home) {
   const parent = dirname(home);
-  const prefix = `${basename(home)}.tmp-`;
-  for (const name of readdirSync(parent)) {
-    if (!name.startsWith(prefix)) continue;
+  const prefixes = [`${basename(home)}.tmp-`, `${basename(home)}.deps-`];
+  let names = [];
+  try {
+    names = readdirSync(parent);
+  } catch {}
+  for (const name of names) {
+    if (!prefixes.some(prefix => name.startsWith(prefix))) continue;
     try {
-      if (Date.now() - statSync(join(parent, name)).mtimeMs > STALE_TMP_MS) rmSync(join(parent, name), { recursive: true, force: true });
+      if (Date.now() - statSync(join(parent, name)).mtimeMs <= STALE_TMP_MS) continue;
+      const doomed = join(parent, `${basename(home)}.deps-${randomUUID()}`);
+      renameSync(join(parent, name), doomed);
+      rmSync(doomed, { recursive: true, force: true });
     } catch {}
   }
 }
@@ -95,6 +112,7 @@ export function provision(env, pin, home) {
   removeStaleTemps(home);
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp);
+  const made = madeId(tmp);
   try {
     const run = (cmd, args, cwd, timeout = STEP_TIMEOUT_MS) => execFileSync(cmd, args, { cwd, stdio: ["ignore", process.stderr, process.stderr], shell: sh && cmd === "npm", timeout });
     console.error(`setting up proof-lab ${pin} in ${home} (first use only)`);
@@ -106,7 +124,7 @@ export function provision(env, pin, home) {
     run("npm", ["ci", "--ignore-scripts"], tmp);
     const playwright = join(tmp, "node_modules", "playwright", "cli.js");
     if (existsSync(playwright)) run(process.execPath, [playwright, "install", "chromium"], tmp, BROWSER_TIMEOUT_MS);
-    markInstalled(tmp);
+    markInstalled(tmp, made);
     moveIntoPlace(tmp, home);
   } catch (error) {
     if (error instanceof Refused) throw error;
@@ -137,40 +155,90 @@ export function check(env, pinText) {
   return { home, pin, receipts: env.PROOF_LAB_RECEIPTS ?? join(home, "receipts") };
 }
 
-function markInstalled(folder) {
+// The identity of a folder this run made, or null when it is gone. A folder at the same path that another run removed and
+// something re-made since (a run that was suspended, its npm writing on) has another one.
+function madeId(folder) {
+  try {
+    return statSync(folder, { bigint: true }).ino;
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+// Told when another run removed an install folder as old while this run was suspended in it.
+const removedMeanwhile = folder => refuse(`${folder} was removed by another proof-lab run while this one was paused in it: run again to install`);
+
+// Marks an install whole, only in the folder this run made: never in one re-made at its path after it was removed.
+function markInstalled(folder, made) {
+  if (madeId(folder) !== made) removedMeanwhile(folder);
   mkdirSync(join(folder, "node_modules"), { recursive: true });
   writeFileSync(join(folder, "node_modules", DEPS_DONE), "");
 }
 
-// One repair at a time: the lock is a folder (mkdir is atomic). A run that finds it held waits for it to go, then looks
-// again, because the holder has usually finished the install. A lock older than a whole install belongs to a killed run.
-function withInstallLock(home, work) {
-  const lock = `${home}.lock`;
-  const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  for (;;) {
+// A checkout the user named is installed in place, as the user would.
+function installDependencies(home) {
+  execFileSync("npm", ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+}
+
+// Moves from to to, trying again when a virus scanner holds a file for a moment. Returns false when from is gone or to is
+// there already (another run moved first), so the caller uses what is in place.
+function move(from, to) {
+  for (let attempt = 1; ; attempt++) {
     try {
-      mkdirSync(lock);
-      break;
+      renameSync(from, to);
+      return true;
     } catch (error) {
-      if (error.code !== "EEXIST") throw error;
-      try {
-        if (Date.now() - statSync(lock).mtimeMs > STEP_TIMEOUT_MS + 60_000) rmSync(lock, { recursive: true, force: true });
-      } catch {}
-      pause(2000);
+      if (!existsSync(from) || existsSync(to)) return false;
+      if (attempt >= 4) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500 * attempt);
     }
-    }
-  try {
-    work();
-  } finally {
-    rmSync(lock, { recursive: true, force: true });
   }
 }
 
-// The plugin's own checkout is installed the way the first install is (no lifecycle scripts) and marked when whole;
-// npm ci empties node_modules first, so an install that was killed has no marker and is redone on the next call.
-function installDependencies(home, own) {
-  execFileSync("npm", own ? ["ci", "--ignore-scripts"] : ["ci"], { cwd: home, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
-  if (own) markInstalled(home);
+// The plugin's own checkout is repaired beside it and moved in whole: npm ci (no lifecycle scripts, as on the first install)
+// runs in a folder of its own with a copy of the checkout's regular tracked files, and the node_modules it makes, marked when
+// whole, replaces the checkout's: the old one is moved aside into that folder, the new one in, and the old one back if that
+// fails (if even that fails, the old one goes with the folder: it was not whole, or no repair would run). An install that is
+// killed leaves the checkout as it was, or, killed between the two renames, with no node_modules, which the next run repairs;
+// the folder it leaves is removed by removeStaleTemps. Two installs that ever overlap (a laptop that slept through the lock's
+// time) give one whole install, never a mix.
+function installOwn(home, whole) {
+  const deps = `${home}.deps-${randomUUID()}`;
+  const old = join(deps, "node_modules-old");
+  const modules = join(home, "node_modules");
+  const realHome = realpathSync(home);
+  try {
+    mkdirSync(deps);
+    const made = madeId(deps);
+    // An entry is "<mode> <object> <stage>\t<name>". Links and submodules are not copied; a name git would never write
+    // (absolute, or leading out of the folder), or a file reached through a link that leaves the checkout, stops the repair
+    // rather than writing outside the folder or reading outside the checkout.
+    for (const entry of git(home, ["ls-files", "-s", "-z"]).split("\0").filter(Boolean)) {
+      const name = entry.slice(entry.indexOf("\t") + 1);
+      if (!/^100(644|755) /.test(entry)) continue;
+      const from = join(home, name);
+      const to = resolve(deps, name);
+      if (isAbsolute(name) || !to.startsWith(deps + sep) || !realpathSync(from).startsWith(realHome + sep)) throw new Error(`proof-lab: a tracked file name leads outside the checkout: ${JSON.stringify(name)}`);
+      mkdirSync(dirname(to), { recursive: true });
+      copyFileSync(from, to);
+    }
+    execFileSync("npm", ["ci", "--ignore-scripts"], { cwd: deps, stdio: "inherit", shell: sh, timeout: STEP_TIMEOUT_MS });
+    markInstalled(deps, made);
+    if (whole()) return; // another run put a whole install in place meanwhile
+    const aside = existsSync(modules) && move(modules, old);
+    try {
+      if (!move(join(deps, "node_modules"), modules) && !whole()) removedMeanwhile(deps);
+    } catch (error) {
+      if (aside) move(old, modules);
+      throw error;
+    }
+  } finally {
+    // A folder that cannot be removed now (a virus scanner) is removed by a later run; it never fails a finished repair.
+    try {
+      rmSync(deps, { recursive: true, force: true, maxRetries: 4 });
+    } catch {}
+  }
 }
 
 function main(argv) {
@@ -178,23 +246,50 @@ function main(argv) {
   const checkOnly = argv.includes("--check-only");
   try {
     const pinText = readFileSync(PIN_FILE, "utf8");
-    if (!process.env.PROOF_LAB_HOME && !checkOnly) {
-      const planned = preflight(process.env, pinText);
-      if (!existsSync(planned.home)) provision(process.env, planned.pin, planned.home);
-    }
+    // Root on a checkout a normal user can change: warned before anything runs from it (a checkout still to be fetched is
+    // judged by the folders above it), not refused, and the browser step does not run from it. Asked again after each step
+    // that changes the checkout; the same warning is printed once.
+    let warned = "";
+    const rootRisk = at => {
+      const risk = checkOnly ? "" : machine.rootRisk({ home: at });
+      if (risk && risk !== warned) console.error(`warning: ${(warned = risk)}`);
+      return risk;
+    };
+    // Before check(): it runs git in the checkout. A named checkout that is not there is refused by check(), not warned.
+    const planned = preflight(process.env, pinText);
+    if (!process.env.PROOF_LAB_HOME || existsSync(planned.home)) rootRisk(planned.home);
+    if (!process.env.PROOF_LAB_HOME && !checkOnly && !existsSync(planned.home)) provision(process.env, planned.pin, planned.home);
     const { home, pin, receipts } = check(process.env, pinText);
     // The plugin's own checkout is rebuilt when its dependencies are gone; a checkout the user named is never touched on --run.
     const ownCheckout = !process.env.PROOF_LAB_HOME;
+    rootRisk(home);
+    // Receipts sent elsewhere, into a folder that a user with fewer rights can change: that user then decides, with a link,
+    // where this run writes its receipt files. Warned like the checkout.
+    if (!checkOnly && process.env.PROOF_LAB_RECEIPTS && machine.othersCanChange(resolve(home, receipts))) console.error(`warning: PROOF_LAB_RECEIPTS names ${receipts}, which a user with fewer rights than this run can change, so a link there can send this run's receipt files elsewhere. Point it at a folder only this run's user can change.`);
     const whole = () => existsSync(join(home, "node_modules", DEPS_DONE));
-    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installDependencies(home, true); });
+    // The lock saves a second download while one repair runs; installOwn is whole on its own if two ever overlap. Folders a
+    // killed run left are removed by any later run, also one that finds the checkout whole (a running repair's folder is young:
+    // each of its steps is shorter than the age).
+    if (ownCheckout && !checkOnly) removeStaleTemps(home);
+    if (ownCheckout && !checkOnly && !whole()) withInstallLock(home, () => { if (!whole()) installOwn(home, whole); });
+    // The downloaded browser is checked against its pinned digest before anything starts it.
+    const browserStep = () => {
+      if (checkOnly || rootRisk(home)) return;
+      const cli = join(home, "node_modules", "playwright", "cli.js");
+      const data = dataFolder(process.env);
+      const record = isAbsolute(data) ? join(data, "browsers-checked.json") : null;
+      const { othersCanChange } = machine;
+      if (existsSync(cli)) verifyBrowsers({ cli, pins: JSON.parse(readFileSync(BROWSER_PINS, "utf8")).digests, record: record && !othersCanChange(record) ? record : null, refuse, othersCanChange });
+      machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+    };
     if (runMode) {
       if (!existsSync(join(home, "node_modules"))) refuse(`${home} has no node_modules: run node setup.mjs once (without --run) to install its dependencies`);
-      if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+      browserStep();
       const child = spawnSync(process.execPath, [join(home, "src", "run-spec.js"), ...argv.slice(1)], { cwd: home, stdio: "inherit" });
       return child.status ?? 2;
     }
-    if (!checkOnly && !ownCheckout) installDependencies(home, false);
-    if (!checkOnly) machine.ensureBrowser({ home, own: ownCheckout, refuse, timeoutMs: STEP_TIMEOUT_MS });
+    if (!checkOnly && !ownCheckout) installDependencies(home);
+    browserStep();
     console.log(`ready: proof-lab ${pin} at ${home}; receipts go to ${receipts}`);
     return 0;
   } catch (error) {

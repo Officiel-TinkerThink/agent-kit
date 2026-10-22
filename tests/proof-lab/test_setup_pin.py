@@ -53,7 +53,8 @@ def make_checkout(root, name="proof-lab", deps=True):
 def make_plugin(root, pin_text):
     plugin = root / "plugin"
     (plugin / "scripts").mkdir(parents=True)
-    shutil.copy(SETUP, plugin / "scripts" / "setup.mjs")
+    for module in SETUP.parent.glob("*.mjs"):  # setup.mjs and the modules it imports
+        shutil.copy(module, plugin / "scripts" / module.name)
     shutil.copytree(SETUP.parent / "platform", plugin / "scripts" / "platform")  # setup.mjs imports the machine adapters
     (plugin / "proof-lab.pin").write_text(pin_text, encoding="utf-8")
     return plugin / "scripts" / "setup.mjs"
@@ -128,13 +129,16 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # Managed checkout: PROOF_LAB_HOME unset, the plugin fetches the pin from the repository (a local folder stands in for GitHub).
     remote, _ = make_checkout(tmp / "remote", deps=False)
-    # One local dependency, so npm ci creates node_modules like the real playwright dependency does; no network is used.
+    # One local dependency, packed like a registry package, so npm ci extracts real files into node_modules as it does for
+    # playwright (a folder dependency would be a link); no network is used.
     (remote / "dep").mkdir()
     (remote / "dep" / "package.json").write_text('{"name": "dep", "version": "1.0.0"}\n', encoding="utf-8")
-    (remote / "package.json").write_text('{"name": "proof-lab", "version": "0.0.0", "dependencies": {"dep": "file:./dep"}}\n', encoding="utf-8")
+    subprocess.run("npm pack --pack-destination ..", cwd=remote / "dep", shell=True, check=True, capture_output=True)
+    shutil.rmtree(remote / "dep")
+    (remote / "package.json").write_text('{"name": "proof-lab", "version": "0.0.0", "dependencies": {"dep": "file:./dep-1.0.0.tgz"}}\n', encoding="utf-8")
     subprocess.run("npm install --ignore-scripts --no-audit --no-fund", cwd=remote, shell=True, check=True, capture_output=True)
     shutil.rmtree(remote / "node_modules")
-    git(remote, "add", "package.json", "package-lock.json", "dep")
+    git(remote, "add", "package.json", "package-lock.json", "dep-1.0.0.tgz")
     git(remote, "commit", "-q", "-m", "lock")
     remote_head = git(remote, "rev-parse", "HEAD")
     mscript = make_plugin(tmp / "managed", f"{remote_head}\n")
@@ -166,7 +170,8 @@ with tempfile.TemporaryDirectory() as tmp:
     # Review findings (cycle 1 of auto-setup): self-heal, stale temp folders, credentials in messages, refusal before install.
     shutil.rmtree(data / remote_head / "node_modules")
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s3.json"))
-    check("the plugin's own checkout is repaired when its node_modules are gone", code == 0 and "ran --spec s3.json" in out and (data / remote_head / "node_modules").is_dir(), f"exit {code} out {out!r} err {err!r}")
+    check("the plugin's own checkout is repaired when its node_modules are gone", code == 0 and "ran --spec s3.json" in out and (data / remote_head / "node_modules" / "dep" / "package.json").is_file(), f"exit {code} out {out!r} err {err!r}")
+    check("a repair is made beside the checkout and leaves no folder there", not list(data.glob(remote_head + ".deps-*")), str(list(data.glob(remote_head + ".deps-*"))))
 
     marker = data / remote_head / "node_modules" / ".proof-lab-installed"
     check("a whole install leaves its marker", marker.is_file())
@@ -197,6 +202,21 @@ with tempfile.TemporaryDirectory() as tmp:
     os.utime(lock, (old_time, old_time))
     code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s6.json"))
     check("an old install lock is cleared and the repair runs", code == 0 and marker.is_file() and not lock.exists(), f"exit {code} err {err!r}")
+
+    # A repair that was killed leaves its dependency folder beside the checkout; the next repair removes an old one.
+    marker.unlink()
+    left = data / (remote_head + ".deps-left")
+    left.mkdir()
+    os.utime(left, (old_time, old_time))
+    busy = data / (remote_head + ".deps-busy")
+    busy.mkdir()
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s7.json"))
+    check("a repair removes an old dependency folder a killed repair left, and keeps a recent one", code == 0 and marker.is_file() and not left.exists() and busy.exists(), f"exit {code} err {err!r}")
+    shutil.rmtree(busy)
+    left.mkdir()
+    os.utime(left, (old_time, old_time))
+    code, out, err = run(mscript, None, repo_env, args=("--run", "--spec", "s7.json"))
+    check("a run that finds the checkout whole also removes an old dependency folder", code == 0 and marker.is_file() and not left.exists(), f"exit {code} err {err!r}")
 
     stale = data / (remote_head + ".tmp-99999")
     stale.mkdir()

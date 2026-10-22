@@ -135,6 +135,15 @@ try {
       rmSync(join(tree, "bin", "dots"));
       out("root: a link to the folder it is in is allowed", othersCanChange(tree) === false);
       rmSync(join(tree, "bin", "self"));
+      // The browser folder itself is a link, in a root-only folder, to a folder that holds a file others can write.
+      const target = join(top, "target");
+      mkdirSync(target);
+      writeFileSync(join(target, "chrome"), "x");
+      symlinkSync(target, join(top, "pointer"));
+      out("root: a browser folder that is a link to a root-only folder is allowed", othersCanChange(join(top, "pointer")) === false);
+      chmodSync(join(target, "chrome"), 0o666);
+      out("root: a browser folder that is a link is judged where it leads (a file there others can write)", othersCanChange(join(top, "pointer")) === true);
+      out("root: a relative path is not judged and counts as changeable", othersCanChange("relative/browser") === true);
       symlinkSync(tree, join(top, "alias"));
       out("root: a root-owned link above the path, in a root-only folder, is allowed (macOS /var)", othersCanChange(join(top, "alias", "bin")) === false);
       symlinkSync("/tmp", join(top, "open"));

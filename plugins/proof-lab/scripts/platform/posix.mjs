@@ -106,12 +106,16 @@ export function rootRisk(ctx, deps = { isRoot, trustedTree }) {
 }
 
 // True when this run is root and a normal user can change `path` or a folder above it: root must then not start a program
-// from it, nor trust what it reads there. Links inside `path` are allowed when they point inside it (a macOS app bundle is
-// made of them). A path not made yet counts by the folders above it.
+// from it, nor trust what it reads there. `path` itself may be a link: it is judged where it really leads, with every folder
+// on the way. Links inside it are allowed when they lead inside it (a macOS app bundle is made of them). A path not made yet
+// counts by the folders above it. A relative path is not judged: it counts as changeable.
 export function othersCanChange(path, deps = { isRoot }) {
   if (!deps.isRoot()) return false;
+  if (!isAbsolute(path)) return true;
   try {
-    return !(rootOwnsAncestors(path) && (!present(path) || rootOwnsTree(path, [], path)));
+    const folders = [];
+    const real = walk(path, folders);
+    return !(folders.every(closed) && (!present(real) || rootOwnsTree(real, [], real)));
   } catch {
     return true;
   }

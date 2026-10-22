@@ -1,0 +1,22 @@
+{
+  "about": "Digests of the browser folders that `playwright install chromium` makes, keyed by archive path. Made by tests/linux/browser-digests.sh; read by scripts/browser-pin.mjs.",
+  "playwright": "1.64.0",
+  "digests": {
+    "builds/cft/156.0.8078.4/linux-arm64/chrome-headless-shell-linux-arm64.zip": "41292871db5e1e13b71fbd65b4a8fc5b716b2a960b6e8c0d8e1885517710532d",
+    "builds/cft/156.0.8078.4/linux-arm64/chrome-linux-arm64.zip": "25c8f76a14a1103860aeeb260f7babd7b9382e87532be29eff15d2ac73280a66",
+    "builds/cft/156.0.8078.4/linux64/chrome-headless-shell-linux64.zip": "00ae6e5417a6c10c75d4b8c80a33cfb9411d2b2978628c3dc707b75503851ef9",
+    "builds/cft/156.0.8078.4/linux64/chrome-linux64.zip": "ac57c484f7232246a31bf0209a94c6ae88dc1618c3f2b02341e9bd96c702fe13",
+    "builds/cft/156.0.8078.4/mac-arm64/chrome-headless-shell-mac-arm64.zip": "d3baf74936307437965b1a895ee5854bf5e20bb154881395a3b29f35329118d2",
+    "builds/cft/156.0.8078.4/mac-arm64/chrome-mac-arm64.zip": "f82f8b0729ed2a09e811e0337658851a6778bedf808ac97b3fc756dc02cec26b",
+    "builds/cft/156.0.8078.4/mac-x64/chrome-headless-shell-mac-x64.zip": "1fda422791671945498eac3a24cd1b85cfca634a11db18ee22af2acd2cae4656",
+    "builds/cft/156.0.8078.4/mac-x64/chrome-mac-x64.zip": "bd9de046c11772cc818455be617a6bb7ab82b31fae77dd44f828c5c6708b65f0",
+    "builds/cft/156.0.8078.4/win64/chrome-headless-shell-win64.zip": "b61a57a66967448ca095ee0fe2f0409f65130e7f685bf231ca9e52f5cd6c6411",
+    "builds/cft/156.0.8078.4/win64/chrome-win64.zip": "4182e3b4218764905019893df631c1b0fe766da0dca51d4d52d56f7f6c2ecb04",
+    "builds/ffmpeg/1013/ffmpeg-linux-arm64.zip": "ab7e7fd174552e3f95b1f156ba968c6d9848143ed7c73a443bf3c873ec2dd777",
+    "builds/ffmpeg/1013/ffmpeg-linux.zip": "79257e08f3ad7df06c2847c5230f2125e5efb26e44e68c93f026dc6870cd2940",
+    "builds/ffmpeg/1013/ffmpeg-mac-arm64.zip": "e21ad0d5af22785266dafec3b0f4a0c085ba3cc4bfca0f40fef9927514c2bda8",
+    "builds/ffmpeg/1013/ffmpeg-mac.zip": "f5cf92c3dc014f1f32367b4de36ff4da361b22ea4b7fc39043f4156a6d6d8c92",
+    "builds/ffmpeg/1013/ffmpeg-win64.zip": "63a176b36bdcf656c5be2a5da08da9d10799173abc25297f6a05437cf73f3817",
+    "builds/winldd/1007/winldd-win64.zip": "1dcf8b72e8e3fcd3ccced40d61ac82b1c747d3b3d1585411c0ef458a6f0cd846"
+  }
+}

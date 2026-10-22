@@ -13,6 +13,11 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 ### Changed
 - A hook that times out or fails no longer blocks the call, except `guard-browser` (browser tools only). `onFailure: block` is removed from `guard-verification-runner`, `guard-git-readonly`, `guard-shell-os` and `guard-annotator`: three apply to one agent and `guard-shell-os` allows every call on Windows, yet a failure of any of them blocked every Bash call. Each still blocks its own agent's calls by its rules, and still fails closed on an internal error once it knows the caller is that agent. Design: `docs/design/shell-adapter.md`, "Hook input and hook failures".
 
+### Security
+- `proof-lab` pins the browser it downloads. Playwright checks only the size of a browser download; the plugin now compares every browser folder it uses with `plugins/proof-lab/browsers.sha256.json` (all five builds: Linux x64 and arm64, macOS x64 and arm64, Windows x64) before the browser first starts, and refuses a mismatch with the reinstall command. As root it refuses browsers in a folder a normal user can change. `tests/linux/browser-digests.sh` remakes the table when Playwright moves.
+- `proof-lab` repairs its own checkout beside it and moves the finished `node_modules` in whole, so an interrupted or doubled repair never leaves a broken install. The install lock has an owner and is kept fresh while it is held: a lock whose process has ended, or that nobody has kept fresh for 30 seconds (also when its process id now belongs to another program), is cleared without a manual step, and a run removes only its own lock or one whose owner is gone.
+- `proof-lab` warns when it runs as root on a checkout that a normal user can change (`npm ci` and the spec run as root from it), before it fetches or installs anything, and then skips the browser step.
+
 ## [0.3.3] - 2026-10-21
 
 ### Added

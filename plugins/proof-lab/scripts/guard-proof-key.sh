@@ -107,7 +107,9 @@ RUN_PROG="run proof-lab through node \"${ROOT_N:-<plugin root>}/scripts/setup.mj
 NODE_CMD=no
 in_view "$VIEW_CMD" "$NODE_WORD" && NODE_CMD=yes
 if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "$SUSPECT_CHARS"; then
-  block "a node command has a glob, brace or backslash in it; $RUN_PROG"
+  # Only the kinds of character are named (never the command's own text), so an author sees what to remove.
+  FOUND=$(printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eo -- "$SUSPECT_CHARS" | sort -u | tr '\n' ' ')
+  block "a node command has a glob, brace or backslash in it (found: ${FOUND% }); $RUN_PROG"
 fi
 if [ "$NODE_CMD" = yes ] && printf '%s\n%s\n' "$CMD_D" "$CMD_U" | grep -Eq -- "src/[^ $(printf '\t')]*[\$]"; then
   block "a node command names its program in src/ with a variable; $RUN_PROG"

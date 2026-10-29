@@ -108,7 +108,9 @@ if ((Hit $raw $proof) -and (Hit $raw '--key([^A-Za-z0-9_-]|$)')) {
 }
 $both = "$cmdD`n$cmdU"
 if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, $suspectChars)) {
-  Block "a node command has a glob, brace or backslash in it; $runProg"
+  # Only the kinds of character are named (never the command's own text), so an author sees what to remove.
+  $found = (([regex]::Matches($both, $suspectChars) | ForEach-Object { $_.Value } | Sort-Object -Unique) -join ' ')
+  Block "a node command has a glob, brace or backslash in it (found: $found); $runProg"
 }
 if (((NodeIn $cmdD) -or (NodeIn $cmdU)) -and [regex]::IsMatch($both, 'src/[^ \t\r\n]*[$]')) {
   Block "a node command names its program in src/ with a variable; $runProg"

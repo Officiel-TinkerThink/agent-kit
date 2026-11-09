@@ -6,6 +6,8 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-09
+
 ### Changed
 - `proof-lab` now pins proof-lab 0.1.0 (`e196639`), which runs many specs at once: a concurrency governor, machine-wide slots, opt-in `--share-browser` and container-aware limits, and a lost browser ends a run as ERROR. The proof-lab suite passes on it on Windows 11 and on Ubuntu 24.04, and the demo gives verdicts 0 1 1 3 0 2 2 there.
 - The `proof-lab` skill and the `proof-runner` agent cover running many specs at once: repeat `--spec` or add `--spec-dir`, `--jobs N` to lower the ceiling, opt-in `--share-browser N` (the signed receipt says the browser was shared; whether that is acceptable evidence is for the validation owner), the container's `--cpus` and `--memory` as the limit, the exit code of a batch, and the sizing rule of thumb. The proof-lab job queue is not reachable through the plugin (it would skip the pin and clean-checkout check) and the skill says so.

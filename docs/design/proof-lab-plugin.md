@@ -46,7 +46,7 @@ plugins/proof-lab/
 
 `setup.mjs` is Node, not a shell script, because proof-lab already needs Node 24. The guard must run even where Node is absent, so it is `sh`.
 
-`proof-lab.pin` holds one full commit hash on its first non-comment line. Current value: `a1b5d62d347849149876967f09107fd1584207b1` (proof-lab, `npm test` runs every test file).
+`proof-lab.pin` holds one full commit hash on its first non-comment line. Current value: `e196639cdb850aae45e08084fc05fd1f9e4d8867` (proof-lab, `npm test` runs every test file).
 
 ## Tests (agent-kit side)
 

@@ -6,6 +6,9 @@ All notable changes to agent-kit are recorded here, newest first. The six plugin
 
 ## [Unreleased]
 
+### Changed
+- `proof-lab` now pins proof-lab 0.1.0 (`e196639`), which runs many specs at once: a concurrency governor, machine-wide slots, opt-in `--share-browser` and container-aware limits, and a lost browser ends a run as ERROR. The proof-lab suite passes on it on Windows 11 and on Ubuntu 24.04, and the demo gives verdicts 0 1 1 3 0 2 2 there.
+
 ## [0.3.4] - 2026-10-22
 
 ### Fixed

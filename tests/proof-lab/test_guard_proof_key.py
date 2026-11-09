@@ -156,6 +156,9 @@ ALLOWED = [
     "npm run build --key x",
     'git commit -m "approve --key rotation"',
     f'node "{P}/scripts/setup.mjs" --run --spec prove.json --key-file /keys/k.txt',
+    # a batch: several specs, a spec folder, --jobs and --share-browser, all through setup.mjs --run
+    f'node "{P}/scripts/setup.mjs" --run --spec a.json --spec b.json --spec c.json --key-file /keys/k.txt --json',
+    f'node "{P}/scripts/setup.mjs" --run --spec-dir D:/specs/batch --jobs 4 --share-browser 4 --key-file /keys/k.txt --json',
     # setup.mjs names no runner, so a cd prefix does not block it
     "cd /x && node setup.mjs --check-only",
     # the sanctioned doctor call: a variable outside the src/ file name is not a runner
